@@ -25,19 +25,28 @@ export const LIMITS = {
   daily: 20,
 } as const;
 
-/// The model. The brief calls it "FLUX 3 Klein"; BFL's API reference lists
-/// FLUX.2 [klein] 4B and 9B. Confirm which one R&D used before deploying.
-export const MODEL_ENDPOINT = "https://api.bfl.ai/v1/flux-2-klein-9b";
+/// The model R&D used: FLUX 3 Image Klein, $0.008 a page at the 768sq tier.
+/// Not FLUX.2 [klein] 4B/9B, which is another model billed per megapixel
+/// (about $0.017 a page) and never tested with these prompts.
+export const MODEL_ENDPOINT = "https://api.bfl.ai/v1/flux-3-image-klein";
+/// Output size tier. With aspect_ratio "auto" the page keeps the photo's
+/// 3:4 or 4:3 shape at about 0.6 MP (e.g. 656×875), which stays in the
+/// cheapest tier. Asking for 768×1024 exactly would bill the 1k tier.
+export const OUTPUT_RESOLUTION = "768sq";
+/// Denoising steps, 1..16. 16 is the API default and what R&D used; set
+/// explicitly so a change of default upstream does not change the pages.
+export const STEPS = 16;
 /// Only hosts BFL answers from. A polling or download URL anywhere else is
 /// refused, so a strange upstream reply cannot point the Worker at an
 /// arbitrary address.
 export const UPSTREAM_HOST_SUFFIX = ".bfl.ai";
 /// BFL's moderation, 0 strictest .. 7. The default; photos of children.
 export const SAFETY_TOLERANCE = 2;
-/// Poll every half second, give up after 40 s. The app waits 60 s.
-export const POLL_INTERVAL_MS = 500;
+/// Poll every second, give up after 40 s. The app waits 60 s. At most about
+/// 42 subrequests (submit, polls, download), under the Workers Free limit of 50.
+export const POLL_INTERVAL_MS = 1_000;
 export const POLL_TIMEOUT_MS = 40_000;
-/// A generated page at about 0.8 MP as PNG is a few hundred KB.
+/// A generated page at about 0.6 MP as PNG is a few hundred KB.
 export const MAX_RESULT_BYTES = 4 * 1024 * 1024;
 
 /// What PhotoPrep.swift produces: 768×1024 or 1024×768 JPEG, no metadata,

@@ -103,8 +103,12 @@ describe("5B.0 invariants", () => {
         prompt: "a photorealistic portrait",
         width: 4096,
         height: 4096,
+        resolution: "4k",
+        aspect_ratio: "21:9",
+        steps: 1,
         output_format: "jpeg",
         safety_tolerance: 7,
+        images: [photo(), photo()],
         input_image_2: photo(),
       }),
       { env: testEnv(apple), model },
@@ -114,8 +118,12 @@ describe("5B.0 invariants", () => {
     const submit = model.submits()[0]!;
     expect(submit.url).toBe(MODEL_ENDPOINT);
     expect(submit.body!.prompt).toBe(PROMPTS.cartoon);
-    expect(submit.body!.width).toBe(768);
-    expect(submit.body!.height).toBe(1024);
+    expect(submit.body).not.toHaveProperty("width");
+    expect(submit.body).not.toHaveProperty("height");
+    expect(submit.body!.resolution).toBe("768sq");
+    expect(submit.body!.aspect_ratio).toBe("auto");
+    expect(submit.body!.steps).toBe(16);
+    expect((submit.body!.images as unknown[]).length).toBe(1);
     expect(submit.body!.output_format).toBe("png");
     expect(submit.body!.safety_tolerance).toBe(2);
     expect(submit.body).not.toHaveProperty("input_image_2");
@@ -678,6 +686,7 @@ describe("5B.5 operational failures", () => {
       { polls: [() => Response.json({ status: "Error" })] },
       { polls: [() => Response.json({ status: "Failed" })] },
       { polls: [() => Response.json({ status: "Task not found" })] },
+      { polls: [() => Response.json({ status: "No Card Generated" })] },
       { polls: [() => new Response("bad gateway", { status: 502 })] },
       { polls: [() => Response.json({ status: "Ready", result: {} })] },
       { download: () => new Response("gone", { status: 404 }) },

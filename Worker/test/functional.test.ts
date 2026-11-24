@@ -12,6 +12,7 @@ import {
   payload,
   photo,
   post,
+  ready,
   sign,
   testEnv,
   toBase64Bytes,
@@ -134,12 +135,21 @@ describe("what is sent to the model", () => {
     expect(submit.headers.get("x-key")).toBe("test-key-never-sent");
     expect(submit.body).toEqual({
       prompt: PROMPTS.cartoon,
-      input_image: image,
-      width: 768,
-      height: 1024,
+      images: [image],
+      resolution: "768sq",
+      aspect_ratio: "auto",
+      steps: 16,
       output_format: "png",
       safety_tolerance: SAFETY_TOLERANCE,
     });
+  });
+
+  it("waits through Pending, Reasoning and Generating", async () => {
+    const status = (s: string) => () => Response.json({ id: "task-1", status: s });
+    const model = fakeModel({ polls: [status("Pending"), status("Reasoning"), status("Generating"), ready] });
+    const response = await post(request(await sign(chain, payload())), { env: testEnv(chain), model });
+    expect(response.status).toBe(200);
+    expect(model.calls.length).toBe(1 + 4 + 1); // submit, four polls, download
   });
 
   it("picks the chibi prompt by key", async () => {

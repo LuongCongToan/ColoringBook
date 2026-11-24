@@ -1,9 +1,11 @@
 import {
   MAX_RESULT_BYTES,
   MODEL_ENDPOINT,
+  OUTPUT_RESOLUTION,
   POLL_INTERVAL_MS,
   POLL_TIMEOUT_MS,
   SAFETY_TOLERANCE,
+  STEPS,
   UPSTREAM_HOST_SUFFIX,
 } from "./config";
 import type { Photo } from "./image";
@@ -92,11 +94,15 @@ export async function generatePage(
       headers,
       body: JSON.stringify({
         prompt,
-        input_image: photo.base64,
-        // Always set: once the API answered 656×875 for a 768×1024 photo,
-        // and a page above ~4 MP is billed at the 4K rate (brief 4.0).
-        width: photo.width,
-        height: photo.height,
+        // The first (only) reference is the photo being redrawn. The API
+        // takes base64 here as well as URLs; a URL would mean storing the
+        // photo somewhere, which docs/privacy.md rules out.
+        images: [photo.base64],
+        // Always set: the page is billed by size tier, and anything above
+        // ~4 MP at the 4K rate (brief 4.0). "auto" keeps the photo's shape.
+        resolution: OUTPUT_RESOLUTION,
+        aspect_ratio: "auto",
+        steps: STEPS,
         // JPEG adds grey noise around the lines and throws the quality check.
         output_format: "png",
         safety_tolerance: SAFETY_TOLERANCE,
@@ -147,9 +153,16 @@ export async function generatePage(
       return { png };
     }
     if (/moderated/i.test(status)) throw new Moderated();
-    if (status === "Error" || status === "Failed" || status === "Task not found") {
+    // Final failures from BFL's get_result enum. "Failed" is not in the enum
+    // but appears in BFL's own polling example, so it is kept.
+    if (
+      status === "Error" ||
+      status === "Failed" ||
+      status === "Task not found" ||
+      status === "No Card Generated"
+    ) {
       throw new UpstreamError("failed");
     }
-    // Pending, Queued, Processing...: keep waiting.
+    // Pending, Reasoning (the automatic prompt upsampler), Generating: keep waiting.
   }
 }
