@@ -59,8 +59,8 @@ final class PageStore {
 
     /// Writes the session's state. The page image is written once; the
     /// state and thumbnail every time.
-    func save(_ session: ColoringSession) {
-        guard session.hasContent else { return }
+    func save(_ session: ColoringSession, force: Bool = false) {
+        guard force || session.hasContent else { return }
         let dir = folder(session.pageID)
         let saved = session.savedPage()
         let source = session.art.sourceData
@@ -92,6 +92,24 @@ final class PageStore {
             let art = try (try? LineArt.load(source, frame: saved.frame)) ?? LineArt.load(source)
             return (art, saved)
         }.value
+    }
+
+    /// A new page from an existing one: same drawing, frame and photo, with
+    /// or without its colors. For an in-app book that starts fresh.
+    func copy(_ id: UUID, keepColors: Bool) async -> UUID? {
+        guard let (art, saved) = try? await load(id) else { return nil }
+        var fresh = saved
+        let newID = UUID()
+        fresh.id = newID
+        fresh.created = Date()
+        if !keepColors {
+            fresh.actions = []
+            fresh.stickers = []
+        }
+        let photo = pages.first { $0.id == id }?.photo.flatMap { try? Data(contentsOf: $0) }
+        let session = ColoringSession(art: art, pageID: newID, restoring: fresh, photo: photo)
+        save(session, force: true)
+        return newID
     }
 
     func delete(_ id: UUID) {

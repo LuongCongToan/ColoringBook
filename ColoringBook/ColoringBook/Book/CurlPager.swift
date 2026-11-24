@@ -10,6 +10,7 @@ struct CurlPager: UIViewControllerRepresentable {
     var reloadToken = 0
     let image: (Int) async -> UIImage?
     var onTap: ((Int) -> Void)?
+    var sounds = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -66,17 +67,26 @@ struct CurlPager: UIViewControllerRepresentable {
                                 previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
             guard completed, let i = (pvc.viewControllers?.first as? CurlPageController)?.index else { return }
             parent.index = i
-            SoundFX.shared.play(.tap)
+            if parent.sounds { SoundFX.shared.play(.tap) }
         }
     }
 }
 
-/// One sheet on screen: white paper the shape of its picture, with a shadow.
+/// One sheet on screen. Every sheet is the same size, the shape of a US
+/// Letter page, like the pages of a real book; the picture sits inside it
+/// with a white margin. Full-page pictures (cover, name page) already are
+/// Letter-shaped and fill the sheet.
 final class CurlPageController: UIViewController {
+    static let sheetRatio: CGFloat = 612 / 792
+    /// Margin around a picture, as a share of the sheet's width. Small:
+    /// pages carry their own white border around the frame already.
+    static let margin: CGFloat = 0.03
+
     let index: Int
     private let load: () async -> UIImage?
     private let onTap: (() -> Void)?
-    private let paper = UIImageView()
+    private let sheet = UIView()
+    private let picture = UIImageView()
     private let spinner = UIActivityIndicatorView(style: .large)
 
     init(index: Int, load: @escaping () async -> UIImage?, onTap: (() -> Void)?) {
@@ -91,23 +101,23 @@ final class CurlPageController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
-        paper.contentMode = .scaleAspectFit
-        paper.backgroundColor = .white
-        paper.layer.shadowColor = UIColor.black.cgColor
-        paper.layer.shadowOpacity = 0.22
-        paper.layer.shadowRadius = 10
-        paper.layer.shadowOffset = CGSize(width: 0, height: 4)
-        paper.isUserInteractionEnabled = true
+        sheet.backgroundColor = .white
+        sheet.layer.shadowColor = UIColor.black.cgColor
+        sheet.layer.shadowOpacity = 0.22
+        sheet.layer.shadowRadius = 10
+        sheet.layer.shadowOffset = CGSize(width: 0, height: 4)
         if onTap != nil {
-            paper.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+            sheet.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
         }
-        view.addSubview(paper)
+        view.addSubview(sheet)
+        picture.contentMode = .scaleAspectFit
+        sheet.addSubview(picture)
         spinner.startAnimating()
         view.addSubview(spinner)
         Task { [weak self] in
             guard let self else { return }
             let image = await self.load()
-            self.paper.image = image
+            self.picture.image = image
             self.spinner.stopAnimating()
             self.view.setNeedsLayout()
         }
@@ -117,14 +127,19 @@ final class CurlPageController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        // Paper the shape of the picture, Letter until it arrives.
-        let ratio = paper.image.map { $0.size.width / $0.size.height } ?? 612 / 792
+        let ratio = Self.sheetRatio
         let bounds = view.bounds.insetBy(dx: 16, dy: 10)
         var size = CGSize(width: bounds.width, height: bounds.width / ratio)
         if size.height > bounds.height { size = CGSize(width: bounds.height * ratio, height: bounds.height) }
-        paper.frame = CGRect(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
+        sheet.frame = CGRect(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
                              width: size.width, height: size.height)
-        paper.layer.shadowPath = UIBezierPath(rect: paper.bounds).cgPath
+        sheet.layer.shadowPath = UIBezierPath(rect: sheet.bounds).cgPath
+
+        // A Letter-shaped picture is a whole page already; anything else
+        // gets the margin.
+        let fullPage = picture.image.map { abs($0.size.width / $0.size.height - ratio) < 0.02 } ?? false
+        let inset = fullPage ? 0 : size.width * Self.margin
+        picture.frame = sheet.bounds.insetBy(dx: inset, dy: inset)
         spinner.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
     }
 }

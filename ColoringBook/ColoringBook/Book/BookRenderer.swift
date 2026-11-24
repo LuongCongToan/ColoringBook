@@ -50,6 +50,8 @@ nonisolated struct BookOptions: Sendable {
     var blankBacks = false
     /// Print the colors the child already added in the app.
     var includeColors = false
+    /// The frame around the cover and the name page.
+    var coverFrame: PageFrame = .stars
 }
 
 /// One page going into the book, already rendered at working size.
@@ -108,7 +110,7 @@ nonisolated enum BookRenderer {
             if options.belongsToPage {
                 pdf.beginPage()
                 kinds.append(.belongsTo)
-                drawBelongsTo(in: pdf.cgContext, name: options.childName)
+                drawBelongsTo(in: pdf.cgContext, name: options.childName, frame: options.coverFrame)
                 sheetDone()
             }
 
@@ -132,16 +134,28 @@ nonisolated enum BookRenderer {
     }
 
     /// The cover as a picture, for the in-app book (same design as the PDF).
-    static func coverImage(name: String, first: BookPageSource?) -> UIImage {
+    static func coverImage(name: String, first: BookPageSource?, frame: PageFrame = .stars, scale: CGFloat = 2) -> UIImage {
+        sheetImage(scale: scale) { ctx in
+            var options = BookOptions()
+            options.childName = name
+            options.coverFrame = frame
+            drawCover(in: ctx, name: name, first: first, options: options)
+        }
+    }
+
+    /// The "This book belongs to" page as a picture, for the in-app book.
+    static func belongsToImage(name: String, frame: PageFrame = .stars) -> UIImage {
+        sheetImage(scale: 2) { drawBelongsTo(in: $0, name: name, frame: frame) }
+    }
+
+    private static func sheetImage(scale: CGFloat, draw: (CGContext) -> Void) -> UIImage {
         let format = UIGraphicsImageRendererFormat()
-        format.scale = 2
+        format.scale = scale
         format.opaque = true
         return UIGraphicsImageRenderer(size: sheet.size, format: format).image { context in
             UIColor.white.setFill()
             context.fill(sheet)
-            var options = BookOptions()
-            options.childName = name
-            drawCover(in: context.cgContext, name: name, first: first, options: options)
+            draw(context.cgContext)
         }
     }
 
@@ -211,7 +225,7 @@ nonisolated enum BookRenderer {
 
     private static func drawCover(in ctx: CGContext, name: String, first: BookPageSource?, options: BookOptions) {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        drawFrame(.stars, in: ctx)
+        drawFrame(options.coverFrame, in: ctx)
         let titleTop = trimmed.isEmpty ? "My" : "\(trimmed)'s"
         let titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)
         drawOutlineText([titleTop, "Coloring Book"], in: titleArea, ctx: ctx)
@@ -229,8 +243,8 @@ nonisolated enum BookRenderer {
         }
     }
 
-    private static func drawBelongsTo(in ctx: CGContext, name: String) {
-        drawFrame(.hearts, in: ctx)
+    private static func drawBelongsTo(in ctx: CGContext, name: String, frame: PageFrame) {
+        drawFrame(frame, in: ctx)
         drawOutlineText(["This book", "belongs to"], in: CGRect(x: 100, y: 200, width: sheet.width - 200, height: 170), ctx: ctx)
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {

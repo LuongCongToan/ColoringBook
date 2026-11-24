@@ -21,21 +21,25 @@ struct BookReaderView: View {
         return (book?.pageIDs ?? []).filter(existing.contains)
     }
 
-    private var count: Int { pageIDs.count + 1 }
+    /// Pages before the pictures: the cover, and the name page if chosen.
+    private var front: Int { book?.belongsToPage == true ? 2 : 1 }
+
+    private var count: Int { pageIDs.count + front }
 
     var body: some View {
         VStack(spacing: 14) {
             CurlPager(count: count, index: $index, reloadToken: reload,
                       image: { await image(at: $0) },
-                      onTap: { i in if i > 0 { Task { await open(i) } } })
+                      onTap: { i in if i >= front { Task { await open(i) } } },
+                      sounds: book?.pageSounds ?? true)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack(spacing: 24) {
                 arrow("chevron.left", label: "Previous page", enabled: index > 0) { index -= 1 }
                 VStack(spacing: 2) {
-                    Text(index == 0 ? "Cover" : "Page \(index) of \(count - 1)")
+                    Text(pageLabel)
                         .font(.headline)
-                    if index > 0 {
+                    if index >= front {
                         Text("Tap the page to color it")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -74,9 +78,15 @@ struct BookReaderView: View {
         }
     }
 
+    private var pageLabel: String {
+        if index == 0 { return "Cover" }
+        if index < front { return "Name page" }
+        return "Page \(index - front + 1) of \(pageIDs.count)"
+    }
+
     private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
-            SoundFX.shared.play(.tap)
+            if book?.pageSounds ?? true { SoundFX.shared.play(.tap) }
             withAnimation { action() }
         } label: {
             Image(systemName: symbol)
@@ -96,11 +106,14 @@ struct BookReaderView: View {
     private func image(at i: Int) async -> UIImage? {
         if let cached = cache[i] { return cached }
         let result: UIImage?
+        let frame = book?.coverFrame ?? .stars
         if i == 0 {
             let first = await source(for: pageIDs.first)
-            result = BookRenderer.coverImage(name: book?.name ?? "", first: first)
+            result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame)
+        } else if i < front {
+            result = BookRenderer.belongsToImage(name: book?.name ?? "", frame: frame)
         } else {
-            result = await session(for: pageIDs[safe: i - 1])?.renderImage()
+            result = await session(for: pageIDs[safe: i - front])?.renderImage()
         }
         cache[i] = result
         return result
@@ -119,7 +132,7 @@ struct BookReaderView: View {
     }
 
     private func open(_ i: Int) async {
-        guard let id = pageIDs[safe: i - 1], let (art, saved) = try? await pages.load(id) else { return }
+        guard let id = pageIDs[safe: i - front], let (art, saved) = try? await pages.load(id) else { return }
         SoundFX.shared.play(.tap)
         coloring = PageToColor(art: art, pageID: id, saved: saved)
     }

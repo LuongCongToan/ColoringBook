@@ -20,6 +20,10 @@ struct ColoringBookApp: App {
             PDFPreviewView(book: book)
         } else if DebugBook.wantsReader {
             DebugReaderRoot()
+        } else if ProcessInfo.processInfo.arguments.contains("-openBookBuilder") {
+            NavigationStack {
+                BookBuilderView(kind: ProcessInfo.processInfo.arguments.contains("-pdf") ? .pdf : .app)
+            }
         } else {
             PageLibraryView()
         }
