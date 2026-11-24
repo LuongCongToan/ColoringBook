@@ -18,6 +18,12 @@ struct StoredBook: Codable, Identifiable, Hashable {
     var layout: BookLayout = .pagesOnly
     /// Pages laid out differently from the rest of the book.
     var pageLayouts: [UUID: BookLayout] = [:]
+    /// Pages where a parent moved or resized the picture or the photo.
+    var pagePlacements: [UUID: PagePlacement] = [:]
+    /// The background the sheets sit on (`BackgroundLibrary`), if any.
+    var background: String?
+    /// The pictures sit on the background too, not only the cover.
+    var backgroundOnPages = true
 
     /// The layout a page shows in, given whether it has a photo.
     func layout(for id: UUID, hasPhoto: Bool) -> BookLayout {
@@ -42,6 +48,9 @@ struct StoredBook: Codable, Identifiable, Hashable {
         pageSounds = try c.decodeIfPresent(Bool.self, forKey: .pageSounds) ?? true
         layout = try c.decodeIfPresent(BookLayout.self, forKey: .layout) ?? .pagesOnly
         pageLayouts = try c.decodeIfPresent([UUID: BookLayout].self, forKey: .pageLayouts) ?? [:]
+        pagePlacements = try c.decodeIfPresent([UUID: PagePlacement].self, forKey: .pagePlacements) ?? [:]
+        background = try c.decodeIfPresent(String.self, forKey: .background)
+        backgroundOnPages = try c.decodeIfPresent(Bool.self, forKey: .backgroundOnPages) ?? true
     }
 
     var title: String {

@@ -20,6 +20,7 @@ struct BookReaderView: View {
     @State private var pdf: BuiltBook?
     @State private var showPlans = false
     @State private var exportError: String?
+    @State private var arranging: ArrangeTarget?
 
     private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
 
@@ -140,6 +141,12 @@ struct BookReaderView: View {
             Text(exportError ?? "")
         }
         .sheet(item: $pdf) { book in PDFPreviewView(book: book) }
+        .fullScreenCover(item: $arranging, onDismiss: {
+            cache = [:]
+            reload += 1
+        }) { target in
+            PageArrangeView(bookID: bookID, pageID: target.pageID)
+        }
         .sheet(isPresented: $showPlans) { PaywallView { Task { await savePDF() } } }
         .navigationDestination(item: $coloring) { page in
             ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
@@ -153,6 +160,13 @@ struct BookReaderView: View {
             pages.refresh()
             if index == 0 && startPage > 0 { index = startPage }
             #if DEBUG && targetEnvironment(simulator)
+            // `-arrangePage`: open Arrange on the start page, once pages load.
+            if ProcessInfo.processInfo.arguments.contains("-arrangePage"), arranging == nil {
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    if case .picture(let id)? = current { arranging = ArrangeTarget(pageID: id) }
+                }
+            }
             if DebugBook.takeAutoSavePDF() {
                 Task { try? await Task.sleep(for: .seconds(1)); await savePDF() }
             }
@@ -195,9 +209,11 @@ struct BookReaderView: View {
             .tint(.primary)
         }
         #endif
-        if let id = current?.pageID, photoURL(id) != nil, let book {
-            // Three small pictures of the layouts; the lit one is this page's.
+        if let id = current?.pageID, let book {
+            // Three small pictures of the layouts (pages made from a photo;
+            // the lit one is this page's), then Arrange for the picture.
             HStack(spacing: 8) {
+                if photoURL(id) != nil {
                 ForEach(BookLayout.allCases) { option in
                     let on = layout(for: id) == option
                     Button {
@@ -215,6 +231,25 @@ struct BookReaderView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.title)
                     .accessibilityAddTraits(on ? .isSelected : [])
+                }
+                }
+                if case .picture? = current {
+                    Button {
+                        SoundFX.shared.play(.tap)
+                        arranging = ArrangeTarget(pageID: id)
+                    } label: {
+                        Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(Self.accent)
+                            .frame(width: 40, height: 30)
+                            .padding(5)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(.white))
+                            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(
+                                book.pagePlacements[id] != nil ? Self.accent : Color.black.opacity(0.12),
+                                lineWidth: book.pagePlacements[id] != nil ? 2.5 : 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Arrange this page")
                 }
             }
         }
@@ -255,26 +290,33 @@ struct BookReaderView: View {
         case .picture(let id): key = "\(sheet)-\(layout(for: id).rawValue)"
         default: key = "\(sheet)"
         }
-        if let cached = cache[key] { return cached }
+        // Sheets look different on another background.
+        let look = "\(book?.background ?? "-")-\(book?.backgroundOnPages ?? true)"
+        if let cached = cache[key + look] { return cached }
         let result: UIImage?
         let frame = book?.coverFrame ?? .stars
+        let background = BackgroundLibrary.named(book?.background)
+        let pageBackground = book?.backgroundOnPages == false ? nil : background
         switch sheet {
         case .cover:
             let first = await source(for: pageIDs.first, photo: false)
-            result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame)
+            result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame, background: background)
         case .belongsTo:
-            result = BookRenderer.belongsToImage(name: book?.name ?? "", frame: frame)
+            result = BookRenderer.belongsToImage(name: book?.name ?? "", frame: frame, background: background)
         case .photo(let id):
-            result = loadPhoto(id).map { BookRenderer.photoPageImage($0) }
+            result = loadPhoto(id).map { BookRenderer.photoPageImage($0, background: pageBackground) }
         case .picture(let id):
             let colored = await session(for: id)?.renderImage()
-            if layout(for: id) == .photoCorner, let colored, let photo = loadPhoto(id) {
-                result = BookRenderer.cornerPageImage(colored: colored, photo: photo)
+            let corner = layout(for: id) == .photoCorner ? loadPhoto(id) : nil
+            let placement = book?.pagePlacements[id]
+            if let colored, corner != nil || pageBackground != nil || placement != nil {
+                result = BookRenderer.pictureImage(colored: colored, photo: corner, background: pageBackground,
+                                                   placement: placement)
             } else {
                 result = colored
             }
         }
-        cache[key] = result
+        cache[key + look] = result
         return result
     }
 
@@ -292,7 +334,7 @@ struct BookReaderView: View {
               let lines = session.renderLineArt().cgImage,
               let colored = session.renderImage().cgImage else { return nil }
         return BookPageSource(lineArt: lines, colored: colored, photo: photo ? loadPhoto(id) : nil,
-                              layout: book?.pageLayouts[id])
+                              layout: book?.pageLayouts[id], placement: book?.pagePlacements[id])
     }
 
     private func open(_ id: UUID) async {
@@ -334,6 +376,8 @@ struct BookReaderView: View {
         options.belongsToPage = book.belongsToPage
         options.coverFrame = book.coverFrame
         options.layout = book.layout
+        options.background = BackgroundLibrary.named(book.background)
+        options.backgroundOnPages = book.backgroundOnPages
         options.includeColors = true
         let opts = options
         let (data, kinds) = await Task.detached(priority: .userInitiated) {
@@ -351,6 +395,11 @@ struct BookReaderView: View {
             exportError = "The PDF could not be saved."
         }
     }
+}
+
+private struct ArrangeTarget: Identifiable {
+    let pageID: UUID
+    var id: UUID { pageID }
 }
 
 private struct PageToColor: Identifiable, Hashable {

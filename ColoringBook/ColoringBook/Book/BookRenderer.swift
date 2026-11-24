@@ -53,8 +53,12 @@ nonisolated struct BookOptions: Sendable {
     var blankBacks = false
     /// Print the colors the child already added in the app.
     var includeColors = false
-    /// The frame around the cover and the name page.
+    /// The frame around the cover and the name page (when no background).
     var coverFrame: PageFrame = .stars
+    /// A picture the sheets sit on; the cover and name page always use it.
+    var background: BookBackground?
+    /// The pictures sit on the background too, not only the cover.
+    var backgroundOnPages = true
 }
 
 /// One page going into the book, already rendered at working size.
@@ -67,6 +71,19 @@ nonisolated struct BookPageSource: @unchecked Sendable {
     let photo: CGImage?
     /// This page's own layout; nil follows the book's.
     var layout: BookLayout? = nil
+    /// Where a parent moved the picture and the photo; nil lays them out.
+    var placement: PagePlacement? = nil
+}
+
+/// Where a parent put things on one page (PageArrangeView), in sheet points.
+/// Unset values keep the automatic layout.
+nonisolated struct PagePlacement: Codable, Sendable, Hashable {
+    var pictureCenter: CGPoint?
+    var pictureScale: CGFloat = 1
+    var photoCenter: CGPoint?
+    var photoScale: CGFloat = 1
+    /// The photo's tilt, in degrees.
+    var photoAngle: Double = 6
 }
 
 /// Builds the printable PDF: US Letter, 0.5 inch margins, artwork at
@@ -115,7 +132,7 @@ nonisolated enum BookRenderer {
             if options.belongsToPage {
                 pdf.beginPage()
                 kinds.append(.belongsTo)
-                drawBelongsTo(in: pdf.cgContext, name: options.childName, frame: options.coverFrame)
+                drawBelongsTo(in: pdf.cgContext, name: options.childName, options: options)
                 sheetDone()
             }
 
@@ -124,7 +141,7 @@ nonisolated enum BookRenderer {
                 if layout == .photoFacing, let photo = page.photo {
                     pdf.beginPage()
                     kinds.append(.photo(index + 1))
-                    drawPhotoPage(photo, in: pdf.cgContext)
+                    drawPhotoPage(photo, in: pdf.cgContext, background: options.pageBackground)
                     // The photo page is the back of the previous sheet in
                     // a bound book; no extra blank after it.
                 }
@@ -140,70 +157,135 @@ nonisolated enum BookRenderer {
     }
 
     /// The cover as a picture, for the in-app book (same design as the PDF).
-    static func coverImage(name: String, first: BookPageSource?, frame: PageFrame = .stars, scale: CGFloat = 2) -> UIImage {
+    static func coverImage(name: String, first: BookPageSource?, frame: PageFrame = .stars,
+                           background: BookBackground? = nil, scale: CGFloat = 2) -> UIImage {
         sheetImage(scale: scale) { ctx in
             var options = BookOptions()
             options.childName = name
             options.coverFrame = frame
+            options.background = background
             drawCover(in: ctx, name: name, first: first, options: options)
         }
     }
 
     /// The "This book belongs to" page as a picture, for the in-app book.
-    static func belongsToImage(name: String, frame: PageFrame = .stars) -> UIImage {
-        sheetImage(scale: 2) { drawBelongsTo(in: $0, name: name, frame: frame) }
-    }
-
-    /// The photo page of "Photo + page", for the in-app book.
-    static func photoPageImage(_ photo: CGImage) -> UIImage {
-        sheetImage(scale: 2) { drawPhotoPage(photo, in: $0) }
-    }
-
-    /// A picture with its photo laid on its corner ("Small photo"), for the
-    /// in-app book: same places as on paper, drawn at screen size and kept
-    /// upright.
-    static func cornerPageImage(colored: UIImage, photo: CGImage) -> UIImage {
+    static func belongsToImage(name: String, frame: PageFrame = .stars, background: BookBackground? = nil) -> UIImage {
         sheetImage(scale: 2) { ctx in
-            let area = sheet.insetBy(dx: margin, dy: margin)
-            let size = colored.size
-            let fit = min(area.width / size.width, area.height / size.height)
-            let drawn = CGSize(width: size.width * fit, height: size.height * fit)
-            let placed = CGRect(x: area.midX - drawn.width / 2, y: area.midY - drawn.height / 2,
-                                width: drawn.width, height: drawn.height)
-            colored.draw(in: placed)
-            drawSnapshot(photo, over: placed, in: ctx)
+            var options = BookOptions()
+            options.coverFrame = frame
+            options.background = background
+            drawBelongsTo(in: ctx, name: name, options: options)
         }
     }
 
-    /// The photo as a snapshot dropped on the picture: a white-bordered print,
-    /// tilted, with a soft shadow, over the picture's bottom right corner.
-    private static func drawSnapshot(_ photo: CGImage, over picture: CGRect, in ctx: CGContext) {
+    /// The photo page of "Photo + page", for the in-app book.
+    static func photoPageImage(_ photo: CGImage, background: BookBackground? = nil) -> UIImage {
+        sheetImage(scale: 2) { drawPhotoPage(photo, in: $0, background: background) }
+    }
+
+    /// A picture on its sheet for the in-app book: on the background if
+    /// there is one, with the photo laid on its corner if given ("Small
+    /// photo"). Same places as on paper, drawn at screen size, kept upright.
+    static func pictureImage(colored: UIImage, photo: CGImage?, background: BookBackground?,
+                             placement: PagePlacement? = nil) -> UIImage {
+        sheetImage(scale: 2) { ctx in
+            defer { if let background { drawOverlay(background, in: ctx) } }
+            let placed = pictureRect(colored.size, background: background, placement: placement)
+            colored.draw(in: placed)
+            if let photo {
+                let snap = snapshot(photoSize: CGSize(width: photo.width, height: photo.height), over: placed,
+                                    background: background, placement: placement)
+                drawSnapshot(photo, snap, in: ctx)
+            }
+        }
+    }
+
+    // MARK: - Where things go on a picture page
+
+    /// The picture fitted to the content area, then moved and scaled as the
+    /// parent placed it. Upright.
+    static func pictureRect(_ size: CGSize, background: BookBackground?, placement: PagePlacement?) -> CGRect {
+        let area = contentArea(background)
+        let fit = min(area.width / size.width, area.height / size.height) * (placement?.pictureScale ?? 1)
+        let drawn = CGSize(width: size.width * fit, height: size.height * fit)
+        let center = placement?.pictureCenter ?? CGPoint(x: area.midX, y: area.midY)
+        return CGRect(x: center.x - drawn.width / 2, y: center.y - drawn.height / 2,
+                      width: drawn.width, height: drawn.height)
+    }
+
+    /// The photo print: its size at scale 1 (white border included), and
+    /// where the photo sits inside it.
+    static func snapshotBase(_ photoSize: CGSize) -> (print: CGSize, photo: CGRect) {
         // About a third of the sheet wide, whatever the photo's shape.
         let longSide: CGFloat = 210
-        let aspect = CGFloat(photo.width) / CGFloat(photo.height)
+        let aspect = photoSize.width / max(photoSize.height, 1)
         let image = aspect >= 1 ? CGSize(width: longSide, height: longSide / aspect)
                                 : CGSize(width: longSide * aspect, height: longSide)
-        let border: CGFloat = 8
-        let print = CGSize(width: image.width + border * 2, height: image.height + border * 2 + 14)
+        let border: CGFloat = 8, chin: CGFloat = 14
+        let print = CGSize(width: image.width + border * 2, height: image.height + border * 2 + chin)
+        return (print, CGRect(origin: CGPoint(x: border, y: border), size: image))
+    }
 
-        // Overlap the picture's corner, but stay on the paper.
-        let edge = sheet.insetBy(dx: 18, dy: 18)
-        var center = CGPoint(x: picture.maxX - print.width * 0.30, y: picture.maxY - print.height * 0.30)
-        center.x = min(center.x, edge.maxX - print.width / 2 - 8)
-        center.y = min(center.y, edge.maxY - print.height / 2 - 8)
+    struct Snapshot {
+        var center: CGPoint
+        var scale: CGFloat
+        /// Degrees.
+        var angle: Double
+    }
 
+    /// Where the photo print goes: as placed, or over the picture's bottom
+    /// right corner, inside the paper (or the background's middle).
+    static func snapshot(photoSize: CGSize, over picture: CGRect, background: BookBackground?,
+                         placement: PagePlacement?) -> Snapshot {
+        let print = snapshotBase(photoSize).print
+        var center: CGPoint
+        if let placed = placement?.photoCenter {
+            center = placed
+        } else {
+            let edge = background?.inner ?? sheet.insetBy(dx: 18, dy: 18)
+            center = CGPoint(x: picture.maxX - print.width * 0.30, y: picture.maxY - print.height * 0.30)
+            center.x = min(center.x, edge.maxX - print.width / 2 - 8)
+            center.y = min(center.y, edge.maxY - print.height / 2 - 8)
+        }
+        return Snapshot(center: center, scale: placement?.photoScale ?? 1, angle: placement?.photoAngle ?? 6)
+    }
+
+    // MARK: - Background
+
+    /// Where the page's content goes: the background's middle (its
+    /// decorations may lie over the edges), or within the usual margins.
+    static func contentArea(_ background: BookBackground?) -> CGRect {
+        guard let background else { return sheet.insetBy(dx: margin, dy: margin) }
+        return background.inner.insetBy(dx: 4, dy: 4)
+    }
+
+    /// The background laid over the finished sheet, stretched to it: its
+    /// middle is see-through, so the page shows and the decorations may
+    /// overlap the picture.
+    private static func drawOverlay(_ background: BookBackground, in ctx: CGContext) {
         ctx.saveGState()
-        ctx.translateBy(x: center.x, y: center.y)
-        ctx.rotate(by: 6 * .pi / 180)
-        let frame = CGRect(x: -print.width / 2, y: -print.height / 2, width: print.width, height: print.height)
+        ctx.interpolationQuality = .high
+        UIImage(cgImage: background.overlay).draw(in: sheet)
+        ctx.restoreGState()
+    }
+
+    /// The photo as a snapshot dropped on the picture: a white-bordered print,
+    /// tilted, with a soft shadow.
+    private static func drawSnapshot(_ photo: CGImage, _ snap: Snapshot, in ctx: CGContext) {
+        let base = snapshotBase(CGSize(width: photo.width, height: photo.height))
+        ctx.saveGState()
+        ctx.translateBy(x: snap.center.x, y: snap.center.y)
+        ctx.rotate(by: snap.angle * .pi / 180)
+        ctx.scaleBy(x: snap.scale, y: snap.scale)
+        let frame = CGRect(x: -base.print.width / 2, y: -base.print.height / 2,
+                           width: base.print.width, height: base.print.height)
         ctx.setShadow(offset: CGSize(width: 2, height: 4), blur: 10, color: UIColor.black.withAlphaComponent(0.3).cgColor)
         UIColor.white.setFill()
         ctx.fill(frame)
         ctx.setShadow(offset: .zero, blur: 0, color: nil)
         UIColor(white: 0.85, alpha: 1).setStroke()
         ctx.stroke(frame, width: 0.5)
-        UIImage(cgImage: photo).draw(in: CGRect(x: frame.minX + border, y: frame.minY + border,
-                                                width: image.width, height: image.height))
+        UIImage(cgImage: photo).draw(in: base.photo.offsetBy(dx: frame.minX, dy: frame.minY))
         ctx.restoreGState()
     }
 
@@ -222,14 +304,25 @@ nonisolated enum BookRenderer {
 
     private static func drawColoringPage(_ page: BookPageSource, corner photo: CGImage?,
                                          in ctx: CGContext, options: BookOptions) {
-        let area = sheet.insetBy(dx: margin, dy: margin)
+        defer { if let background = options.pageBackground { drawOverlay(background, in: ctx) } }
+        let area = contentArea(options.pageBackground)
 
         let art = page.lineArt
-        let landscape = art.width > art.height
-        // Landscape pictures turn sideways to use the whole portrait sheet.
-        let target = landscape ? CGSize(width: area.height, height: area.width) : area.size
-        let fit = min(target.width / CGFloat(art.width), target.height / CGFloat(art.height))
-        let drawn = CGSize(width: CGFloat(art.width) * fit, height: CGFloat(art.height) * fit)
+        let artSize = CGSize(width: art.width, height: art.height)
+        // Landscape pictures turn sideways to use the whole portrait sheet,
+        // unless a parent placed the picture (then it stays as arranged).
+        let landscape = art.width > art.height && page.placement == nil
+        let drawn: CGSize
+        var center = CGPoint(x: area.midX, y: area.midY)
+        if page.placement != nil {
+            let rect = pictureRect(artSize, background: options.pageBackground, placement: page.placement)
+            drawn = rect.size
+            center = CGPoint(x: rect.midX, y: rect.midY)
+        } else {
+            let target = landscape ? CGSize(width: area.height, height: area.width) : area.size
+            let fit = min(target.width / artSize.width, target.height / artSize.height)
+            drawn = CGSize(width: artSize.width * fit, height: artSize.height * fit)
+        }
         let pixels = CGSize(width: drawn.width / 72 * dpi, height: drawn.height / 72 * dpi)
 
         guard let lines = printReady(art, size: pixels, weight: options.lines) else { return }
@@ -241,7 +334,7 @@ nonisolated enum BookRenderer {
         }
 
         ctx.saveGState()
-        ctx.translateBy(x: area.midX, y: area.midY)
+        ctx.translateBy(x: center.x, y: center.y)
         if landscape { ctx.rotate(by: -.pi / 2) }
         UIImage(cgImage: picture).draw(in: CGRect(x: -drawn.width / 2, y: -drawn.height / 2,
                                                   width: drawn.width, height: drawn.height))
@@ -250,20 +343,24 @@ nonisolated enum BookRenderer {
         if let photo {
             // Where the picture landed on the sheet (turned, if landscape).
             let onSheet = landscape ? CGSize(width: drawn.height, height: drawn.width) : drawn
-            let placed = CGRect(x: area.midX - onSheet.width / 2, y: area.midY - onSheet.height / 2,
+            let placed = CGRect(x: center.x - onSheet.width / 2, y: center.y - onSheet.height / 2,
                                 width: onSheet.width, height: onSheet.height)
-            drawSnapshot(photo, over: placed, in: ctx)
+            let snap = snapshot(photoSize: CGSize(width: photo.width, height: photo.height), over: placed,
+                                background: options.pageBackground, placement: page.placement)
+            drawSnapshot(photo, snap, in: ctx)
         }
     }
 
-    private static func drawPhotoPage(_ photo: CGImage, in ctx: CGContext) {
-        let area = sheet.insetBy(dx: margin + 18, dy: margin + 60)
+    private static func drawPhotoPage(_ photo: CGImage, in ctx: CGContext, background: BookBackground?) {
+        defer { if let background { drawOverlay(background, in: ctx) } }
+        let box = contentArea(background)
+        let area = box.insetBy(dx: 18, dy: 60)
         drawPhoto(photo, in: area, ctx: ctx, corner: 18)
         let caption = "Color me like the photo!"
         let font = UIFont(name: "ArialRoundedMTBold", size: 22) ?? .boldSystemFont(ofSize: 22)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: accent]
         let size = caption.size(withAttributes: attributes)
-        caption.draw(at: CGPoint(x: sheet.midX - size.width / 2, y: sheet.maxY - margin - 40), withAttributes: attributes)
+        caption.draw(at: CGPoint(x: box.midX - size.width / 2, y: box.maxY - 40), withAttributes: attributes)
     }
 
     /// A photo fitted into a rect, with rounded corners and a thin border.
@@ -282,15 +379,25 @@ nonisolated enum BookRenderer {
     }
 
     private static func drawCover(in ctx: CGContext, name: String, first: BookPageSource?, options: BookOptions) {
+        defer { if let background = options.background { drawOverlay(background, in: ctx) } }
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        drawFrame(options.coverFrame, in: ctx)
+        let titleArea: CGRect, artArea: CGRect
+        if let background = options.background {
+            let box = contentArea(background).insetBy(dx: 10, dy: 10)
+            titleArea = CGRect(x: box.minX + 8, y: box.minY + 18, width: box.width - 16, height: min(170, box.height * 0.28))
+            artArea = CGRect(x: box.minX + 16, y: titleArea.maxY + 22,
+                             width: box.width - 32, height: box.maxY - 18 - (titleArea.maxY + 22))
+        } else {
+            drawFrame(options.coverFrame, in: ctx)
+            titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)
+            artArea = CGRect(x: 110, y: 310, width: sheet.width - 220, height: 380)
+        }
         let titleTop = trimmed.isEmpty ? "My" : "\(trimmed)'s"
-        let titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)
         drawOutlineText([titleTop, "Coloring Book"], in: titleArea, ctx: ctx)
 
         // The first picture as the cover art, colorable like the rest.
         if let first {
-            let area = CGRect(x: 110, y: 310, width: sheet.width - 220, height: 380)
+            let area = artArea
             let art = first.lineArt
             let fit = min(area.width / CGFloat(art.width), area.height / CGFloat(art.height))
             let drawn = CGSize(width: CGFloat(art.width) * fit, height: CGFloat(art.height) * fit)
@@ -301,19 +408,29 @@ nonisolated enum BookRenderer {
         }
     }
 
-    private static func drawBelongsTo(in ctx: CGContext, name: String, frame: PageFrame) {
-        drawFrame(frame, in: ctx)
-        drawOutlineText(["This book", "belongs to"], in: CGRect(x: 100, y: 200, width: sheet.width - 200, height: 170), ctx: ctx)
+    private static func drawBelongsTo(in ctx: CGContext, name: String, options: BookOptions) {
+        defer { if let background = options.background { drawOverlay(background, in: ctx) } }
+        // Where the words go: the usual places, or the background's middle.
+        var box = CGRect(x: 100, y: 0, width: sheet.width - 200, height: sheet.height)
+        var dy: CGFloat = 0
+        if let background = options.background {
+            let inner = contentArea(background).insetBy(dx: 10, dy: 10)
+            box = CGRect(x: inner.minX + 20, y: inner.minY, width: inner.width - 40, height: inner.height)
+            dy = inner.midY - sheet.midY  // the usual layout, centered in the middle
+        } else {
+            drawFrame(options.coverFrame, in: ctx)
+        }
+        drawOutlineText(["This book", "belongs to"], in: CGRect(x: box.minX, y: 200 + dy, width: box.width, height: 170), ctx: ctx)
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty {
             // A line to write the name on.
             ctx.setStrokeColor(UIColor.black.cgColor)
             ctx.setLineWidth(2)
-            ctx.move(to: CGPoint(x: 140, y: 520))
-            ctx.addLine(to: CGPoint(x: sheet.width - 140, y: 520))
+            ctx.move(to: CGPoint(x: box.minX + 40, y: 520 + dy))
+            ctx.addLine(to: CGPoint(x: box.maxX - 40, y: 520 + dy))
             ctx.strokePath()
         } else {
-            drawOutlineText([trimmed], in: CGRect(x: 100, y: 420, width: sheet.width - 200, height: 110), ctx: ctx)
+            drawOutlineText([trimmed], in: CGRect(x: box.minX, y: 420 + dy, width: box.width, height: 110), ctx: ctx)
         }
     }
 
@@ -420,4 +537,9 @@ nonisolated enum BookRenderer {
         let combined = line.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: color.cropped(to: extent)])
         return ciContext.createCGImage(combined, from: extent)
     }
+}
+
+extension BookOptions {
+    /// The background behind the pictures, if they get one.
+    nonisolated var pageBackground: BookBackground? { backgroundOnPages ? background : nil }
 }

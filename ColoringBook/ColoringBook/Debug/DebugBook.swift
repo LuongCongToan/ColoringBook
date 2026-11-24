@@ -52,6 +52,10 @@ enum DebugBook {
            let layout = BookLayout(rawValue: args[i + 1]) {
             book.layout = layout
         }
+        // `-bookBackground pink-leaves`: a background from BackgroundLibrary.
+        if let i = args.firstIndex(of: "-bookBackground"), i + 1 < args.count {
+            book.background = args[i + 1]
+        }
         BookStore.shared.save(book)
         return book.id
     }

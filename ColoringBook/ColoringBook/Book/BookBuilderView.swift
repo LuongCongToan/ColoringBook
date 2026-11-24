@@ -36,6 +36,8 @@ struct BookBuilderView: View {
         opts.coverFrame = book?.coverFrame ?? .stars
         opts.belongsToPage = book?.belongsToPage ?? true
         opts.layout = book?.layout ?? .pagesOnly
+        opts.background = BackgroundLibrary.named(book?.background)
+        opts.backgroundOnPages = book?.backgroundOnPages ?? true
         _options = State(initialValue: opts)
         _pageSounds = State(initialValue: book?.pageSounds ?? true)
     }
@@ -44,6 +46,7 @@ struct BookBuilderView: View {
         ScrollView {
             VStack(spacing: 16) {
                 coverCard
+                if !backgrounds.isEmpty { backgroundCard }
                 pagesCard
                 layoutCard
                 appOptions
@@ -86,6 +89,8 @@ struct BookBuilderView: View {
                     .textInputAutocapitalization(.words)
                     .padding(10)
                     .background(RoundedRectangle(cornerRadius: 10).fill(Color(.secondarySystemBackground)))
+                // A background brings its own border; frames are for plain sheets.
+                if options.background == nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(PageFrame.allCases) { frame in
@@ -106,6 +111,7 @@ struct BookBuilderView: View {
                     }
                     .padding(2)
                 }
+                }
                 Toggle("\u{201C}This book belongs to\u{201D} page", isOn: $options.belongsToPage)
                     .font(.subheadline)
             }
@@ -116,7 +122,7 @@ struct BookBuilderView: View {
 
     /// Changes whenever the cover would look different.
     private var coverKey: String {
-        "\(options.childName)|\(options.coverFrame.rawValue)|\(selected.first?.uuidString ?? "")"
+        "\(options.childName)|\(options.coverFrame.rawValue)|\(options.background?.name ?? "")|\(selected.first?.uuidString ?? "")"
     }
 
     private func renderCover() async {
@@ -131,7 +137,56 @@ struct BookBuilderView: View {
         }
         guard !Task.isCancelled else { return }
         coverPreview = BookRenderer.coverImage(name: options.childName, first: first,
-                                               frame: options.coverFrame, scale: 0.6)
+                                               frame: options.coverFrame, background: options.background, scale: 0.6)
+    }
+
+    // MARK: - Background
+
+    private let backgrounds = BackgroundLibrary.all()
+
+    private var backgroundCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Background").font(.headline)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    backgroundChip(nil)
+                    ForEach(backgrounds) { backgroundChip($0) }
+                }
+                .padding(3)
+            }
+            if options.background != nil {
+                Toggle("On every page, not only the cover", isOn: $options.backgroundOnPages)
+                    .font(.subheadline)
+                Text("Colored backgrounds use more ink when printed.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemBackground)))
+    }
+
+    private func backgroundChip(_ background: BookBackground?) -> some View {
+        let on = options.background == background
+        return Button {
+            SoundFX.shared.play(.tap)
+            options.background = background
+        } label: {
+            Group {
+                if let background {
+                    Image(decorative: background.image, scale: 1).resizable()
+                } else {
+                    Color.white.overlay(Text("None").font(.caption.weight(.semibold)).foregroundStyle(.secondary))
+                }
+            }
+            .frame(width: 58, height: 75)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(on ? Self.accent : Color.black.opacity(0.12), lineWidth: on ? 3 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(background.map { "\($0.title) background" } ?? "No background")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     // MARK: - Pages
@@ -334,6 +389,8 @@ struct BookBuilderView: View {
         book.name = options.childName
         book.pageIDs = pageIDs
         book.coverFrame = options.coverFrame
+        book.background = options.background?.name
+        book.backgroundOnPages = options.backgroundOnPages
         book.belongsToPage = options.belongsToPage
         book.layout = options.layout
         book.pageSounds = pageSounds
