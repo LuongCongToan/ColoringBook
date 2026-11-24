@@ -32,6 +32,11 @@ struct BookReaderView: View {
                       image: { await image(at: $0) },
                       onTap: { i in if i >= front { Task { await open(i) } } },
                       sounds: book?.pageSounds ?? true)
+                // Exactly one sheet: nothing around the paper to curl.
+                .aspectRatio(CurlPageController.sheetRatio, contentMode: .fit)
+                .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack(spacing: 24) {

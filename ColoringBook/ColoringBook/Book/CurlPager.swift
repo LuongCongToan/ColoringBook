@@ -72,10 +72,10 @@ struct CurlPager: UIViewControllerRepresentable {
     }
 }
 
-/// One sheet on screen. Every sheet is the same size, the shape of a US
-/// Letter page, like the pages of a real book; the picture sits inside it
-/// with a white margin. Full-page pictures (cover, name page) already are
-/// Letter-shaped and fill the sheet.
+/// One sheet on screen. The pager is sized to exactly one Letter-shaped
+/// sheet, so this view *is* the paper: when it curls there is no empty area
+/// around it to show up grey. The picture sits inside with a white margin;
+/// full-page pictures (cover, name page) are Letter-shaped and fill it.
 final class CurlPageController: UIViewController {
     static let sheetRatio: CGFloat = 612 / 792
     /// Margin around a picture, as a share of the sheet's width. Small:
@@ -85,7 +85,6 @@ final class CurlPageController: UIViewController {
     let index: Int
     private let load: () async -> UIImage?
     private let onTap: (() -> Void)?
-    private let sheet = UIView()
     private let picture = UIImageView()
     private let spinner = UIActivityIndicatorView(style: .large)
 
@@ -100,18 +99,12 @@ final class CurlPageController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear
-        sheet.backgroundColor = .white
-        sheet.layer.shadowColor = UIColor.black.cgColor
-        sheet.layer.shadowOpacity = 0.22
-        sheet.layer.shadowRadius = 10
-        sheet.layer.shadowOffset = CGSize(width: 0, height: 4)
+        view.backgroundColor = .white
         if onTap != nil {
-            sheet.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
+            view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped)))
         }
-        view.addSubview(sheet)
         picture.contentMode = .scaleAspectFit
-        sheet.addSubview(picture)
+        view.addSubview(picture)
         spinner.startAnimating()
         view.addSubview(spinner)
         Task { [weak self] in
@@ -127,19 +120,9 @@ final class CurlPageController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        let ratio = Self.sheetRatio
-        let bounds = view.bounds.insetBy(dx: 16, dy: 10)
-        var size = CGSize(width: bounds.width, height: bounds.width / ratio)
-        if size.height > bounds.height { size = CGSize(width: bounds.height * ratio, height: bounds.height) }
-        sheet.frame = CGRect(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
-                             width: size.width, height: size.height)
-        sheet.layer.shadowPath = UIBezierPath(rect: sheet.bounds).cgPath
-
-        // A Letter-shaped picture is a whole page already; anything else
-        // gets the margin.
-        let fullPage = picture.image.map { abs($0.size.width / $0.size.height - ratio) < 0.02 } ?? false
-        let inset = fullPage ? 0 : size.width * Self.margin
-        picture.frame = sheet.bounds.insetBy(dx: inset, dy: inset)
+        let fullPage = picture.image.map { abs($0.size.width / $0.size.height - Self.sheetRatio) < 0.02 } ?? false
+        let inset = fullPage ? 0 : view.bounds.width * Self.margin
+        picture.frame = view.bounds.insetBy(dx: inset, dy: inset)
         spinner.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
     }
 }
