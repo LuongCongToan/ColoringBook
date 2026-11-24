@@ -25,6 +25,8 @@ enum DevSamples {
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         return files
             .filter { ["jpg", "jpeg", "png"].contains($0.pathExtension.lowercased()) }
+            // Frame artwork lives in the same folder (FrameLibrary).
+            .filter { !$0.lastPathComponent.hasPrefix("frame-") }
             // Pages are 3:4 or 4:3; square files in the folder are artwork
             // (like the paint bucket icon), not pages.
             .filter { !isSquare($0) }

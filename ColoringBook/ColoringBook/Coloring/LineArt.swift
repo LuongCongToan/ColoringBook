@@ -71,7 +71,12 @@ nonisolated struct LineArt: @unchecked Sendable {
             ctx.saveGState()
             ctx.translateBy(x: art.minX, y: art.maxY)
             ctx.scaleBy(x: 1, y: -1)
-            ctx.draw(image, in: CGRect(origin: .zero, size: art.size))
+            // Drop a thin border: model pages can carry a grey edge column
+            // that the threshold would turn into a stray line.
+            let edge = 2
+            let trimmed = image.cropping(to: CGRect(x: edge, y: edge, width: image.width - 2 * edge,
+                                                    height: image.height - 2 * edge)) ?? image
+            ctx.draw(trimmed, in: CGRect(origin: .zero, size: art.size))
             ctx.restoreGState()
 
             ctx.setStrokeColor(gray: 0, alpha: 1)

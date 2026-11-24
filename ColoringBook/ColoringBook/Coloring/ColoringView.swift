@@ -13,8 +13,8 @@ struct ColoringView: View {
 
     @State private var autosave: Task<Void, Never>?
 
-    init(art: LineArt, pageID: UUID = UUID(), saved: SavedPage? = nil) {
-        _session = State(initialValue: ColoringSession(art: art, pageID: pageID, restoring: saved))
+    init(art: LineArt, pageID: UUID = UUID(), saved: SavedPage? = nil, photo: Data? = nil) {
+        _session = State(initialValue: ColoringSession(art: art, pageID: pageID, restoring: saved, photo: photo))
     }
 
     var body: some View {
@@ -61,6 +61,10 @@ struct ColoringView: View {
                 guard !Task.isCancelled else { return }
                 PageStore.shared.save(session)
             }
+        }
+        .onAppear {
+            // A page just made from a photo goes into "My pages" right away.
+            PageStore.shared.save(session)
         }
         .onDisappear {
             autosave?.cancel()

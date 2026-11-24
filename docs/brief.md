@@ -767,6 +767,25 @@ Code ở `ColoringBook/ColoringBook/Create/`. Màn chính có thẻ "Make a colo
 - **Lưu tranh** (`PageStore`): mỗi trang một thư mục trong Application Support, gồm ảnh tranh gốc, `page.json` (khung, thao tác, sticker) và ảnh thu nhỏ. Tự lưu 1 giây sau mỗi thay đổi và khi rời màn tô. Màn chính có mục "My pages" (giữ ngón để xoá). Đã thử tắt và mở lại app: trang mở ra đúng như cũ. Lịch sử hoàn tác không được lưu.
 - **Khung từ PNG:** xem [frame-art-spec.md](frame-art-spec.md), mục 8.
 
+### Dựng sách và xuất PDF (làm ngày 2026-11-24)
+
+Code ở `ColoringBook/ColoringBook/Book/`. Màn chính có thẻ "Make a coloring book".
+
+- **Chọn trang:** chọn từ "My pages" theo thứ tự chạm (gợi ý 5–20 trang), kéo để đổi thứ tự.
+- **Bìa:** "<Tên>'s Coloring Book" bằng chữ rỗng để tô (Arial Rounded), khung sao, và tranh đầu tiên. Có thể thêm trang "This book belongs to <Tên>" (khung tim; không có tên thì để một dòng kẻ để viết tay).
+- **Kiểu trình bày:** "Coloring pages" (một tranh mỗi trang); "Photo + page" (ảnh màu bên trái, tranh tô bên phải, kèm dòng "Color me like the photo!"); "Small photo" (ảnh nhỏ ở góc dưới bên phải). Trang không có ảnh thì in tranh một mình.
+- **Tuỳ chọn:** nét Thin / Medium / Thick (làm dày 0 / 1,5 / 4 px ở 300 dpi); trang trắng sau mỗi tờ; in kèm màu đã tô trong app.
+- **Khổ và chất lượng in:** Letter, lề 0,5 inch. Tranh ngang được xoay để lấp đầy trang dọc. Tranh được xử lý cho in như `print_page.py`: phóng Lanczos lên 300 dpi, làm mờ nhẹ, lọc ngưỡng 0,6, làm dày nét bằng morphology.
+- **Sau khi tạo:** xem trước bằng PDFKit, chia sẻ (Files, Mail, AirDrop), in qua AirPrint (thang xám).
+- **Trả phí:** xuất sách cần Pro hoặc "Một cuốn sách" (bỏ qua khi Simulator không có StoreKit).
+- **Ảnh gốc:** trang tạo từ ảnh giữ ảnh màu đã cắt (`photo.jpg`, không có EXIF) ngay trên máy, cho kiểu có ảnh.
+- **Lối tắt thử nhanh (Debug, Simulator):** `xcrun simctl launch booted pt.team.coloringbook -makeTestBook` ghi 3 sách thử 10 trang vào thư mục Documents của app. Đã kiểm cả 3 kiểu: 12 trang (bìa, trang "thuộc về", 10 tranh); 18 trang với kiểu ảnh và tranh.
+- **Hai loại sách** (chốt ngày 2026-11-24):
+  - **Sách trong app** (`BookStore`, `BookReaderView`): tên và danh sách trang theo thứ tự, lưu trên máy. Màn chính có kệ "My books". Lật trang như sách thật (`CurlPager`, hiệu ứng lật trang), nút mũi tên lớn cho bé, chạm một trang để tô tiếp; khi quay lại, trang hiện màu mới. Bìa dùng chung thiết kế với PDF. Nút in trên thanh trên mở lại màn dựng sách để sửa hoặc xuất PDF.
+  - **Sách PDF:** "Preview PDF" mở **xem trước dạng tài liệu** (`PDFPreviewView`, PDFKit cuộn dọc) trước khi lưu, chia sẻ hoặc in. Có tóm tắt (số tranh, số trang, số tờ in một mặt hoặc hai mặt), lưu ý tự động, dải ảnh thu nhỏ có nhãn, và các nút "Save or share PDF" và "Print" (mặc định in một mặt).
+  - Thử nhanh trên Simulator: `-readTestBook` (thêm `-startPage N`), `-reviewTestBook`, `-makeTestBook`.
+- **Chưa làm:** khổ A4; bìa và khung theo theme; in hai mặt có lề gáy khác nhau.
+
 ### Việc đầu tiên của session mới: giai đoạn 0
 
 > **Đã làm một phần ngày 2026-11-24:** model, quy trình chuẩn bị ảnh, prompt, bộ đo và bản in đã có ở mục 4.0. Tiếp tục từ danh sách "Việc còn lại trước khi chốt" trong mục 4.0, rồi làm các bước dưới đây còn thiếu (đọc review Colorify, model line-art trên máy cho chế độ Sketch).

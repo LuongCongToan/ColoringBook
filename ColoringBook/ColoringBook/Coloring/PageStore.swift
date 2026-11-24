@@ -18,6 +18,8 @@ struct SavedPageInfo: Identifiable, Hashable {
     let id: UUID
     let updated: Date
     let thumbnail: URL
+    /// The color photo the page came from, if it was made from one.
+    let photo: URL?
 }
 
 /// Pages in progress, on this device only (docs/privacy.md): each in its own
@@ -48,7 +50,9 @@ final class PageStore {
             guard let id = UUID(uuidString: url.lastPathComponent),
                   let data = try? Data(contentsOf: url.appendingPathComponent("page.json")),
                   let saved = try? JSONDecoder().decode(SavedPage.self, from: data) else { return nil }
-            return SavedPageInfo(id: id, updated: saved.updated, thumbnail: url.appendingPathComponent("thumb.jpg"))
+            let photo = url.appendingPathComponent("photo.jpg")
+            return SavedPageInfo(id: id, updated: saved.updated, thumbnail: url.appendingPathComponent("thumb.jpg"),
+                                 photo: fm.fileExists(atPath: photo.path) ? photo : nil)
         }
         .sorted { $0.updated > $1.updated }
     }
@@ -62,11 +66,14 @@ final class PageStore {
         let source = session.art.sourceData
         let thumb = session.renderImage().preparingThumbnail(of: CGSize(width: 480, height: 480 * CGFloat(session.art.height) / CGFloat(session.art.width)))
         let thumbData = thumb?.jpegData(compressionQuality: 0.8)
+        let photo = session.photoData
         Task.detached(priority: .utility) {
             let fm = FileManager.default
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             let sourceURL = dir.appendingPathComponent("source.img")
             if !fm.fileExists(atPath: sourceURL.path) { try? source.write(to: sourceURL, options: .atomic) }
+            let photoURL = dir.appendingPathComponent("photo.jpg")
+            if let photo, !fm.fileExists(atPath: photoURL.path) { try? photo.write(to: photoURL, options: .atomic) }
             if let json = try? JSONEncoder().encode(saved) {
                 try? json.write(to: dir.appendingPathComponent("page.json"), options: .atomic)
             }

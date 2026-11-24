@@ -67,9 +67,14 @@ final class ColoringSession {
     let pageID: UUID
     private let created: Date
 
-    init(art: LineArt, pageID: UUID = UUID(), restoring saved: SavedPage? = nil) {
+    /// The color photo the page was drawn from (cropped, no metadata), for
+    /// the book's "photo and page" layout. Nil for imported pages.
+    let photoData: Data?
+
+    init(art: LineArt, pageID: UUID = UUID(), restoring saved: SavedPage? = nil, photo: Data? = nil) {
         self.art = art
         self.pageID = pageID
+        self.photoData = photo
         self.created = saved?.created ?? Date()
         self.paint = PagePaint(width: art.width, height: art.height, barrier: art.barrier)
         if let saved {
@@ -84,7 +89,8 @@ final class ColoringSession {
 
     /// Anything worth keeping: a fresh, untouched page is not saved.
     var hasContent: Bool {
-        !paint.actions.isEmpty || !stickers.isEmpty || art.frame != .default
+        // A page made from a photo is kept even before it is colored.
+        photoData != nil || !paint.actions.isEmpty || !stickers.isEmpty || art.frame != .default
     }
 
     func savedPage() -> SavedPage {
@@ -300,6 +306,36 @@ final class ColoringSession {
     }
 
     // MARK: - Export
+
+    /// The page for printing as a coloring page: lines and stickers, with
+    /// no color, at working size. Stickers keep their white insides.
+    func renderLineArt() -> UIImage {
+        let size = CGSize(width: art.width, height: art.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let rect = CGRect(origin: .zero, size: size)
+            UIColor.white.setFill()
+            context.fill(rect)
+            UIImage(cgImage: art.lines).draw(in: rect)
+            let cg = context.cgContext
+            for sticker in stickers {
+                cg.saveGState()
+                cg.concatenate(sticker.transform)
+                cg.setFillColor(UIColor.white.cgColor)
+                cg.addPath(sticker.kind.outline)
+                cg.fillPath()
+                cg.setStrokeColor(UIColor.black.cgColor)
+                cg.setLineWidth(StickerKind.lineWidth)
+                cg.setLineJoin(.round)
+                cg.setLineCap(.round)
+                cg.addPath(sticker.kind.lines)
+                cg.strokePath()
+                cg.restoreGState()
+            }
+        }
+    }
 
     /// The finished page at working size, for sharing or printing.
     func renderImage() -> UIImage {

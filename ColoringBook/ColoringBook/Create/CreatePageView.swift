@@ -8,6 +8,8 @@ struct CreatePageView: View {
     @State private var pick: PhotosPickerItem?
     @State private var prepared: PhotoPrep.Result?
     @State private var preview: UIImage?
+    /// The same crop in color, kept with the page for the book layouts.
+    @State private var colorPhoto: Data?
     @State private var style: PageStyle = .cartoon
     @State private var phase: Phase = .choosing
     @State private var askConsent = false
@@ -72,7 +74,7 @@ struct CreatePageView: View {
             }
         }
         .navigationDestination(item: $coloring) { item in
-            ColoringView(art: item.art)
+            ColoringView(art: item.art, photo: item.photo)
         }
     }
 
@@ -226,8 +228,8 @@ struct CreatePageView: View {
         prepared = result
         // Show the parent the same crop in color; the pale grey version that
         // is actually sent would only look broken.
-        preview = (try? await prepare(data, lighten: false)).flatMap { UIImage(data: $0.jpeg) }
-            ?? UIImage(data: result.jpeg)
+        colorPhoto = (try? await prepare(data, lighten: false))?.jpeg
+        preview = colorPhoto.flatMap { UIImage(data: $0) } ?? UIImage(data: result.jpeg)
         phase = .choosing
     }
 
@@ -254,7 +256,7 @@ struct CreatePageView: View {
             phase = .failed("This page could not be opened. Try drawing it again.")
             return
         }
-        coloring = ArtToColor(art: art)
+        coloring = ArtToColor(art: art, photo: colorPhoto)
     }
 
     @concurrent
@@ -419,6 +421,7 @@ private enum Theme {
 private struct ArtToColor: Identifiable, Hashable {
     let id = UUID()
     let art: LineArt
+    var photo: Data?
 
     static func == (a: Self, b: Self) -> Bool { a.id == b.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

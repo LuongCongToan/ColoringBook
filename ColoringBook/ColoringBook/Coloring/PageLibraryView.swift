@@ -9,6 +9,7 @@ struct PageLibraryView: View {
     @State private var opened: OpenedPage?
     @State private var error: String?
     @State private var store = PageStore.shared
+    @State private var bookStore = BookStore.shared
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -43,6 +44,62 @@ struct PageLibraryView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+
+                NavigationLink {
+                    BookBuilderView()
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "book.closed.fill")
+                            .font(.system(size: 34, weight: .bold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Make a coloring book")
+                                .font(.title3.weight(.heavy))
+                            Text("PDF to print, with your child's name")
+                                .font(.subheadline.weight(.medium))
+                                .opacity(0.9)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.headline.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(20)
+                    .background(
+                        LinearGradient(colors: [Color(red: 0.36, green: 0.55, blue: 0.95), Color(red: 0.55, green: 0.36, blue: 0.86)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .shadow(color: .blue.opacity(0.25), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+                if !bookStore.books.isEmpty {
+                    Text("My books")
+                        .font(.title2.weight(.bold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 16) {
+                            ForEach(bookStore.books) { book in
+                                NavigationLink {
+                                    BookReaderView(bookID: book.id)
+                                } label: {
+                                    bookCover(book)
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button("Delete book", systemImage: "trash", role: .destructive) {
+                                        bookStore.delete(book.id)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                    }
+                }
 
                 if !store.pages.isEmpty {
                     Text("My pages")
@@ -134,6 +191,38 @@ struct PageLibraryView: View {
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 16).fill(.white))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.black.opacity(0.08)))
+    }
+
+    /// A book on the shelf: its first page as the cover, the title on a band,
+    /// and a darker spine on the left.
+    private func bookCover(_ book: StoredBook) -> some View {
+        let first = book.pageIDs.lazy.compactMap { id in store.pages.first { $0.id == id } }.first
+        return ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: 10).fill(.white)
+            AsyncImage(url: first?.thumbnail) { image in
+                image.resizable().scaledToFit()
+            } placeholder: {
+                Image(systemName: "book.closed").font(.largeTitle).foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .padding(.bottom, 34)
+            Text(book.title)
+                .font(.caption.weight(.heavy))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+                .padding(6)
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(Color(red: 0.55, green: 0.36, blue: 0.86))
+        }
+        .frame(width: 130, height: 170)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .leading) {
+            Rectangle().fill(.black.opacity(0.18)).frame(width: 8)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10))
+        }
+        .shadow(color: .black.opacity(0.18), radius: 6, x: 2, y: 4)
+        .accessibilityLabel(book.title)
     }
 
     private func savedThumbnail(_ page: SavedPageInfo) -> some View {
