@@ -54,7 +54,7 @@ final class ColoringSession {
     private struct Snapshot {
         var actions: [PaintAction]
         var stickers: [PlacedSticker]
-        var frame: PageFrame
+        var frame: FrameChoice
     }
     private var undoStack: [Snapshot] = []
     private var redoStack: [Snapshot] = []
@@ -63,10 +63,33 @@ final class ColoringSession {
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
 
-    init(art: LineArt) {
+    /// Which saved page this is (PageStore).
+    let pageID: UUID
+    private let created: Date
+
+    init(art: LineArt, pageID: UUID = UUID(), restoring saved: SavedPage? = nil) {
         self.art = art
+        self.pageID = pageID
+        self.created = saved?.created ?? Date()
         self.paint = PagePaint(width: art.width, height: art.height, barrier: art.barrier)
+        if let saved {
+            paint.set(saved.actions)
+            stickers = saved.stickers
+            for sticker in stickers { stickerImages[sticker.id] = stickerLayer(for: sticker).makeImage() }
+        }
         self.pageImage = paint.layer.makeImage()
+    }
+
+    // MARK: - Saving
+
+    /// Anything worth keeping: a fresh, untouched page is not saved.
+    var hasContent: Bool {
+        !paint.actions.isEmpty || !stickers.isEmpty || art.frame != .default
+    }
+
+    func savedPage() -> SavedPage {
+        SavedPage(id: pageID, created: created, updated: Date(), frame: art.frame,
+                  actions: paint.actions, stickers: stickers)
     }
 
     // MARK: - Sizes
@@ -96,7 +119,7 @@ final class ColoringSession {
     /// Swaps the frame around the picture. The drawing stays where it is,
     /// so paint inside it is kept; paint in the old frame's band is
     /// replayed over the new frame's shapes.
-    func setFrame(_ frame: PageFrame) {
+    func setFrame(_ frame: FrameChoice) {
         guard frame != art.frame, let framed = art.with(frame: frame) else { return }
         record()
         apply(framed)

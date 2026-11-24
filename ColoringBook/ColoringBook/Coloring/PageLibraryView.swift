@@ -8,6 +8,7 @@ struct PageLibraryView: View {
     @State private var pick: PhotosPickerItem?
     @State private var opened: OpenedPage?
     @State private var error: String?
+    @State private var store = PageStore.shared
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -42,6 +43,35 @@ struct PageLibraryView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+
+                if !store.pages.isEmpty {
+                    Text("My pages")
+                        .font(.title2.weight(.bold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                    LazyVGrid(columns: columns, spacing: 16) {
+                        ForEach(store.pages) { page in
+                            Button {
+                                Task { await openSaved(page.id) }
+                            } label: {
+                                savedThumbnail(page)
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button("Delete page", systemImage: "trash", role: .destructive) {
+                                    store.delete(page.id)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    Text("Samples")
+                        .font(.title2.weight(.bold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                }
 
                 LazyVGrid(columns: columns, spacing: 16) {
                     PhotosPicker(selection: $pick, matching: .images) {
@@ -80,10 +110,11 @@ struct PageLibraryView: View {
                 #endif
             }
             .navigationDestination(item: $opened) { page in
-                ColoringView(art: page.art)
+                ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
             }
         }
         .task { samples = DevSamples.pages() }
+        .onAppear { store.refresh() }
         .onChange(of: pick) { _, item in
             guard let item else { return }
             Task {
@@ -103,6 +134,31 @@ struct PageLibraryView: View {
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 16).fill(.white))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.black.opacity(0.08)))
+    }
+
+    private func savedThumbnail(_ page: SavedPageInfo) -> some View {
+        AsyncImage(url: page.thumbnail) { image in
+            image.resizable().scaledToFit()
+        } placeholder: {
+            Color.white
+        }
+        // A new thumbnail is written on every save; key on the time so the
+        // grid shows the latest one.
+        .id(page.updated)
+        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.35), lineWidth: 2))
+    }
+
+    private func openSaved(_ id: UUID) async {
+        do {
+            let (art, saved) = try await store.load(id)
+            opened = OpenedPage(art: art, pageID: id, saved: saved)
+            error = nil
+        } catch {
+            self.error = "Could not open this page."
+        }
     }
 
     private func open(_ url: URL) async {
@@ -128,6 +184,8 @@ struct PageLibraryView: View {
 private struct OpenedPage: Identifiable, Hashable {
     let id = UUID()
     let art: LineArt
+    var pageID = UUID()
+    var saved: SavedPage?
 
     static func == (a: Self, b: Self) -> Bool { a.id == b.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

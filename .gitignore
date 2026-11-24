@@ -39,3 +39,6 @@ Tools/rnd/out/
 
 # Marketing material, kept out of git as in Haru
 Marketings/
+
+# R&D pages, test photos and test frames (family photos, never commit)
+tempdrawing_img/

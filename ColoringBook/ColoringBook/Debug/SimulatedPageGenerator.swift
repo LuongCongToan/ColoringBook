@@ -17,6 +17,12 @@ struct SimulatedPageGenerator: PageGenerating {
     ]
 
     func generate(_ photo: PhotoPrep.Result, style: PageStyle) async throws -> GeneratedPage {
+        // Behave like the Worker about paying when StoreKit is there to test
+        // with (launched from Xcode with Products.storekit). Launched any other
+        // way the Simulator has no products, and the flow goes on regardless.
+        if StoreModel.shared.isAvailable, await StoreModel.shared.currentJWS() == nil {
+            throw GenerationError.notEntitled
+        }
         try await Task.sleep(for: Self.delay)
         // This file is ColoringBook/ColoringBook/Debug/SimulatedPageGenerator.swift.
         let folder = URL(fileURLWithPath: #filePath)

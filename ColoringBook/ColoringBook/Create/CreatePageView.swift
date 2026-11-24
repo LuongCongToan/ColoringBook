@@ -12,6 +12,7 @@ struct CreatePageView: View {
     @State private var phase: Phase = .choosing
     @State private var askConsent = false
     @State private var coloring: ArtToColor?
+    @State private var showPlans = false
     /// Guideline 5.1.2(i): ask before the first photo leaves the device
     /// (docs/privacy.md). Kept per install.
     @AppStorage("photoUploadConsent") private var consentGiven = false
@@ -63,6 +64,12 @@ struct CreatePageView: View {
                 askConsent = false
             }
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showPlans) {
+            PaywallView {
+                // Bought: carry on with the page the parent asked for.
+                Task { await draw() }
+            }
         }
         .navigationDestination(item: $coloring) { item in
             ColoringView(art: item.art)
@@ -232,6 +239,9 @@ struct CreatePageView: View {
             guard let image = UIImage(data: page.imageData) else { throw GenerationError.server }
             SoundFX.shared.play(.sticker)
             phase = .done(page, image)
+        } catch GenerationError.notEntitled {
+            phase = .choosing
+            showPlans = true
         } catch let error as GenerationError {
             phase = .failed(Self.message(for: error))
         } catch {
@@ -262,7 +272,7 @@ struct CreatePageView: View {
         case .unreachable:
             "No connection. Check the internet and try again. No page was used."
         case .notEntitled:
-            "Drawing pages needs Pro or a coloring book. (Plans are coming in a later build.)"
+            "Drawing pages needs Pro or a coloring book."
         case .rejected:
             "This photo could not be drawn. Try a different photo."
         case .quotaExhausted(let resetAt):

@@ -1,5 +1,4 @@
 import Foundation
-import StoreKit
 
 /// Calls the `coloring-api` Worker (Worker/README.md, "API").
 ///
@@ -27,7 +26,7 @@ struct WorkerPageGenerator: PageGenerating {
     }
 
     func generate(_ photo: PhotoPrep.Result, style: PageStyle) async throws -> GeneratedPage {
-        guard let jws = await Self.entitlementJWS() else { throw GenerationError.notEntitled }
+        guard let jws = await StoreModel.shared.currentJWS() else { throw GenerationError.notEntitled }
 
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
@@ -62,23 +61,5 @@ struct WorkerPageGenerator: PageGenerating {
         default:
             throw GenerationError.server
         }
-    }
-
-    /// The signed transaction the Worker verifies: an active Pro plan, or a
-    /// "One Coloring Book" purchase.
-    private static func entitlementJWS() async -> String? {
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result, transaction.revocationDate == nil else { continue }
-            if let expiry = transaction.expirationDate, expiry <= Date() { continue }
-            return result.jwsRepresentation
-        }
-        // Finished consumables are not entitlements; look in the history
-        // (iOS 18, SKIncludeConsumableInAppPurchaseHistory).
-        for await result in Transaction.all {
-            guard case .verified(let transaction) = result, transaction.revocationDate == nil,
-                  transaction.productType == .consumable else { continue }
-            return result.jwsRepresentation
-        }
-        return nil
     }
 }

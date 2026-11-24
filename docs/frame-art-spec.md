@@ -78,7 +78,12 @@ AI vẽ ảnh thường làm sai các điểm sau: nét dày mỏng không đề
 
 ## 8. Đưa vào app
 
-App hiện có 7 khung vẽ bằng code (`ColoringBook/ColoringBook/Coloring/PageFrame.swift`). Khung từ file PNG cần thêm một bước nạp ảnh: đọc kênh alpha của PNG làm nét khung, thu về cỡ làm việc, rồi ghép như khung vẽ bằng code. Phần này chưa làm; khi có file khung đầu tiên thì làm.
+App đã nạp được khung từ PNG (`ColoringBook/ColoringBook/Coloring/FrameLibrary.swift`):
+
+- **Thử khung mới:** chép cặp `frame-<tên>-landscape.png` và `frame-<tên>-portrait.png` vào `tempdrawing_img/` ở gốc repo (thư mục này không vào git). Bản Debug trên Simulator tự thấy và hiện trong khay khung, sau 7 khung vẽ bằng code. Preview `Debug/FrameArtPreview.swift` ghép khung với một tranh mẫu để xem nhanh.
+- **Đưa vào app thật:** chép cặp file vào `ColoringBook/ColoringBook/Frames/`. Thư mục này nằm trong synchronized folder nên file tự vào bundle.
+- Thiếu một trong hai hướng thì khung bị bỏ qua.
+- App ghép khung ở chế độ multiply, nên file nền trong suốt hay nền trắng đều được. App luôn vẽ thêm đường viền trong của mình, để vùng tranh khép kín kể cả khi đường viền trong của file lệch vài pixel.
 
 ## 9. Prompt mẫu cho AI vẽ ảnh
 

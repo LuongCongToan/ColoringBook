@@ -5,6 +5,7 @@ struct ColoringBookApp: App {
     var body: some Scene {
         WindowGroup {
             PageLibraryView()
+                .task { StoreModel.shared.start() }
         }
     }
 }

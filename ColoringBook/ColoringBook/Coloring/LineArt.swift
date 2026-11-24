@@ -17,9 +17,11 @@ nonisolated struct LineArt: @unchecked Sendable {
     /// 1 where a fill must stop (a line), 0 where it may spread.
     let barrier: [UInt8]
     /// The frame drawn around the picture.
-    let frame: PageFrame
+    let frame: FrameChoice
     /// The model's page as received, kept so the frame can be changed.
     let source: CGImage
+    /// The same page as the bytes that arrived, for saving.
+    let sourceData: Data
 
     static let workingLongSide = 1600
     /// Darker than this counts as line. JPEG pages carry grey noise near the
@@ -28,19 +30,19 @@ nonisolated struct LineArt: @unchecked Sendable {
 
     enum Failure: Error { case unreadable }
 
-    static func load(_ data: Data, frame: PageFrame = .plain) throws -> LineArt {
+    static func load(_ data: Data, frame: FrameChoice = .default) throws -> LineArt {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
-              let art = make(from: image, frame: frame) else { throw Failure.unreadable }
+              let art = make(from: image, data: data, frame: frame) else { throw Failure.unreadable }
         return art
     }
 
     /// The same page with a different frame.
-    func with(frame newFrame: PageFrame) -> LineArt? {
-        newFrame == frame ? self : Self.make(from: source, frame: newFrame)
+    func with(frame newFrame: FrameChoice) -> LineArt? {
+        newFrame == frame ? self : Self.make(from: source, data: sourceData, frame: newFrame)
     }
 
-    static func make(from image: CGImage, frame: PageFrame) -> LineArt? {
+    static func make(from image: CGImage, data: Data, frame: FrameChoice) -> LineArt? {
         let scale = Double(workingLongSide) / Double(max(image.width, image.height))
         let width = Int((Double(image.width) * scale).rounded())
         let height = Int((Double(image.height) * scale).rounded())
@@ -76,7 +78,25 @@ nonisolated struct LineArt: @unchecked Sendable {
             ctx.setLineWidth(min(size.width, size.height) * PageFrame.lineWidth)
             ctx.setLineJoin(.round)
             ctx.setLineCap(.round)
-            ctx.addPath(frame.path(in: size))
+            switch frame {
+            case .builtIn(let style):
+                ctx.addPath(style.path(in: size))
+            case .image(let name):
+                // Artwork over the whole page; multiply keeps only its dark
+                // lines, whether the file is transparent or white.
+                if let art = FrameLibrary.imageFrame(named: name),
+                   let picture = FrameLibrary.image(at: art.url(forLandscape: width >= height)) {
+                    ctx.saveGState()
+                    ctx.setBlendMode(.multiply)
+                    ctx.translateBy(x: 0, y: size.height)
+                    ctx.scaleBy(x: 1, y: -1)
+                    ctx.draw(picture, in: CGRect(origin: .zero, size: size))
+                    ctx.restoreGState()
+                }
+                // The inner line, always: the picture stays closed off even
+                // if the artwork's own line is off by a few pixels.
+                ctx.addPath(PageFrame.plain.path(in: size))
+            }
             ctx.strokePath()
             return true
         }
@@ -91,7 +111,8 @@ nonisolated struct LineArt: @unchecked Sendable {
         mask = morph(mask, width: width, height: height, radius: closeRadius, grow: true)
         mask = morph(mask, width: width, height: height, radius: closeRadius, grow: false)
         mask = morph(mask, width: width, height: height, radius: 1, grow: true)
-        return LineArt(width: width, height: height, lines: lines, barrier: mask, frame: frame, source: image)
+        return LineArt(width: width, height: height, lines: lines, barrier: mask, frame: frame,
+                       source: image, sourceData: data)
     }
 
     static let closeRadius = 3

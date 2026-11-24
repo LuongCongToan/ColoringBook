@@ -1,0 +1,156 @@
+import Foundation
+import Observation
+import StoreKit
+
+/// Product ids. Must match ColoringBook/Products.storekit, App Store Connect
+/// and `PRODUCT_IDS` in Worker/src/config.ts (docs/app-store-products.md).
+enum ProductID {
+    static let monthly = "pt.team.coloringbook.pro.monthly"
+    static let yearly = "pt.team.coloringbook.pro.yearly"
+    static let book = "pt.team.coloringbook.book.single"
+    static let all = [yearly, monthly, book]
+}
+
+/// Links every screen that sells something must show (Guideline 3.1.2).
+enum AppLinks {
+    /// Apple's standard licence agreement.
+    static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    /// Placeholder until the policy in docs/privacy.md is published.
+    static let privacy = URL(string: "https://luongcongtoan.github.io/coloringbook/privacy.html")!
+}
+
+/// Everything about paying: products, purchases, and what the user owns.
+///
+/// StoreKit is the authority. The app shows what it says but never enforces
+/// limits itself: the Worker verifies the signed transaction and counts pages
+/// (docs/app-store-products.md, "Hạn mức").
+@MainActor
+@Observable
+final class StoreModel {
+    static let shared = StoreModel()
+
+    private(set) var products: [Product] = []
+    private(set) var isLoading = false
+    private(set) var isPurchasing = false
+    /// An active Pro plan, including StoreKit's free trial.
+    private(set) var hasPro = false
+    /// This Apple Account can still get the yearly plan's free trial. False
+    /// until StoreKit answers: promising a used trial is worse than showing
+    /// it a moment late.
+    private(set) var trialEligible = false
+    var message: String?
+
+    private var updates: Task<Void, Never>?
+
+    var yearly: Product? { products.first { $0.id == ProductID.yearly } }
+    var monthly: Product? { products.first { $0.id == ProductID.monthly } }
+    var book: Product? { products.first { $0.id == ProductID.book } }
+    /// Products loaded: StoreKit (or the Xcode StoreKit file) is reachable.
+    var isAvailable: Bool { !products.isEmpty }
+
+    func start() {
+        guard updates == nil else { return }
+        updates = Task { [weak self] in
+            // Renewals, refunds, Ask to Buy approvals and purchases made on
+            // another device arrive here.
+            for await update in Transaction.updates {
+                if case .verified(let transaction) = update { await transaction.finish() }
+                await self?.refresh()
+            }
+        }
+        Task {
+            await refresh()
+            await load()
+        }
+    }
+
+    func load() async {
+        guard products.isEmpty, !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let loaded = try await Product.products(for: ProductID.all)
+            products = ProductID.all.compactMap { id in loaded.first { $0.id == id } }
+            if let subscription = yearly?.subscription {
+                trialEligible = await subscription.isEligibleForIntroOffer
+            }
+        } catch {
+            message = "The App Store could not be reached. Check the connection and try again."
+        }
+    }
+
+    /// Returns true when the purchase went through.
+    @discardableResult
+    func purchase(_ product: Product) async -> Bool {
+        guard !isPurchasing else { return false }
+        isPurchasing = true
+        defer { isPurchasing = false }
+        do {
+            switch try await product.purchase() {
+            case .success(let verification):
+                guard case .verified(let transaction) = verification else {
+                    message = "That purchase could not be verified."
+                    return false
+                }
+                // A book's pages are counted by the Worker, keyed on this
+                // transaction, from its first use; the transaction stays in
+                // the history after finishing (iOS 18,
+                // SKIncludeConsumableInAppPurchaseHistory).
+                await transaction.finish()
+                await refresh()
+                return true
+            case .userCancelled:
+                return false
+            case .pending:
+                message = "Waiting for approval. Drawing unlocks as soon as it goes through."
+                return false
+            @unknown default:
+                return false
+            }
+        } catch {
+            message = error.localizedDescription
+            return false
+        }
+    }
+
+    func restore() async {
+        isPurchasing = true
+        defer { isPurchasing = false }
+        do {
+            try await AppStore.sync()
+            await refresh()
+            if await currentJWS() == nil { message = "No previous purchase found on this Apple Account." }
+        } catch StoreKitError.userCancelled {
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func refresh() async {
+        var pro = false
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let t) = result, t.revocationDate == nil,
+                  t.productID == ProductID.monthly || t.productID == ProductID.yearly else { continue }
+            if let expiry = t.expirationDate, expiry <= Date() { continue }
+            pro = true
+        }
+        hasPro = pro
+    }
+
+    /// The signed transaction the Worker verifies before it spends money: an
+    /// active plan first, otherwise the newest book purchase.
+    func currentJWS() async -> String? {
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let t) = result, t.revocationDate == nil,
+                  t.productID == ProductID.monthly || t.productID == ProductID.yearly else { continue }
+            if let expiry = t.expirationDate, expiry <= Date() { continue }
+            return result.jwsRepresentation
+        }
+        var newest: (Date, String)?
+        for await result in Transaction.all {
+            guard case .verified(let t) = result, t.revocationDate == nil, t.productID == ProductID.book else { continue }
+            if newest == nil || t.purchaseDate > newest!.0 { newest = (t.purchaseDate, result.jwsRepresentation) }
+        }
+        return newest?.1
+    }
+}

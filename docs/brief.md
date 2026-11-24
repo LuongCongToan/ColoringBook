@@ -760,6 +760,13 @@ Code ở `ColoringBook/ColoringBook/Create/`. Màn chính có thẻ "Make a colo
 - **Gọi Worker thật:** `WorkerPageGenerator` gửi `POST /generate` kèm JWS của gói Pro hoặc gói sách. Endpoint đang là `coloring-api-staging.pt-team2011.workers.dev` (giả định; sửa sau khi deploy). Chưa có màn mua hàng nên bản thật sẽ báo cần mua.
 - Đã chạy thử đủ luồng trên simulator với ảnh `3nguoi` (ảnh được thêm vào thư viện Ảnh của simulator bằng `simctl addmedia`, không vào repo).
 
+### Mua hàng, lưu tranh, khung từ PNG (làm ngày 2026-11-24)
+
+- **Mua hàng** (`Store/`): `StoreModel` (StoreKit 2: tải sản phẩm, mua, khôi phục, theo dõi `Transaction.updates`, lấy JWS cho Worker) và `PaywallView`. Màn mua có giá theo kỳ, dùng thử 3 ngày (chỉ hiện khi StoreKit xác nhận còn quyền), nhãn tiết kiệm tính từ giá thật, điều khoản gia hạn, Restore, Terms, Privacy (Guideline 3.1.2), và **khoá phụ huynh** (một phép nhân) trước khi mua. Màn tạo trang mở màn mua khi Worker báo chưa có quyền, mua xong thì tự vẽ tiếp. Đã thử mua gói năm bằng `Products.storekit` khi chạy app từ Xcode. Gói sách gọi `finish()` ngay; Worker tạo bộ đếm theo `transactionId` ở lần tạo tranh đầu. Khi có `/credit` thì đổi sang finish sau khi Worker ghi nhận. URL Privacy đang là chỗ giữ chỗ.
+- **Bản giả lập** cũng đòi phải mua khi StoreKit có sản phẩm (chạy từ Xcode). Chạy cách khác thì Simulator không có sản phẩm, và luồng vẫn đi tiếp để thử.
+- **Lưu tranh** (`PageStore`): mỗi trang một thư mục trong Application Support, gồm ảnh tranh gốc, `page.json` (khung, thao tác, sticker) và ảnh thu nhỏ. Tự lưu 1 giây sau mỗi thay đổi và khi rời màn tô. Màn chính có mục "My pages" (giữ ngón để xoá). Đã thử tắt và mở lại app: trang mở ra đúng như cũ. Lịch sử hoàn tác không được lưu.
+- **Khung từ PNG:** xem [frame-art-spec.md](frame-art-spec.md), mục 8.
+
 ### Việc đầu tiên của session mới: giai đoạn 0
 
 > **Đã làm một phần ngày 2026-11-24:** model, quy trình chuẩn bị ảnh, prompt, bộ đo và bản in đã có ở mục 4.0. Tiếp tục từ danh sách "Việc còn lại trước khi chốt" trong mục 4.0, rồi làm các bước dưới đây còn thiếu (đọc review Colorify, model line-art trên máy cho chế độ Sketch).

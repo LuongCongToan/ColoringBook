@@ -11,8 +11,10 @@ struct ColoringView: View {
     @State private var session: ColoringSession
     @State private var exported: ExportedPage?
 
-    init(art: LineArt) {
-        _session = State(initialValue: ColoringSession(art: art))
+    @State private var autosave: Task<Void, Never>?
+
+    init(art: LineArt, pageID: UUID = UUID(), saved: SavedPage? = nil) {
+        _session = State(initialValue: ColoringSession(art: art, pageID: pageID, restoring: saved))
     }
 
     var body: some View {
@@ -49,6 +51,20 @@ struct ColoringView: View {
         }
         .sheet(item: $exported) { page in
             ShareSheet(items: [page.image])
+        }
+        // Saved a moment after every change, and on leaving, so a child can
+        // put the iPad down and come back to the same page.
+        .onChange(of: session.revision) { _, _ in
+            autosave?.cancel()
+            autosave = Task {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                PageStore.shared.save(session)
+            }
+        }
+        .onDisappear {
+            autosave?.cancel()
+            PageStore.shared.save(session)
         }
         .sensoryFeedback(.selection, trigger: session.tool)
         .sensoryFeedback(.selection, trigger: session.color)
@@ -391,7 +407,7 @@ private struct FrameTray: View {
     }
 
     @ViewBuilder private var items: some View {
-        ForEach(PageFrame.allCases) { frame in
+        ForEach(FrameLibrary.all()) { frame in
             let selected = session.art.frame == frame
             Button {
                 SoundFX.shared.play(.sticker)
@@ -419,15 +435,18 @@ private struct FrameTray: View {
 /// A frame for the tray: its top-left corner shown three times as big, so a
 /// child can tell stars from hearts at button size.
 struct FramePreview: View {
-    let frame: PageFrame
+    let frame: FrameChoice
 
     var body: some View {
         GeometryReader { geo in
             let big = CGSize(width: geo.size.width * 3, height: geo.size.height * 3)
-            ZStack(alignment: .topLeading) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 4).fill(.white)
-                Path(frame.path(in: big))
-                    .stroke(.black, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                // The artwork at three times the size, as an overlay on a view
+                // the size of the button, so it is cut to the button.
+                Color.clear
+                    .overlay(alignment: .topLeading) { artwork(size: big).frame(width: big.width, height: big.height) }
+                    .clipped()
                 Image(systemName: "face.smiling")
                     .font(.system(size: geo.size.height * 0.34))
                     .foregroundStyle(.black.opacity(0.22))
@@ -436,11 +455,24 @@ struct FramePreview: View {
             .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }
+
+    @ViewBuilder private func artwork(size: CGSize) -> some View {
+        switch frame {
+        case .builtIn(let style):
+            Path(style.path(in: size))
+                .stroke(.black, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+        case .image(let name):
+            if let art = FrameLibrary.imageFrame(named: name),
+               let picture = FrameLibrary.image(at: art.landscape) {
+                Image(decorative: picture, scale: 1).resizable()
+            }
+        }
+    }
 }
 
 #Preview("Frame tray") {
     LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], spacing: 10) {
-        ForEach(PageFrame.allCases) { frame in
+        ForEach(FrameLibrary.all()) { frame in
             FramePreview(frame: frame)
                 .frame(width: 96, height: 72)
                 .padding(6)
