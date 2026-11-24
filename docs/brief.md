@@ -752,6 +752,14 @@ Logic nghiệp vụ nằm trên Worker, nên bản Android chỉ cần dựng l�
 - **Ngân sách trước khi ra mắt:** khoảng $10 thử model, $0–5/tháng cho Worker.
 - **Ba số cần đo sau phát hành:** tỷ lệ cài xong tạo được tranh đầu; tỷ lệ trả phí ở paywall; chi phí AI trên mỗi lượt cài.
 
+### Luồng tạo trang trong app (làm ngày 2026-11-24)
+
+Code ở `ColoringBook/ColoringBook/Create/`. Màn chính có thẻ "Make a coloring page", dẫn qua các bước: chọn ảnh (PhotosPicker) → PhotoPrep (phụ huynh xem bản màu cùng khung cắt, bản gửi đi là bản xám nhạt) → chọn Cartoon hoặc Chibi → xin phép gửi ảnh lần đầu (Guideline 5.1.2(i)) → màn chờ có bút chì nhảy → kết quả → "Color it!" mở màn tô màu. Có nút "Try chibi/cartoon style", và có ghi chú rằng thử kiểu khác tốn thêm một trang.
+
+- **Gọi AI giả lập:** bản Debug trên Simulator dùng `SimulatedPageGenerator`. Nó chờ 4 giây rồi trả tranh R&D của ảnh `3nguoi` từ `tempdrawing_img/` (Cartoon ra `3nguoi_result.jpg`, Chibi ra `chibi_3nguoi_result.jpeg`). Không gửi gì ra ngoài, không tốn tiền.
+- **Gọi Worker thật:** `WorkerPageGenerator` gửi `POST /generate` kèm JWS của gói Pro hoặc gói sách. Endpoint đang là `coloring-api-staging.pt-team2011.workers.dev` (giả định; sửa sau khi deploy). Chưa có màn mua hàng nên bản thật sẽ báo cần mua.
+- Đã chạy thử đủ luồng trên simulator với ảnh `3nguoi` (ảnh được thêm vào thư viện Ảnh của simulator bằng `simctl addmedia`, không vào repo).
+
 ### Việc đầu tiên của session mới: giai đoạn 0
 
 > **Đã làm một phần ngày 2026-11-24:** model, quy trình chuẩn bị ảnh, prompt, bộ đo và bản in đã có ở mục 4.0. Tiếp tục từ danh sách "Việc còn lại trước khi chốt" trong mục 4.0, rồi làm các bước dưới đây còn thiếu (đọc review Colorify, model line-art trên máy cho chế độ Sketch).

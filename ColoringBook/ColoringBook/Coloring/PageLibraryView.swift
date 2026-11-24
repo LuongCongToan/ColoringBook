@@ -14,6 +14,35 @@ struct PageLibraryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
+                NavigationLink {
+                    CreatePageView()
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 40, weight: .bold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Make a coloring page")
+                                .font(.title3.weight(.heavy))
+                            Text("From a family photo")
+                                .font(.subheadline.weight(.medium))
+                                .opacity(0.9)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.headline.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(22)
+                    .background(
+                        LinearGradient(colors: [Color(red: 0.98, green: 0.45, blue: 0.20), Color(red: 0.95, green: 0.30, blue: 0.45)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .shadow(color: .orange.opacity(0.3), radius: 10, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
                 LazyVGrid(columns: columns, spacing: 16) {
                     PhotosPicker(selection: $pick, matching: .images) {
                         VStack(spacing: 8) {
