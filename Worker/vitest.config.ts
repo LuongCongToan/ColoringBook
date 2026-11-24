@@ -11,7 +11,7 @@ export default defineConfig({
           // Not a key. Every test injects its own fetch, so nothing here is
           // ever sent anywhere - and a test asserts this value never appears
           // in a response.
-          ANTHROPIC_API_KEY: "test-key-never-sent",
+          BFL_API_KEY: "test-key-never-sent",
         },
       },
     }),

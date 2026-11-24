@@ -1,13 +1,24 @@
 import { env as bindings } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
-import { DAILY_CHECKS, MAX_TOKENS, MODEL } from "../src/config";
-import { SYSTEM_PROMPT } from "../src/checker";
+import { LIMITS, MODEL_ENDPOINT, PROMPTS, PROMPT_VERSION, PRO_YEARLY, SAFETY_TOLERANCE } from "../src/config";
 import type { Env } from "../src/env";
 import worker from "../src/index";
-import { CHECKED, type Chain, fakeModel, makeChain, payload, post, sign, testEnv } from "./fixtures";
+import {
+  PNG,
+  type Chain,
+  bookPayload,
+  fakeModel,
+  makeChain,
+  payload,
+  photo,
+  post,
+  sign,
+  testEnv,
+  toBase64Bytes,
+} from "./fixtures";
 
-// The path a paying learner takes. The other file is the one that earns its
-// keep; this one says what "working" means so that file has something to
+// The path a paying parent takes. adversarial.test.ts is the file that earns
+// its keep; this one says what "working" means so that file has something to
 // protect.
 
 let chain: Chain;
@@ -17,69 +28,76 @@ beforeAll(async () => {
 
 const request = (jws: string, extra: Record<string, unknown> = {}) => ({
   jws,
-  word: "학교",
-  sentence: "저는 학교를 가요.",
-  lang: "vi",
+  image: photo(),
+  style: "cartoon",
   ...extra,
 });
 
-describe("a subscriber checks a sentence", () => {
-  it("returns the correction, the notes and what is left today", async () => {
+const remainingOf = async (response: Response) => ((await response.json()) as { remaining: number }).remaining;
+
+describe("a subscriber makes a coloring page", () => {
+  it("returns the page, what is left this month, and the prompt version", async () => {
     const model = fakeModel();
     const response = await post(request(await sign(chain, payload())), { env: testEnv(chain), model });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      corrected: CHECKED.corrected,
-      notes: CHECKED.notes,
-      remaining: DAILY_CHECKS - 1,
+      image: toBase64Bytes(PNG),
+      remaining: LIMITS.monthly - 1,
+      style: "cartoon",
+      promptVersion: PROMPT_VERSION,
     });
-    expect(model.calls).toHaveLength(1);
-  });
-
-  it("answers in the shape SentenceFeedback decodes in the app", async () => {
-    const model = fakeModel();
-    const response = await post(request(await sign(chain, payload())), { env: testEnv(chain), model });
-    const body = (await response.json()) as Record<string, unknown>;
-
-    // Shared/AI/SentenceCheckClient.swift decodes exactly these three keys.
-    expect(Object.keys(body).sort()).toEqual(["corrected", "notes", "remaining"]);
-    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(model.submits()).toHaveLength(1);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 
-  it("returns no notes for a sentence that was already right", async () => {
-    const model = fakeModel({ verdict: "checked", corrected: "저는 학교에 가요.", notes: [] });
-    const response = await post(request(await sign(chain, payload()), { sentence: "저는 학교에 가요." }), {
-      env: testEnv(chain),
-      model,
-    });
-
-    expect(response.status).toBe(200);
-    expect(((await response.json()) as { notes: unknown[] }).notes).toEqual([]);
-  });
-
-  it("counts down as the day's checks are used", async () => {
+  it("counts down as the month's pages are used", async () => {
     const jws = await sign(chain, payload());
     const env = testEnv(chain);
     const seen: number[] = [];
-    for (const sentence of ["저는 학교에 가요.", "학교가 커요.", "학교에서 공부해요."]) {
-      const response = await post(request(jws, { sentence }), { env, model: fakeModel() });
-      seen.push(((await response.json()) as { remaining: number }).remaining);
+    for (let i = 0; i < 3; i++) {
+      // A different photo each time, so none is taken for a retry.
+      const response = await post(request(jws, { image: photo({ size: 600 + i }) }), { env, model: fakeModel() });
+      seen.push(await remainingOf(response));
     }
-    expect(seen).toEqual([DAILY_CHECKS - 1, DAILY_CHECKS - 2, DAILY_CHECKS - 3]);
+    expect(seen).toEqual([LIMITS.monthly - 1, LIMITS.monthly - 2, LIMITS.monthly - 3]);
   });
 
-  it("accepts the yearly product as well as the monthly one", async () => {
-    const jws = await sign(chain, payload({ productId: "pt.team.haru.pro.yearly" }));
-    const response = await post(request(jws), { env: testEnv(chain), model: fakeModel() });
+  it("accepts the yearly plan as well as the monthly one", async () => {
+    const response = await post(request(await sign(chain, payload({ productId: PRO_YEARLY }))), {
+      env: testEnv(chain),
+      model: fakeModel(),
+    });
     expect(response.status).toBe(200);
+  });
+
+  it("accepts a landscape photo", async () => {
+    const response = await post(request(await sign(chain, payload()), { image: photo({ width: 1024, height: 768 }) }), {
+      env: testEnv(chain),
+      model: fakeModel(),
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it("gives a free trial its own ten pages", async () => {
+    const response = await post(request(await sign(chain, payload({ productId: PRO_YEARLY, offerType: 1 }))), {
+      env: testEnv(chain),
+      model: fakeModel(),
+    });
+    expect(await remainingOf(response)).toBe(LIMITS.trial - 1);
+  });
+
+  it("gives a Family Sharing member the family allowance", async () => {
+    const response = await post(request(await sign(chain, payload({ inAppOwnershipType: "FAMILY_SHARED" }))), {
+      env: testEnv(chain),
+      model: fakeModel(),
+    });
+    expect(await remainingOf(response)).toBe(LIMITS.family - 1);
   });
 
   it("serves a sandbox purchase when the sandbox allowance is open", async () => {
     // App Review and TestFlight both buy in the sandbox.
-    const jws = await sign(chain, payload({ environment: "Sandbox" }));
-    const response = await post(request(jws), {
+    const response = await post(request(await sign(chain, payload({ environment: "Sandbox" }))), {
       env: testEnv(chain, { SANDBOX_DAILY_CAP: "50" }),
       model: fakeModel(),
     });
@@ -87,60 +105,93 @@ describe("a subscriber checks a sentence", () => {
   });
 });
 
-describe("what is sent to the model", () => {
-  it("uses the fixed model, cap and system prompt", async () => {
-    const model = fakeModel();
-    await post(request(await sign(chain, payload())), { env: testEnv(chain), model });
-    const sent = model.calls[0]!.body;
-
-    expect(model.calls[0]!.url).toBe("https://api.anthropic.com/v1/messages");
-    expect(sent.model).toBe(MODEL);
-    expect(sent.max_tokens).toBe(MAX_TOKENS);
-    expect(sent.system).toBe(SYSTEM_PROMPT);
-    expect(sent.output_config).toMatchObject({ effort: "low", format: { type: "json_schema" } });
-    // Sampling parameters are rejected by this model family; none may be sent.
-    expect(sent).not.toHaveProperty("temperature");
-    expect(sent).not.toHaveProperty("top_p");
+describe("a parent who bought One Coloring Book", () => {
+  it("draws on that book's thirty pages", async () => {
+    const response = await post(request(await sign(chain, bookPayload())), { env: testEnv(chain), model: fakeModel() });
+    expect(response.status).toBe(200);
+    expect(await remainingOf(response)).toBe(LIMITS.book - 1);
   });
 
-  it("passes the sentence as data, with the language named by the server", async () => {
+  it("keeps two books apart", async () => {
+    const env = testEnv(chain);
+    const first = await sign(chain, bookPayload());
+    await post(request(first), { env, model: fakeModel() });
+    await post(request(first, { image: photo({ size: 700 }) }), { env, model: fakeModel() });
+
+    const second = await post(request(await sign(chain, bookPayload())), { env, model: fakeModel() });
+    expect(await remainingOf(second)).toBe(LIMITS.book - 1);
+  });
+});
+
+describe("what is sent to the model", () => {
+  it("uses the fixed endpoint, prompt, size, format and moderation level", async () => {
+    const model = fakeModel();
+    const image = photo();
+    await post(request(await sign(chain, payload()), { image }), { env: testEnv(chain), model });
+    const submit = model.submits()[0]!;
+
+    expect(submit.url).toBe(MODEL_ENDPOINT);
+    expect(submit.headers.get("x-key")).toBe("test-key-never-sent");
+    expect(submit.body).toEqual({
+      prompt: PROMPTS.cartoon,
+      input_image: image,
+      width: 768,
+      height: 1024,
+      output_format: "png",
+      safety_tolerance: SAFETY_TOLERANCE,
+    });
+  });
+
+  it("picks the chibi prompt by key", async () => {
+    const model = fakeModel();
+    const response = await post(request(await sign(chain, payload()), { style: "chibi" }), { env: testEnv(chain), model });
+    expect(model.submits()[0]!.body!.prompt).toBe(PROMPTS.chibi);
+    expect(((await response.json()) as { style: string }).style).toBe("chibi");
+  });
+
+  it("falls back to cartoon for a style it does not know", async () => {
+    for (const style of ["watercolor", "", 3, null, "__proto__", "constructor"]) {
+      const model = fakeModel();
+      await post(request(await sign(chain, payload()), { style }), { env: testEnv(chain), model });
+      expect(model.submits()[0]!.body!.prompt, String(style)).toBe(PROMPTS.cartoon);
+    }
+  });
+
+  it("polls, then downloads the sample with no key attached", async () => {
     const model = fakeModel();
     await post(request(await sign(chain, payload())), { env: testEnv(chain), model });
-    const messages = model.calls[0]!.body.messages as { role: string; content: string }[];
-
-    expect(messages).toHaveLength(1);
-    expect(messages[0]!.role).toBe("user");
-    expect(JSON.parse(messages[0]!.content)).toEqual({
-      target_word: "학교",
-      explain_in: "Vietnamese",
-      sentence: "저는 학교를 가요.",
-    });
+    const [submit, poll, download] = model.calls;
+    expect(submit!.method).toBe("POST");
+    expect(poll!.headers.get("x-key")).toBe("test-key-never-sent");
+    // The signed delivery URL needs no key, and should not be handed one.
+    expect(download!.headers.get("x-key")).toBeNull();
   });
 });
 
 describe("the deployed entry point", () => {
   const env = bindings as unknown as Env;
 
-  it("serves POST /check and nothing else", async () => {
+  it("serves POST /generate and nothing else", async () => {
     for (const [method, path] of [
-      ["GET", "/check"],
+      ["GET", "/generate"],
       ["GET", "/"],
       ["POST", "/"],
-      ["POST", "/check/"],
-      ["PUT", "/check"],
-      ["DELETE", "/check"],
-      ["OPTIONS", "/check"],
+      ["POST", "/check"],
+      ["POST", "/generate/"],
+      ["PUT", "/generate"],
+      ["DELETE", "/generate"],
+      ["OPTIONS", "/generate"],
     ] as const) {
-      const response = await worker.fetch(new Request(`https://haru-check.example${path}`, { method }), env);
+      const response = await worker.fetch(new Request(`https://coloring-api.example${path}`, { method }), env);
       expect(response.status, `${method} ${path}`).toBe(404);
     }
   });
 
   it("turns away a request with no transaction", async () => {
     const response = await worker.fetch(
-      new Request("https://haru-check.example/check", {
+      new Request("https://coloring-api.example/generate", {
         method: "POST",
-        body: JSON.stringify({ word: "학교", sentence: "저는 학교에 가요.", lang: "vi" }),
+        body: JSON.stringify({ image: photo(), style: "cartoon" }),
       }),
       env,
     );

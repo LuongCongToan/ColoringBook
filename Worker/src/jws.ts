@@ -14,13 +14,23 @@ export class EntitlementError extends Error {
 
 /// The fields of a StoreKit 2 JWSTransaction this Worker reads.
 export interface Transaction {
+  /// This purchase. A consumable's counter is keyed on it.
+  transactionId: string;
+  /// The subscription across renewals and reinstalls. Each Family Sharing
+  /// member gets their own.
   originalTransactionId: string;
   bundleId: string;
   productId: string;
+  /// "Auto-Renewable Subscription", "Consumable", ...
+  type: string;
   environment: string;
   expiresDate?: number;
   revocationDate?: number;
   signedDate?: number;
+  /// 1 = introductory offer, i.e. the free trial.
+  offerType?: number;
+  /// "PURCHASED" or "FAMILY_SHARED".
+  inAppOwnershipType: string;
 }
 
 /// Marker extensions Apple puts on the certificates that sign App Store
@@ -169,15 +179,20 @@ async function verify(
     typeof payload[name] === "number" ? (payload[name] as number) : undefined;
 
   const transaction: Transaction = {
+    transactionId: text("transactionId"),
     originalTransactionId: text("originalTransactionId"),
     bundleId: text("bundleId"),
     productId: text("productId"),
+    type: text("type"),
     environment: text("environment"),
     expiresDate: number("expiresDate"),
     revocationDate: number("revocationDate"),
     signedDate,
+    offerType: number("offerType"),
+    inAppOwnershipType: text("inAppOwnershipType"),
   };
-  if (!/^[0-9A-Za-z-]{1,64}$/.test(transaction.originalTransactionId)) {
+  const id = /^[0-9A-Za-z-]{1,64}$/;
+  if (!id.test(transaction.originalTransactionId) || !id.test(transaction.transactionId)) {
     throw unauthorized("malformed");
   }
   return transaction;
@@ -185,12 +200,15 @@ async function verify(
 
 export interface EntitlementPolicy {
   bundleId: string;
-  productIds: ReadonlySet<string>;
+  /// Auto-renewable subscriptions: must not be expired.
+  subscriptions: ReadonlySet<string>;
+  /// Consumables: no expiry; the page counter decides what is left.
+  consumables: ReadonlySet<string>;
   /// Whether an Apple-signed sandbox transaction is entertained at all.
   allowSandbox: boolean;
 }
 
-/// Decides whether a verified transaction buys a sentence check right now.
+/// Decides whether a verified transaction buys a coloring page right now.
 ///
 /// Separate from `verifyTransaction` on purpose: that one answers "did Apple
 /// sign this", this one answers "is it for us, and is it still good". A real
@@ -201,10 +219,18 @@ export interface EntitlementPolicy {
 export function authorize(tx: Transaction, policy: EntitlementPolicy, now: Date): void {
   const forbidden = (reason: string) => new EntitlementError(403, reason);
   if (tx.bundleId !== policy.bundleId) throw forbidden("bundle");
-  if (!policy.productIds.has(tx.productId)) throw forbidden("product");
+  const subscription = policy.subscriptions.has(tx.productId);
+  const consumable = policy.consumables.has(tx.productId);
+  if (!subscription && !consumable) throw forbidden("product");
+  // The type is signed too: a subscription id on a consumable record, or the
+  // reverse, is not a purchase this Worker knows how to count.
+  if (subscription && tx.type !== "Auto-Renewable Subscription") throw forbidden("type");
+  if (consumable && tx.type !== "Consumable") throw forbidden("type");
   // Refunded or revoked. Without this line a refund keeps the AI for life.
   if (tx.revocationDate !== undefined) throw forbidden("revoked");
-  if (tx.expiresDate === undefined || tx.expiresDate <= now.getTime()) throw forbidden("expired");
+  if (subscription && (tx.expiresDate === undefined || tx.expiresDate <= now.getTime())) {
+    throw forbidden("expired");
+  }
   if (tx.environment === "Production") return;
   if (tx.environment === "Sandbox" && policy.allowSandbox) return;
   throw forbidden("environment");

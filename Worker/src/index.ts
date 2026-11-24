@@ -13,7 +13,7 @@ export default {
     } catch {
       // Whatever went wrong, the caller learns nothing about it. A stack
       // trace in a response is documentation for an attacker.
-      console.log(JSON.stringify({ event: "check", status: 500, reason: "internal" }));
+      console.log(JSON.stringify({ event: "generate", status: 500, reason: "internal" }));
       return new Response(JSON.stringify({ error: "unavailable" }), {
         status: 500,
         headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },

@@ -1,10 +1,10 @@
-# The sentence-checking backend for Haru (SCOPE.md sections 5 and 5B).
+# The coloring-page backend for ColoringBook (docs/worker-security.md).
 #
 # There are no secrets in this file and there must never be any. The one
 # secret is set out of band:
 #
-#   npx wrangler secret put ANTHROPIC_API_KEY
-#   npx wrangler secret put ANTHROPIC_API_KEY --env staging
+#   npx wrangler secret put BFL_API_KEY
+#   npx wrangler secret put BFL_API_KEY --env staging
 #
 # Deploy with `npm run deploy`, which refuses to ship if a test fails.
 
@@ -15,10 +15,10 @@ workers_dev = true
 
 [vars]
 ENVIRONMENT = "production"
-# The fuse: checks per UTC day across every subscriber. At about $0.00017 a
-# check this caps a day's bill near $0.85. Raise it as subscribers arrive.
-GLOBAL_DAILY_CAP = "5000"
-# Checks per UTC day shared by every sandbox transaction. App Review buys in
+# The fuse: pages per UTC day across every user. At about $0.01-0.02 a page
+# this caps a day's bill near $10. Start low; raise it as subscribers arrive.
+GLOBAL_DAILY_CAP = "500"
+# Pages per UTC day shared by every sandbox transaction. App Review buys in
 # the sandbox and exercises the production Worker, so "0" here means the
 # reviewer sees the paid feature fail. See README.md, "Sandbox".
 SANDBOX_DAILY_CAP = "50"
@@ -37,8 +37,8 @@ name = "coloring-api-staging"
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
-GLOBAL_DAILY_CAP = "500"
-SANDBOX_DAILY_CAP = "500"
+GLOBAL_DAILY_CAP = "200"
+SANDBOX_DAILY_CAP = "200"
 
 [[env.staging.durable_objects.bindings]]
 name = "QUOTA"

@@ -1,49 +1,100 @@
 /// Everything the server fixes and the client cannot influence (SCOPE.md 5B.0, I3).
 
-/// Must match PRODUCT_BUNDLE_IDENTIFIER and ProductID in Shared/Store/ProAccess.swift.
-/// Tools/check_identifiers.py keeps the two sides in step.
-export const BUNDLE_ID = "pt.team.haru";
-export const PRODUCT_IDS: ReadonlySet<string> = new Set([
-  "pt.team.haru.pro.monthly",
-  "pt.team.haru.pro.yearly",
-]);
+/// Must match PRODUCT_BUNDLE_IDENTIFIER in ColoringBook.xcodeproj and the
+/// product ids in ColoringBook/Products.storekit (docs/app-store-products.md).
+export const BUNDLE_ID = "pt.team.coloringbook";
+export const PRO_MONTHLY = "pt.team.coloringbook.pro.monthly";
+export const PRO_YEARLY = "pt.team.coloringbook.pro.yearly";
+export const BOOK = "pt.team.coloringbook.book.single";
+export const SUBSCRIPTIONS: ReadonlySet<string> = new Set([PRO_MONTHLY, PRO_YEARLY]);
+export const PRODUCT_IDS: ReadonlySet<string> = new Set([...SUBSCRIPTIONS, BOOK]);
 
-/// ProAccess.dailyChecks in the app shows the same number; this one enforces it.
-export const DAILY_CHECKS = 20;
+/// Pages per period, docs/app-store-products.md "Hạn mức và ngân sách".
+/// The app shows the number the Worker returns; this is the one that counts.
+export const LIMITS = {
+  /// Calendar month (UTC), the person who bought the plan.
+  monthly: 60,
+  /// Calendar month (UTC), each Family Sharing member. Every member has their
+  /// own originalTransactionId, so a family cannot share one counter.
+  family: 20,
+  /// The whole 3-day free trial.
+  trial: 10,
+  /// One "One Coloring Book" purchase: 20 pages and 10 redraws.
+  book: 30,
+  /// Any plan, per UTC day: a script cannot burn a month in an hour.
+  daily: 20,
+} as const;
 
-export const MODEL = "claude-haiku-5-5";
-/// Thinking counts toward this cap, so it is sized for a short think plus the
-/// ~250-token answer rather than for the answer alone.
-export const MAX_TOKENS = 2048;
+/// The model. The brief calls it "FLUX 3 Klein"; BFL's API reference lists
+/// FLUX.2 [klein] 4B and 9B. Confirm which one R&D used before deploying.
+export const MODEL_ENDPOINT = "https://api.bfl.ai/v1/flux-2-klein-9b";
+/// Only hosts BFL answers from. A polling or download URL anywhere else is
+/// refused, so a strange upstream reply cannot point the Worker at an
+/// arbitrary address.
+export const UPSTREAM_HOST_SUFFIX = ".bfl.ai";
+/// BFL's moderation, 0 strictest .. 7. The default; photos of children.
+export const SAFETY_TOLERANCE = 2;
+/// Poll every half second, give up after 40 s. The app waits 60 s.
+export const POLL_INTERVAL_MS = 500;
+export const POLL_TIMEOUT_MS = 40_000;
+/// A generated page at about 0.8 MP as PNG is a few hundred KB.
+export const MAX_RESULT_BYTES = 4 * 1024 * 1024;
 
-/// Same as SentenceCheckClient.maxSentenceLength. The client's check is
-/// politeness; this one is the limit.
-export const MAX_SENTENCE = 280;
-/// A StoreKit JWS runs 5-7 KB with its certificate chain. Anything far beyond
-/// that is not a request this endpoint serves, and is refused before it is read.
-export const MAX_BODY_BYTES = 32 * 1024;
+/// What PhotoPrep.swift produces: 768×1024 or 1024×768 JPEG, no metadata,
+/// 85–210 KB in tests. Anything else is not from the app.
+export const IMAGE_SIZES: readonly (readonly [number, number])[] = [
+  [768, 1024],
+  [1024, 768],
+];
+export const MAX_IMAGE_BYTES = 300 * 1024;
+/// Image as base64 (×4/3) plus a 5–7 KB JWS plus a little JSON.
+export const MAX_BODY_BYTES = 450 * 1024;
 
 /// A second identical request inside this window is taken to be a retry of
 /// one whose answer was lost, and is not charged again - once.
 export const REPLAY_WINDOW_MS = 120_000;
 
-/// The eleven languages of ContentLanguage.swift. The client sends a code and
-/// the server looks the name up here; nothing the client writes reaches the
-/// prompt as an instruction (SCOPE.md 5B.3).
-export const LANGUAGES: Readonly<Record<string, string>> = {
-  en: "English",
-  ja: "Japanese",
-  zh: "Simplified Chinese",
-  vi: "Vietnamese",
-  th: "Thai",
-  id: "Indonesian",
-  ru: "Russian",
-  mn: "Mongolian",
-  es: "Spanish",
-  fr: "French",
-  ar: "Arabic",
+/// Prompts are configuration with a version number (CLAUDE.md). When a prompt
+/// changes, bump PROMPT_VERSION and record the test results in docs/brief.md.
+/// The client sends a style key; nothing it writes reaches the prompt.
+export const PROMPT_VERSION = "2026-11-24.1";
+export const PROMPTS: Readonly<Record<string, string>> = {
+  // docs/brief.md 4.0, "Prompt cuối cùng" (Cartoon, chế độ Đơn giản).
+  cartoon: `Uncolored coloring book page, clean outline line art only, like a printed kids'
+coloring book. Every area is empty white inside its outline - including hair,
+eyebrows and clothes. Hair is just an outline with a few thin strand lines.
+Pupils are small solid black dots.
+
+Redraw this photo in a cute, friendly cartoon style. Keep the same people and animals,
+their poses, hairstyles or fur markings, glasses shapes and clothing shapes.
+Keep each person's age, gender and ethnicity. Keep each facial expression from the
+photo, including smiles with teeth; a closed mouth is a short line curving slightly upward.
+Keep each animal's own coat pattern as large outlined patches (for example calico or
+spotted patches), drawn as closed shapes to color - not generic stripes.
+
+Simple features, nose as one small curved line without nostrils. Smooth, even black
+outlines on a white page. Plain white background without furniture or walls.
+Add a simple ground line or cushion under animals that are lying or sitting.
+Plain clothes: no logos, text or printed pictures, and no fabric patterns.
+Finish outlines neatly where the photo edge cuts a body.`,
+  // docs/brief.md 4.0, "Prompt Chibi – đã chọn".
+  chibi: `Uncolored coloring book page, clean outline line art only, like a printed kids'
+coloring book. Every area is empty white inside its outline - including hair,
+eyebrows and clothes. Hair is just an outline with a few thin strand lines.
+
+Redraw this photo in a cute chibi style: very large round head, small body about two
+heads tall, big round eyes with solid black pupils, tiny simple hands and feet.
+Keep the same people and animals in the same left-to-right order, with their hairstyles
+or fur markings, glasses shapes, clothing shapes and facial expressions, so each one is
+recognizable. Keep each person's age, gender and ethnicity. Simplify poses to fit the
+chibi proportions; arms around shoulders stay simple.
+
+Simple features, nose as one small curved line without nostrils, mouth as in the photo.
+Smooth, even black outlines on a white page. Plain white background without furniture
+or walls. Plain clothes: no logos, text or printed pictures, and no fabric patterns.
+Phone screens are blank. Finish outlines neatly where the photo edge cuts a body.`,
 };
-export const FALLBACK_LANGUAGE = "en";
+export const DEFAULT_STYLE = "cartoon";
 
 /// Apple Root CA - G3, DER, base64. Downloaded from
 /// https://www.apple.com/certificateauthority/AppleRootCA-G3.cer

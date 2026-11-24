@@ -1,6 +1,8 @@
 # Chuyển Worker từ Haru sang ColoringBook
 
-Thư mục này là bản chép nguyên Worker `haru-check` của Haru (TopikVocab) ngày 2026-11-24. Chỉ đổi tên Worker thành `coloring-api` (và `coloring-api-staging`) trong `wrangler.toml` và `package.json`, để lỡ chạy `npm run deploy` cũng **không ghi đè Worker đang chạy cho Haru**. Code và test vẫn là của Haru, chưa sửa gì.
+Thư mục này chép từ Worker `haru-check` của Haru (TopikVocab) ngày 2026-11-24, đổi tên thành `coloring-api` (và `coloring-api-staging`) để lỡ chạy `npm run deploy` cũng **không ghi đè Worker đang chạy cho Haru**.
+
+> **Đã viết lại ngày 2026-11-24:** `/generate` gọi BFL, kiểm ảnh, hạn mức theo gói, 75 test qua. Xem [README.md](README.md), mục "Chưa làm", cho phần còn lại. Bảng dưới đây giữ lại làm lịch sử.
 
 Luật bảo mật và nhóm test bắt buộc: [docs/worker-security.md](../docs/worker-security.md).
 
