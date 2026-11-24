@@ -1,0 +1,328 @@
+import Observation
+import UIKit
+
+/// Everything about one page being colored: paint, stickers, and the history
+/// that undo walks back through.
+///
+/// Layers, bottom to top: white paper, paint (bucket fills and brush strokes
+/// in one bitmap, so the eraser clears both), the page's lines (multiply),
+/// stickers. Lines above the paint mean coloring can never cover a line. Each
+/// sticker carries its own fills, so moving, scaling or turning it never
+/// loses the color inside it.
+@Observable
+final class ColoringSession {
+    enum Tool: String, CaseIterable, Identifiable {
+        case fill, brush, rainbow, eraser, sticker, frame
+        var id: String { rawValue }
+
+        var usesSize: Bool { self == .brush || self == .rainbow || self == .eraser }
+        var usesColor: Bool { self == .fill || self == .brush }
+    }
+
+    private(set) var art: LineArt
+    var tool: Tool = .fill { didSet { if tool != .sticker { selectedSticker = nil } } }
+    var color: RGBA = Palette.colors[0]
+    /// Index into `sizes(for:)`, remembered per tool.
+    var sizeIndex: [Tool: Int] = [.brush: 1, .rainbow: 2, .eraser: 2]
+    private(set) var stickers: [PlacedSticker] = []
+    var selectedSticker: UUID?
+    /// How far the page is zoomed in, 1 = fits the screen. Set by the + and
+    /// − buttons and by pinching; the canvas keeps the pan position.
+    var zoom: CGFloat = 1
+
+    static let zoomSteps: [CGFloat] = [1, 1.5, 2, 3]
+    static var maxZoom: CGFloat { zoomSteps.last! }
+
+    func zoomIn() {
+        zoom = Self.zoomSteps.first(where: { $0 > zoom + 0.01 }) ?? Self.maxZoom
+    }
+
+    func zoomOut() {
+        zoom = Self.zoomSteps.last(where: { $0 < zoom - 0.01 }) ?? 1
+    }
+
+    /// Bumped on every visible change, so views know to redraw.
+    private(set) var revision = 0
+    /// The last bucket tap, so the canvas can play the spreading animation.
+    private(set) var lastFill: (serial: Int, point: CGPoint)?
+    private(set) var pageImage: CGImage?
+    private(set) var stickerImages: [UUID: CGImage] = [:]
+
+    private var paint: PagePaint
+    private var stickerLayers: [UUID: FillLayer] = [:]
+
+    private struct Snapshot {
+        var actions: [PaintAction]
+        var stickers: [PlacedSticker]
+        var frame: PageFrame
+    }
+    private var undoStack: [Snapshot] = []
+    private var redoStack: [Snapshot] = []
+    private static let historyLimit = 60
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    init(art: LineArt) {
+        self.art = art
+        self.paint = PagePaint(width: art.width, height: art.height, barrier: art.barrier)
+        self.pageImage = paint.layer.makeImage()
+    }
+
+    // MARK: - Sizes
+
+    /// Brush widths in page pixels (1600 px on the long side), small to huge.
+    static func sizes(for tool: Tool) -> [CGFloat] {
+        tool == .eraser ? [24, 48, 80, 130, 200] : [10, 22, 40, 70, 110]
+    }
+
+    var currentWidth: CGFloat {
+        let sizes = Self.sizes(for: tool)
+        return sizes[min(max(sizeIndex[tool] ?? 1, 0), sizes.count - 1)]
+    }
+
+    /// The ink a stroke made now would use, or nil for tools that do not draw.
+    var currentInk: Stroke.Ink? {
+        switch tool {
+        case .brush: .solid(color)
+        case .rainbow: .rainbow
+        case .eraser: .eraser
+        case .fill, .sticker, .frame: nil
+        }
+    }
+
+    // MARK: - Frame
+
+    /// Swaps the frame around the picture. The drawing stays where it is,
+    /// so paint inside it is kept; paint in the old frame's band is
+    /// replayed over the new frame's shapes.
+    func setFrame(_ frame: PageFrame) {
+        guard frame != art.frame, let framed = art.with(frame: frame) else { return }
+        record()
+        apply(framed)
+    }
+
+    private func apply(_ framed: LineArt) {
+        art = framed
+        paint.rebuild(barrier: framed.barrier)
+        pageImage = paint.layer.makeImage()
+        revision += 1
+    }
+
+    // MARK: - Fill
+
+    /// A bucket tap at a page pixel: inside the topmost sticker under it, or
+    /// on the page.
+    func fill(atPage point: CGPoint) {
+        if let index = stickers.lastIndex(where: { $0.contains(pagePoint: point) }) {
+            let sticker = stickers[index]
+            let unit = sticker.unitPoint(fromPage: point)
+            let n = CGFloat(StickerRaster.resolution)
+            var layer = stickerLayer(for: sticker)
+            guard let (x, y) = layer.seed(nearX: Int(unit.x * n), y: Int(unit.y * n)) else { return }
+            let op = FillOp(x: x, y: y, color: color)
+            record()
+            layer.fill(op)
+            stickers[index].ops.append(op)
+            stickerLayers[sticker.id] = layer
+            stickerImages[sticker.id] = layer.makeImage()
+        } else {
+            guard let (x, y) = paint.layer.seed(nearX: Int(point.x), y: Int(point.y)) else { return }
+            record()
+            paint.apply(.fill(FillOp(x: x, y: y, color: color)))
+            pageImage = paint.layer.makeImage()
+            lastFill = ((lastFill?.serial ?? 0) + 1, CGPoint(x: x, y: y))
+        }
+        revision += 1
+    }
+
+    // MARK: - Brush
+
+    /// A finished stroke from the canvas.
+    func commit(_ stroke: Stroke) {
+        guard !stroke.points.isEmpty else { return }
+        record()
+        paint.apply(.stroke(stroke))
+        pageImage = paint.layer.makeImage()
+        revision += 1
+    }
+
+    // MARK: - Stickers
+
+    func addSticker(_ kind: StickerKind) {
+        record()
+        let size = CGFloat(min(art.width, art.height)) * 0.3
+        // Fan new stickers out a little so they do not land exactly on top
+        // of each other.
+        let offset = CGFloat(stickers.count % 5) * size * 0.15
+        let sticker = PlacedSticker(
+            id: UUID(), kind: kind,
+            center: CGPoint(x: CGFloat(art.width) / 2 + offset, y: CGFloat(art.height) / 2 + offset),
+            size: size, rotation: 0)
+        stickers.append(sticker)
+        stickerImages[sticker.id] = stickerLayer(for: sticker).makeImage()
+        selectedSticker = sticker.id
+        tool = .sticker
+        revision += 1
+    }
+
+    func sticker(at point: CGPoint) -> UUID? {
+        stickers.last(where: { $0.contains(pagePoint: point) })?.id
+    }
+
+    func stickerState(_ id: UUID) -> PlacedSticker? {
+        stickers.first(where: { $0.id == id })
+    }
+
+    /// Call once when a drag, pinch or turn begins, so undo restores the
+    /// position from before the whole gesture rather than from each step.
+    func beginStickerGesture() { record() }
+
+    func updateSticker(_ id: UUID, center: CGPoint? = nil, size: CGFloat? = nil, rotation: CGFloat? = nil) {
+        guard let i = stickers.firstIndex(where: { $0.id == id }) else { return }
+        if let center {
+            stickers[i].center = CGPoint(
+                x: min(max(center.x, 0), CGFloat(art.width)),
+                y: min(max(center.y, 0), CGFloat(art.height)))
+        }
+        if let size {
+            let short = CGFloat(min(art.width, art.height))
+            stickers[i].size = min(max(size, short * 0.1), short * 1.2)
+        }
+        if let rotation { stickers[i].rotation = rotation }
+        revision += 1
+    }
+
+    func deleteSticker(_ id: UUID) {
+        guard stickers.contains(where: { $0.id == id }) else { return }
+        record()
+        stickers.removeAll { $0.id == id }
+        stickerLayers[id] = nil
+        stickerImages[id] = nil
+        if selectedSticker == id { selectedSticker = nil }
+        revision += 1
+    }
+
+    /// Brings a sticker to the front.
+    func raiseSticker(_ id: UUID) {
+        guard let i = stickers.firstIndex(where: { $0.id == id }), i != stickers.count - 1 else { return }
+        stickers.append(stickers.remove(at: i))
+        revision += 1
+    }
+
+    private func stickerLayer(for sticker: PlacedSticker) -> FillLayer {
+        if let layer = stickerLayers[sticker.id] { return layer }
+        var layer = StickerRaster.layer(for: sticker.kind)
+        layer.replay(sticker.ops)
+        stickerLayers[sticker.id] = layer
+        return layer
+    }
+
+    // MARK: - Undo
+
+    private func snapshot() -> Snapshot {
+        Snapshot(actions: paint.actions, stickers: stickers, frame: art.frame)
+    }
+
+    private func record() {
+        undoStack.append(snapshot())
+        if undoStack.count > Self.historyLimit { undoStack.removeFirst() }
+        redoStack.removeAll()
+    }
+
+    func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(snapshot())
+        restore(previous)
+    }
+
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(snapshot())
+        restore(next)
+    }
+
+    private func restore(_ s: Snapshot) {
+        var repaint = false
+        if s.frame != art.frame, let framed = art.with(frame: s.frame) {
+            art = framed
+            paint.rebuild(barrier: framed.barrier)
+            repaint = true
+        }
+        if s.actions != paint.actions {
+            paint.set(s.actions)
+            repaint = true
+        }
+        if repaint { pageImage = paint.layer.makeImage() }
+        let old = Dictionary(uniqueKeysWithValues: stickers.map { ($0.id, $0) })
+        stickers = s.stickers
+        var layers: [UUID: FillLayer] = [:]
+        var images: [UUID: CGImage] = [:]
+        for sticker in stickers {
+            if let before = old[sticker.id], before.ops == sticker.ops, before.kind == sticker.kind,
+               let layer = stickerLayers[sticker.id], let image = stickerImages[sticker.id] {
+                layers[sticker.id] = layer
+                images[sticker.id] = image
+            } else {
+                var layer = StickerRaster.layer(for: sticker.kind)
+                layer.replay(sticker.ops)
+                layers[sticker.id] = layer
+                images[sticker.id] = layer.makeImage()
+            }
+        }
+        stickerLayers = layers
+        stickerImages = images
+        if let selected = selectedSticker, !stickers.contains(where: { $0.id == selected }) { selectedSticker = nil }
+        revision += 1
+    }
+
+    // MARK: - Export
+
+    /// The finished page at working size, for sharing or printing.
+    func renderImage() -> UIImage {
+        let size = CGSize(width: art.width, height: art.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let rect = CGRect(origin: .zero, size: size)
+            UIColor.white.setFill()
+            context.fill(rect)
+            if let pageImage { UIImage(cgImage: pageImage).draw(in: rect) }
+            UIImage(cgImage: art.lines).draw(in: rect, blendMode: .multiply, alpha: 1)
+
+            let cg = context.cgContext
+            for sticker in stickers {
+                cg.saveGState()
+                cg.concatenate(sticker.transform)
+                if let image = stickerImages[sticker.id] {
+                    UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: 1, height: 1))
+                }
+                cg.setStrokeColor(UIColor.black.cgColor)
+                cg.setLineWidth(StickerKind.lineWidth)
+                cg.setLineJoin(.round)
+                cg.setLineCap(.round)
+                cg.addPath(sticker.kind.lines)
+                cg.strokePath()
+                cg.restoreGState()
+            }
+        }
+    }
+}
+
+/// Paint colors. Bright, few, and big enough for small hands. White is in
+/// the list so a region can be painted back to paper with the bucket.
+enum Palette {
+    static let colors: [RGBA] = [
+        RGBA(hex: 0xE53935), RGBA(hex: 0xFB8C00), RGBA(hex: 0xFDD835), RGBA(hex: 0x7CB342),
+        RGBA(hex: 0x2E7D32), RGBA(hex: 0x00ACC1), RGBA(hex: 0x42A5F5), RGBA(hex: 0x1E3A8A),
+        RGBA(hex: 0x8E24AA), RGBA(hex: 0xF06292), RGBA(hex: 0x8D6E63), RGBA(hex: 0xFFCCBC),
+        RGBA(hex: 0xD7A86E), RGBA(hex: 0x9E9E9E), RGBA(hex: 0x212121), .white,
+    ]
+}
+
+extension RGBA {
+    var uiColor: UIColor {
+        UIColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: CGFloat(a) / 255)
+    }
+}

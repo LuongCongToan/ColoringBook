@@ -684,6 +684,40 @@ Bản đầu chỉ cần hai hiệu ứng: animation lúc chờ tạo tranh và 
 
 ### Tô màu trong app (giai đoạn 5)
 
+> **Đã làm bản đầu ngày 2026-11-24** (làm sớm theo yêu cầu), code ở `ColoringBook/ColoringBook/Coloring/`: chạm để tô vùng, bút màu, bút dạ và tẩy (PencilKit), 10 sticker nét tạm vẽ bằng path, hoàn tác/làm lại, xuất PNG. Chưa lưu tranh đang tô. Tranh mẫu R&D chỉ đọc trên Simulator bản Debug, từ `tempdrawing_img/`, không đóng gói vào app.
+>
+> **Phát hiện khi thử tô (cần sửa ở prompt):** vùng tô chỉ tách được khi nét khép kín.
+> - Tóc và mặt thường thành **một vùng**, vì prompt dặn "Hair is just an outline with a few thin strand lines" nên model không vẽ đường chân tóc (bé gái trái trong `chibi_3nguoi_result.jpeg`). Thử thêm: "a clear hairline separates the hair from the forehead and face".
+> - Thân người bị cắt ở giữa tranh không có nét khép ở dưới, nên nền tràn vào áo (người giữa trong `chibi_3nguoi_result.jpeg`). Câu "Finish outlines neatly where the photo edge cuts a body" chưa đủ.
+> - Mặt nạ tô: ngưỡng 200, đóng khe hở 3 px rồi làm dày 1 px (ở 1600 px). Cách này lấp được khe nhỏ do nhiễu JPEG, nhưng không lấp được chỗ model bỏ hẳn một nét.
+> - Nên thêm vào bộ đo chất lượng (`measure.py`) một chỉ số "vùng lớn nhất chiếm bao nhiêu % trang", để bắt các tranh mà tóc dính mặt hay áo dính nền.
+
+**Giao diện cho bé, làm lại ngày 2026-11-24.** Căn cứ: NN/g (nút khoảng 2×2 cm cho trẻ nhỏ), Google "Designing engaging apps" (bé dưới 5 tuổi chưa biết đọc nên dùng icon; tránh pinch và thao tác nhiều ngón; mỗi thao tác cần phản hồi), Smashing Magazine (nút ở mép dưới hay bị chạm nhầm).
+
+| Quyết định | Lý do |
+|---|---|
+| Chỉ dùng icon, không có chữ; nút công cụ 72 pt, ô màu và chấm cỡ nét 64–76 pt | Bé chưa biết đọc; ngón tay chưa khéo |
+| Năm công cụ: xô tô, bút, **bút cầu vồng 7 màu**, tẩy, sticker. Bỏ bút dạ | Ít lựa chọn hơn |
+| Icon xô và bút hiện đúng màu đang chọn | Bé thấy ngay mình sẽ tô màu gì |
+| **Chọn cỡ nét bằng 5 chấm to dần**, vẽ bằng màu đang dùng; bút, bút cầu vồng và tẩy nhớ cỡ riêng | Dễ hiểu hơn thanh trượt |
+| **Tẩy xoá cả màu tô bằng xô**, không chỉ nét bút | Bé nghĩ tẩy là xoá mọi thứ mình đã tô |
+| Màu loang ra từ chỗ chạm (0,35 giây) kèm rung nhẹ | Mỗi thao tác đều có phản hồi |
+| Sticker có tay nắm ở góc để phóng to và xoay bằng một ngón; pinch vẫn dùng được | Bé nhỏ khó pinch |
+| Nút hoàn tác tròn lớn trên tranh; bỏ nút làm lại khỏi màn hình; nút chia sẻ nhỏ, ở góc trên | Hoàn tác là "phao cứu sinh"; chia sẻ là việc của phụ huynh |
+| iPad và màn hình ngang: công cụ cạnh trái, màu cạnh phải. Điện thoại dọc: công cụ ở dưới | Tranh luôn to nhất có thể |
+| Biểu tượng xô tô vẽ riêng theo mẫu 3D (SF Symbols không có): xô xanh than nằm nghiêng, quai trắng tay cầm vàng, sơn chảy đúng màu đang chọn | Bé nhận ra công cụ qua hình cái xô |
+| **Phóng to bằng nút kính lúp +/−** (1×, 1,5×, 2×, 3×), cộng nút về cỡ vừa màn hình khi đang phóng to. Pinch là cách phụ | Bé nhỏ chưa pinch được; phóng to giúp tô vùng nhỏ |
+| Phóng to và kéo tranh bằng `UIScrollView` (giống app Ảnh: mượt, có quán tính, nảy ở mép). **Hai ngón** để pinch và kéo với mọi công cụ; một ngón chỉ để tô, vẽ, kéo sticker. Nét đang vẽ dở bị bỏ khi ngón thứ hai chạm vào | Bản tự viết đầu tiên quá nhạy; một ngón kéo trôi tranh khi bé định tô |
+| **Âm thanh** cho mọi thao tác, tổng hợp trong code (không có file, không vướng bản quyền): "bloop" khi tô xô, "tick" khi chọn, chuỗi nốt lấp lánh khi thêm sticker, tiếng tua ngược khi hoàn tác, lên/xuống giọng khi phóng to/thu nhỏ, tiếng chấm nhẹ khi đặt bút. Chế độ `ambient`: tôn trọng nút gạt im lặng, không chặn nhạc | Bé dưới 5 tuổi cần phản hồi bằng tiếng |
+
+Engine vẽ tự viết thay cho PencilKit (một nét PencilKit chỉ có một màu, không làm được bút cầu vồng). Mọi thao tác ghi vào một lớp màu duy nhất, có điểm lưu trung gian sau mỗi 6 thao tác. Đo trên Mac (bản tối ưu): tô xô khoảng 7 ms, hoàn tác 14 bước 6 ms.
+
+**Khung tranh (2026-11-24):** công cụ thứ sáu, 7 khung có sẵn, vẽ bằng code (`PageFrame.swift`): Đơn giản, Viền đôi, Bong bóng, Ngôi sao, Trái tim, Bông hoa, Răng cưa. Khung là nét chưa tô màu, bé tô được bằng xô như phần tranh. Tranh luôn nằm trong vùng bên trong (lề khoảng 9% cạnh ngắn), nên đổi khung không làm lệch màu đã tô trong tranh; đổi khung hoàn tác được. Đường viền trong **không** lấp được thân người bị hở ở giữa tranh (lỗi tranh nêu ở trên): thân áo kết thúc trước khi chạm viền, nên nền vẫn tràn vào áo. Lỗi này vẫn phải sửa ở prompt. Dựng trang có khung mất khoảng 22 ms. Hình xem trước trong khay phóng to góc khung ×3 để bé phân biệt được sao, tim, hoa. Sau này: khung theo theme (khủng long, biển xanh…) theo mục "Theme của sách"; quy cách vẽ ở [frame-art-spec.md](frame-art-spec.md).
+
+**Xô tô tôn trọng nét bút (sửa ngày 2026-11-24):** chạm vào giấy trống thì tô mọi điểm chưa có màu trong vùng, màu nằm dưới nét bút nên nét vẫn giữ và làm đường biên; chạm vào chỗ đã có màu thì chỉ thay màu đó (sai lệch mỗi kênh tối đa 48). Bản đầu ghi đè cả vùng, xoá mất nét bút đã vẽ.
+
+**Còn nên làm:** công tắc tắt âm thanh trong phần cài đặt cho phụ huynh; khoá phụ huynh cho nút thoát và nút chia sẻ (ví dụ giữ 2 giây); kéo sticker thẳng từ khay vào tranh; lưu tranh đang tô; thử với trẻ thật.
+
 - **Chạm để tô vùng:** tự viết flood fill trên bitmap bằng Swift. Nét đã được làm dày nên vùng khép kín, tô không lem.
 - **Tô tự do bằng Apple Pencil:** PencilKit. Nét tô của bé ở lớp dưới, lớp nét đen ở trên (chế độ multiply), nên tô thế nào cũng không đè mất nét.
 - **Metal:** chỉ dùng nếu tranh lớn mà tô bị chậm.

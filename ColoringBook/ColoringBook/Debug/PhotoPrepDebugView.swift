@@ -13,8 +13,7 @@ struct PhotoPrepDebugView: View {
     @State private var source: Data?
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
                 Section {
                     PhotosPicker("Choose a photo", selection: $pick, matching: .images)
                     Toggle("Lighten (for FLUX 3 Klein)", isOn: $lighten)
@@ -42,9 +41,8 @@ struct PhotoPrepDebugView: View {
                                   preview: SharePreview("Prepared photo", image: Image(uiImage: image)))
                     }
                 }
-            }
-            .navigationTitle("Photo prep")
         }
+        .navigationTitle("Photo prep")
         .onChange(of: pick) { _, item in
             Task { await load(item) }
         }
