@@ -20,7 +20,7 @@ Luật bảo mật và nhóm test bắt buộc: [docs/worker-security.md](../doc
 
 | File | Haru | ColoringBook |
 |---|---|---|
-| `src/config.ts` | `BUNDLE_ID = "pt.team.haru"`, gói Pro tháng và năm, `DAILY_CHECKS = 20`, model Claude | Bundle mới; sản phẩm `pro.yearly`, `pro.monthly`, `book.single` (brief mục 5); hạn mức tranh và ngân sách tiền; tên model FLUX 3 Klein và các tầng dự phòng |
+| `src/config.ts` | `BUNDLE_ID = "pt.team.haru"`, gói Pro tháng và năm, `DAILY_CHECKS = 20`, model Claude | Bundle mới; sản phẩm `pro.yearly`, `pro.monthly`, `book.single`; hạn mức tranh và ngân sách tiền theo bảng ở [docs/app-store-products.md](../docs/app-store-products.md) (trần riêng cho `FAMILY_SHARED`, trial nhận qua `offerType`); tên model FLUX 3 Klein và các tầng dự phòng |
 | `src/checker.ts` | Gọi Claude chấm câu | `generator.ts`: gọi BFL FLUX 3 Klein (sửa ảnh), prompt cố định theo kiểu vẽ (Cartoon, Chibi) lấy từ brief mục 4.0, kích thước ảnh trả về, PNG; phân tầng khi tranh hỏng |
 | `src/guard.ts` | Làm sạch câu tiếng Hàn | Kiểm ảnh gửi lên: định dạng JPEG, kích thước đúng 768×1024 hoặc 1024×768, dung lượng tối đa, không có EXIF. Kiểm mô tả chữ (chế độ "Từ ý tưởng"): độ dài, bộ lọc nội dung |
 | `src/handler.ts` | Luồng `/check` | Luồng `/generate`: xác thực JWS, giữ lượt và ngân sách, gọi model, trả ảnh, hoàn lượt khi lỗi. Thêm App Attest. Thêm App Store Server Notifications (hoàn tiền) cho gói "Một cuốn sách" |

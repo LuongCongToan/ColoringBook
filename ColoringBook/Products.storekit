@@ -1,0 +1,91 @@
+{
+  "identifier": "C0B00C01",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "C0B00CB00K1",
+      "localizations": [
+        {
+          "description": "One book of up to 20 pages, ready to print",
+          "displayName": "One Coloring Book",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "pt.team.coloringbook.book.single",
+      "referenceName": "Coloring Book Book",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "COLORINGBOOK",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storeKitErrors": [],
+    "_storefront": "USA",
+    "_timeRate": 0
+  },
+  "subscriptionGroups": [
+    {
+      "id": "C0B00CPRO1",
+      "localizations": [],
+      "name": "Coloring Book Pro",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "7.99",
+          "familyShareable": true,
+          "groupNumber": 1,
+          "internalID": "C0B00CMONTH1",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "60 AI coloring pages a month and unlimited books",
+              "displayName": "Coloring Book Pro Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "pt.team.coloringbook.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Coloring Book Pro Monthly",
+          "subscriptionGroupID": "C0B00CPRO1",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "29.99",
+          "familyShareable": true,
+          "groupNumber": 1,
+          "internalID": "C0B00CYEAR1",
+          "introductoryOffer": {
+            "internalID": "C0B00CTRIAL1",
+            "numberOfPeriods": 1,
+            "paymentMode": "free",
+            "subscriptionPeriod": "P3D"
+          },
+          "localizations": [
+            {
+              "description": "60 AI coloring pages a month and unlimited books",
+              "displayName": "Coloring Book Pro Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "pt.team.coloringbook.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Coloring Book Pro Yearly",
+          "subscriptionGroupID": "C0B00CPRO1",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

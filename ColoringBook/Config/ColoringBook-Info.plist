@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Only HTTPS through the system, so uploads skip the export
+	     compliance question every time. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Finished "One Coloring Book" purchases stay in Transaction.all, so a
+	     reinstall can ask the Worker for the pages left on each book
+	     (docs/app-store-products.md). iOS 18+, which is why the app needs 18. -->
+	<key>SKIncludeConsumableInAppPurchaseHistory</key>
+	<true/>
+</dict>
+</plist>

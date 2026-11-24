@@ -18,6 +18,8 @@ Tài liệu bàn giao để mở một session riêng cho app này. Ảnh thử 
 - Thêm sticker: khi dựng sách và khi tô màu trong app (mục 6, "Sticker"; mục 8).
 - Thêm theme cho sách: bìa, khung trang, họa tiết góc, bộ sticker riêng (mục 6, "Theme của sách"; mục 8).
 - Script R&D nằm trong [Tools/rnd/](../Tools/rnd/).
+- **Gói IAP thiết kế lại** ở [app-store-products.md](app-store-products.md), thay bảng "Các gói đề xuất" ở mục 5. Đã chốt bật Family Sharing.
+- **Quyền riêng tư:** ảnh gửi lên server nhưng không lưu giữ, xem [privacy.md](privacy.md).
 
 ## 1. Tóm tắt
 
@@ -34,7 +36,7 @@ Tài liệu bàn giao để mở một session riêng cho app này. Ảnh thử 
 |---|---|
 | Thị trường | US/global, nhóm chịu chi. Không nhắm thị trường Việt Nam, không đánh giá tính năng theo tiếng Việt. |
 | Nền tảng | Chỉ iOS (iPhone và iPad). Android chỉ xét khi iOS đạt $200/tháng hoặc tỷ lệ trả phí ở paywall từ 2% trở lên. |
-| Công nghệ app | SwiftUI thuần, iOS 17+. Không dùng Flutter. |
+| Công nghệ app | SwiftUI thuần, **iOS 18+** (nâng từ 17 ngày 2026-11-24, để khôi phục lượt của gói "Một cuốn sách" sau khi cài lại, xem [app-store-products.md](app-store-products.md)). Không dùng Flutter. |
 | Engine | Không dùng Unity hay Godot. Các phần chính của app (chọn ảnh, PDF, AirPrint, StoreKit, Vision) đều là thứ Apple làm sẵn; engine game chỉ thêm plugin, làm app nặng hơn và mở chậm hơn. Chỉ xét lại Unity nếu app chuyển thành game cho bé chơi (nhiều màn, 3D, vật lý) hoặc cần ra iOS và Android cùng lúc. |
 | Hiệu ứng | Rive hoặc Lottie cho linh vật và animation, SpriteKit hoặc `CAEmitterLayer` cho particle, shader Metal trong SwiftUI cho hiệu ứng màu. Xem mục 7. |
 | ASO | Nhắm các cụm "personalized coloring book", "custom coloring book for kids", "coloring book gift". Không tranh cụm "AI coloring book". |
@@ -42,6 +44,8 @@ Tài liệu bàn giao để mở một session riêng cho app này. Ảnh thử 
 | Danh mục App Store | Không đăng vào Kids Category (vì ảnh được gửi cho bên thứ ba). Người dùng là phụ huynh. |
 | Tạo tranh | Kết hợp ba tầng, xem mục 4. OpenCV/Core Image không thay được AI cho phần tạo tranh chính. |
 | Logic nghiệp vụ | Đặt ở backend proxy để sau này port Android chỉ cần dựng lại giao diện. |
+| Family Sharing | Bật cho gói đăng ký (2026-11-24). Không tắt lại được. Thành viên gia đình có trần riêng, thấp hơn người mua. Xem [app-store-products.md](app-store-products.md). |
+| Ảnh người dùng | Gửi lên Worker và nhà cung cấp AI để tạo tranh, không lưu giữ (2026-11-24). Xem [privacy.md](privacy.md). |
 
 ## 3. Thị trường (tra ngày 2026-11-15, cập nhật 2026-11-22)
 
@@ -447,6 +451,8 @@ Bản 2026-11-15 định bán $4.99/tuần hoặc $29.99/năm, trần 100 tranh/
 
 ### Các gói đề xuất
 
+> **Đã thay bằng [app-store-products.md](app-store-products.md) (2026-11-24).** Bảng dưới đây giữ lại làm lịch sử; chỗ nào khác thì theo file mới.
+
 | Gói | Loại IAP | Giá (Mỹ) | Thu sau 15% phí | Gồm |
 |---|---|---|---|---|
 | Miễn phí | | $0 | | Sketch trên máy không giới hạn; 3 tranh AI; in và lưu từng tranh. Xuất sách PDF cần trả phí |
@@ -458,7 +464,7 @@ Bản 2026-11-15 định bán $4.99/tuần hoặc $29.99/năm, trần 100 tranh/
 - **Không bán gói trọn đời.** Mỗi tranh tốn tiền API, nên mua một lần mà dùng mãi sẽ lỗ.
 - **Rẻ hơn đối thủ:** gói năm thấp hơn Colorify $10. Một cuốn $4.99 tương đương khoảng $0.21 mỗi trang, ngang 50 credit $9.99 của Colorify, nhưng user mua "một cuốn sách" chứ không mua xu.
 - **Dùng thử 3 ngày** chỉ có ở gói năm, giới hạn 10 tranh AI trong thời gian dùng thử, để tránh lạm dụng.
-- **Bật Family Sharing** cho gói đăng ký, để ông bà và bố mẹ dùng chung. Trần tranh tính theo `originalTransactionId`, tức là dùng chung cho cả gia đình.
+- **Bật Family Sharing** cho gói đăng ký, để ông bà và bố mẹ dùng chung. ~~Trần tranh tính theo `originalTransactionId`, tức là dùng chung cho cả gia đình.~~ Sai: mỗi thành viên gia đình có `originalTransactionId` riêng, nên không gom được trần chung. Cách xử lý ở [app-store-products.md](app-store-products.md), mục "Family Sharing".
 - **Lượt tự động tạo lại khi tranh hỏng** (xem mục 4) không trừ vào số tranh của user ở mọi gói. Chi phí của nó vẫn tính vào ngân sách tiền của user (xem "Kiểm soát chi phí AI" bên dưới).
 - Số tranh mỗi tháng là con số hiện cho user thấy. Worker giữ thêm ngân sách tiền cho mỗi user và không hiện con số đó.
 - **Một cuốn sách** lưu số lượt còn lại trên Worker, theo giao dịch. Consumable không khôi phục được khi cài lại app, nên lượt còn lại phải nằm trên server.
@@ -644,7 +650,7 @@ Về sau: công chúa và lâu đài, siêu anh hùng (tự thiết kế), xe c�
 
 ## 7. Kiến trúc
 
-- **App:** SwiftUI, iOS 17+, iPhone và iPad; StoreKit 2 cho subscription; PDFKit và AirPrint cho xuất và in; lưu tranh cục bộ.
+- **App:** SwiftUI, iOS 18+, iPhone và iPad; StoreKit 2 cho subscription; PDFKit và AirPrint cho xuất và in; lưu tranh cục bộ.
 
 ### Mỗi phần dùng gì
 
@@ -695,7 +701,7 @@ Logic nghiệp vụ nằm trên Worker, nên bản Android chỉ cần dựng l�
   - Xem mục 5, "Kiểm soát chi phí AI".
 - **Luồng xử lý:** tách nền và cắt sát nhân vật → thu ảnh về 768–1024px → Worker → model → trả tranh nhỏ → làm sạch nét và kiểm tra chất lượng trên máy → phóng to lên khổ Letter 300dpi → lưu.
 - **An toàn nội dung:** lọc prompt chữ trước khi gọi model; bật bộ lọc an toàn của nhà cung cấp.
-- **Quyền riêng tư:** không lưu ảnh trên server; ghi rõ trong privacy policy rằng ảnh được gửi cho nhà cung cấp AI để xử lý.
+- **Quyền riêng tư:** ảnh được gửi lên server để tạo tranh nhưng không lưu giữ; ghi rõ trong privacy policy rằng ảnh được gửi cho nhà cung cấp AI để xử lý. Chi tiết, luật cho code và khai báo App Privacy ở [privacy.md](privacy.md).
 
 ## 8. Kế hoạch
 
