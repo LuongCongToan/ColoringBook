@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dựng Worker haru-check</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --text: #1f2328; --muted: #5d6570;
+    --line: #e2dfd8; --accent: #b4532a; --accent-soft: #fbeee7;
+    --code-bg: #f3f1ec; --warn-bg: #fff6d9; --warn-line: #e3c35a;
+    --ok-bg: #e9f5ec; --ok-line: #7fb98d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17191c; --surface: #1f2226; --text: #e6e3dc; --muted: #9aa1ab;
+      --line: #33373d; --accent: #f0966a; --accent-soft: #33241c;
+      --code-bg: #121416; --warn-bg: #36301a; --warn-line: #8a7630;
+      --ok-bg: #1b2e21; --ok-line: #3f7a4f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.65 "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 8px; }
+  .lede { color: var(--muted); margin: 0 0 28px; }
+  h2 {
+    font-size: 21px; margin: 44px 0 12px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  h2 .num {
+    display: inline-block; min-width: 30px; height: 30px; line-height: 30px;
+    text-align: center; border-radius: 50%; margin-right: 8px;
+    background: var(--accent); color: var(--bg); font-size: 15px;
+  }
+  h3 { font-size: 17px; margin: 24px 0 6px; }
+  a { color: var(--accent); }
+  ol, ul { padding-left: 24px; }
+  li { margin: 6px 0; }
+  code {
+    font: 14px/1.5 Consolas, "Cascadia Mono", Menlo, monospace;
+    background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+    overflow-wrap: anywhere;
+  }
+  .cmd {
+    position: relative; margin: 12px 0; background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 8px;
+  }
+  .cmd pre {
+    margin: 0; padding: 14px 84px 14px 14px; overflow-x: auto;
+    font: 14px/1.6 Consolas, "Cascadia Mono", Menlo, monospace;
+  }
+  .cmd button {
+    position: absolute; top: 8px; right: 8px; padding: 4px 10px;
+    font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  }
+  .note, .warn, .ok {
+    margin: 14px 0; padding: 12px 14px; border-radius: 8px;
+    border-left: 4px solid var(--line); background: var(--surface);
+  }
+  .warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+  .ok { background: var(--ok-bg); border-left-color: var(--ok-line); }
+  .toc {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 18px;
+  }
+  .toc ol { margin: 6px 0 0; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 14px; }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  .checklist input { margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Dựng Worker chấm câu <code>haru-check</code></h1>
+<p class="lede">Từ lúc chưa có tài khoản nào đến lúc app gọi được Worker. Làm một lần; lần sau chỉ cần mục 6 để deploy lại.</p>
+
+<div class="toc">
+  <strong>Mục lục</strong>
+  <ol>
+    <li><a href="#node">Kiểm tra Node.js trên máy</a></li>
+    <li><a href="#cloudflare">Đăng ký Cloudflare</a></li>
+    <li><a href="#anthropic">Đăng ký Anthropic và lấy API key</a></li>
+    <li><a href="#test">Chạy test ở máy</a></li>
+    <li><a href="#login">Đăng nhập wrangler</a></li>
+    <li><a href="#deploy">Deploy staging rồi production</a></li>
+    <li><a href="#app">Nối app vào Worker</a></li>
+    <li><a href="#verify">Kiểm tra Worker đang sống</a></li>
+    <li><a href="#trouble">Lỗi hay gặp</a></li>
+    <li><a href="#before-review">Trước khi nộp duyệt</a></li>
+  </ol>
+</div>
+
+<div class="warn">
+  <strong>Dùng tài khoản cá nhân.</strong> Cả Cloudflare lẫn Anthropic đều đăng ký bằng email cá nhân của bạn, không dùng tài khoản của nhóm hay công ty. API key Anthropic tiêu tiền thật.
+</div>
+
+<h2 id="node"><span class="num">1</span>Kiểm tra Node.js trên máy</h2>
+<p>Mọi lệnh bên dưới (<code>npm</code>, <code>npx</code>) đều cần Node.js. Mở terminal và chạy:</p>
+<div class="cmd"><pre>node --version
+npm --version</pre></div>
+<ul>
+  <li>Cả hai in ra số phiên bản: sang mục 2.</li>
+  <li>Báo "not found" / "not recognized": cài bản LTS từ <a href="https://nodejs.org">nodejs.org</a>, sau đó <strong>mở terminal mới</strong> rồi chạy lại hai lệnh trên. Terminal đang mở sẵn không nhận PATH mới.</li>
+</ul>
+<p class="note">Lệnh là <code>npx</code> (n-p-x). Gõ nhầm thành <code>nox</code> cũng ra lỗi "not found".</p>
+
+<h2 id="cloudflare"><span class="num">2</span>Đăng ký Cloudflare</h2>
+<p>Gói miễn phí là đủ cho Worker này, kể cả Durable Object (loại SQLite) dùng để đếm hạn mức. Không cần thẻ.</p>
+<ol>
+  <li>Mở <a href="https://dash.cloudflare.com/sign-up">dash.cloudflare.com/sign-up</a>, đăng ký bằng email và mật khẩu.</li>
+  <li>Mở hộp thư, bấm link xác minh email. Chưa xác minh thì deploy sẽ bị từ chối.</li>
+  <li>Nếu Cloudflare hỏi thêm domain hay chọn gói: bỏ qua, Worker không cần domain riêng.</li>
+  <li>Mở trang Workers bằng link trực tiếp:
+    <a href="https://dash.cloudflare.com/?to=/:account/workers-and-pages">dash.cloudflare.com/?to=/:account/workers-and-pages</a>.
+    Tìm bằng tay thì nó nằm ở thanh bên trái, nhóm <strong>Compute</strong> → <strong>Workers &amp; Pages</strong>.</li>
+  <li>Ở cột phải, ô <strong>Account details</strong> có dòng <strong>Subdomain</strong>. Đó là phần đuôi của mọi URL Worker. Chưa có thì bấm biểu tượng bút chì để đặt.</li>
+</ol>
+<div class="ok">
+  Tài khoản hiện tại đã có subdomain <code>pt-team2011.workers.dev</code>. Không cần bấm <strong>Create application</strong>: Worker tự xuất hiện trong danh sách sau khi deploy từ terminal.
+</div>
+<p class="note">Nếu bạn thấy trang "Get started by adding your first chart" thì đó là phần Analytics, chưa phải Workers. Dùng link trực tiếp ở bước 4.</p>
+
+<h2 id="anthropic"><span class="num">3</span>Đăng ký Anthropic và lấy API key</h2>
+<p>Tài khoản API tách biệt với gói Claude trả tháng (claude.ai, Claude Code). Có gói đó không có nghĩa là có credit API.</p>
+<ol>
+  <li>Mở <a href="https://console.anthropic.com">console.anthropic.com</a> và đăng ký bằng email cá nhân. Có thể phải xác minh số điện thoại.</li>
+  <li>Vào <strong>Billing</strong>, thêm thẻ và nạp credit. Mức nạp nhỏ nhất là đủ: mỗi lượt chấm tốn khoảng $0,00017.</li>
+  <li>Vào <strong>Limits</strong>, đặt giới hạn chi tiêu hàng tháng (ví dụ $10). Đây là lớp chặn cuối cùng nếu Worker có lỗ hổng.</li>
+  <li>Vào <strong>API Keys</strong> → <strong>Create Key</strong>, đặt tên dễ nhận ra (ví dụ <code>haru-check-prod</code>).</li>
+  <li>Copy key ngay (dạng <code>sk-ant-...</code>). Key chỉ hiện <strong>một lần</strong>; lỡ đóng thì tạo key mới.</li>
+</ol>
+<div class="warn">
+  <strong>Key chỉ đi một chỗ:</strong> dán vào khi <code>wrangler secret put</code> hỏi (mục 6). Không lưu vào file trong repo, không dán vào chat, không commit. Nếu lỡ lộ, vào <strong>API Keys</strong> xoá key đó và tạo key mới.
+</div>
+<p class="note">Tên các mục trong console (Billing, Limits, API Keys) có thể đổi theo thời gian; nếu không thấy thì tìm trong phần Settings.</p>
+
+<h2 id="test"><span class="num">4</span>Chạy test ở máy</h2>
+<p>Miễn phí, không cần mạng, không cần key: test dùng <code>fetch</code> giả nên không bao giờ gọi Anthropic.</p>
+<div class="cmd"><pre>cd Worker
+npm install
+npm test
+npm run typecheck</pre></div>
+<p>Phải thấy 66 test qua. Có test fail thì dừng ở đây, đừng deploy.</p>
+
+<h2 id="login"><span class="num">5</span>Đăng nhập wrangler</h2>
+<p>Vẫn đứng trong thư mục <code>Worker</code>:</p>
+<div class="cmd"><pre>npx wrangler login</pre></div>
+<p>Trình duyệt mở ra, đăng nhập Cloudflare và bấm <strong>Allow</strong>. Kiểm tra đã đăng nhập đúng tài khoản:</p>
+<div class="cmd"><pre>npx wrangler whoami</pre></div>
+
+<h2 id="deploy"><span class="num">6</span>Deploy staging rồi production</h2>
+
+<h3>Staging (cho TestFlight)</h3>
+<div class="cmd"><pre>npx wrangler secret put ANTHROPIC_API_KEY --env staging
+npm run deploy:staging</pre></div>
+
+<h3>Production</h3>
+<div class="cmd"><pre>npx wrangler secret put ANTHROPIC_API_KEY
+npm run deploy</pre></div>
+
+<ul>
+  <li><code>secret put</code> hỏi giá trị, dán key vào rồi Enter. Màn hình không hiện key là bình thường.</li>
+  <li>Staging và production là hai Worker riêng nên phải đặt secret hai lần. Dùng chung một key hoặc tạo hai key đều được.</li>
+  <li><code>npm run deploy</code> chạy typecheck và test trước; có test fail thì không deploy.</li>
+  <li>Lần đầu, <code>secret put</code> hỏi có tạo Worker mới không: trả lời <strong>Y</strong>.</li>
+  <li>Lệnh production in cảnh báo "Multiple environments are defined... no target environment was specified". Chỉ là cảnh báo: không ghi <code>--env</code> nghĩa là production, cứ dán key như thường.</li>
+  <li>Secret chỉ cần đặt một lần. Những lần deploy sau chỉ chạy <code>npm run deploy</code>.</li>
+</ul>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Bản</th><th>Tên Worker</th><th>URL</th></tr>
+  <tr><td>Staging</td><td><code>haru-check-staging</code></td><td><code>https://haru-check-staging.pt-team2011.workers.dev/check</code></td></tr>
+  <tr><td>Production</td><td><code>haru-check</code></td><td><code>https://haru-check.pt-team2011.workers.dev/check</code></td></tr>
+</table>
+</div>
+<p class="note">URL thật là dòng wrangler in ra sau khi deploy. Hai URL trên suy từ subdomain hiện tại; nếu đổi subdomain thì URL đổi theo.</p>
+
+<h2 id="app"><span class="num">7</span>Nối app vào Worker</h2>
+<p>Mở <code>Shared/AI/SentenceCheckClient.swift</code>, sửa hằng số <code>endpoint</code> thành URL production kèm <code>/check</code>:</p>
+<div class="cmd"><pre>static let endpoint = URL(string: "https://haru-check.pt-team2011.workers.dev/check")!</pre></div>
+<p>Sau đó tick hai mục "Deploy Worker chấm câu" và "Sửa SentenceCheckClient.endpoint" trong <code>TODO.md</code>.</p>
+
+<h2 id="verify"><span class="num">8</span>Kiểm tra Worker đang sống</h2>
+<div class="cmd"><pre>curl -i -X POST https://haru-check.pt-team2011.workers.dev/check -H "Content-Type: application/json" -d "{}"</pre></div>
+<p>Nhận về <strong>400</strong> hoặc <strong>401</strong> là đúng: Worker đang chạy và từ chối request không có giao dịch hợp lệ, trước khi gọi Anthropic. Lần thử này không tốn tiền.</p>
+<p>Muốn thử chấm câu thật thì cần một JWS thật từ bản TestFlight, gửi vào bản staging.</p>
+<p>Xem log trực tiếp khi đang thử:</p>
+<div class="cmd"><pre>npx wrangler tail
+npx wrangler tail --env staging</pre></div>
+
+<h2 id="trouble"><span class="num">9</span>Lỗi hay gặp</h2>
+<div class="tablewrap">
+<table>
+  <tr><th>Triệu chứng</th><th>Nguyên nhân và cách sửa</th></tr>
+  <tr><td><code>npx</code> / <code>npm</code> not found</td><td>Chưa cài Node.js, hoặc terminal mở trước khi cài. Xem mục 1.</td></tr>
+  <tr><td>Không thấy Workers &amp; Pages</td><td>Đang ở trang khác của dashboard. Dùng link trực tiếp ở mục 2.</td></tr>
+  <tr><td>Deploy báo cần xác minh email</td><td>Bấm link xác minh Cloudflare đã gửi vào hộp thư.</td></tr>
+  <tr><td>Deploy hỏi đăng ký subdomain <code>workers.dev</code></td><td>Tài khoản chưa có subdomain. Trả lời ngay trong terminal hoặc đặt ở dashboard (mục 2, bước 5).</td></tr>
+  <tr><td>Wrangler deploy nhầm tài khoản</td><td>Chạy <code>npx wrangler whoami</code>. Sai thì <code>npx wrangler logout</code> rồi <code>login</code> lại.</td></tr>
+  <tr><td><code>npm run deploy</code> dừng giữa chừng</td><td>Có test hoặc typecheck fail. Đọc lỗi, sửa, chạy lại; đừng gọi thẳng <code>wrangler deploy</code> để bỏ qua.</td></tr>
+  <tr><td>App luôn nhận "thử lại sau" (503)</td><td>Chưa đặt <code>ANTHROPIC_API_KEY</code> cho đúng môi trường, key sai, hoặc tài khoản Anthropic hết credit.</td></tr>
+  <tr><td>App luôn mở paywall (401/403)</td><td>Bundle ID hoặc product ID trong <code>Worker/src/config.ts</code> không khớp app. Chạy <code>python -E -P Tools/check_worker.py</code>.</td></tr>
+</table>
+</div>
+
+<h2 id="before-review"><span class="num">10</span>Trước khi nộp duyệt</h2>
+<ul class="checklist">
+  <li><label><input type="checkbox"> <span><code>SANDBOX_DAILY_CAP</code> trong <code>Worker/wrangler.toml</code> đang là <code>"50"</code>, không phải <code>"0"</code>. Reviewer của Apple mua trong sandbox; để 0 thì họ thấy tính năng trả tiền báo lỗi.</span></label></li>
+  <li><label><input type="checkbox"> <span><code>GLOBAL_DAILY_CAP</code> phù hợp số người dùng (mặc định 5000 lượt/ngày, trần khoảng $0,85/ngày).</span></label></li>
+  <li><label><input type="checkbox"> <span>Giới hạn chi tiêu hàng tháng đã đặt trong console Anthropic.</span></label></li>
+  <li><label><input type="checkbox"> <span><code>SentenceCheckClient.endpoint</code> trỏ vào URL production thật.</span></label></li>
+  <li><label><input type="checkbox"> <span>Đã thử một JWS thật từ TestFlight với bản staging.</span></label></li>
+  <li><label><input type="checkbox"> <span>Đã thử bằng API thật: vài chục câu sai kiểu người học, và mười câu tiêm lệnh thuần tiếng Hàn (phải ra <code>off_task</code>). Chi tiết ở cuối <code>Worker/README.md</code>.</span></label></li>
+</ul>
+
+</main>
+<script>
+  document.querySelectorAll('.cmd').forEach(function (box) {
+    var btn = document.createElement('button');
+    btn.textContent = 'Copy';
+    btn.addEventListener('click', function () {
+      navigator.clipboard.writeText(box.querySelector('pre').textContent).then(function () {
+        btn.textContent = 'Đã copy';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1500);
+      });
+    });
+    box.appendChild(btn);
+  });
+</script>
+</body>
+</html>

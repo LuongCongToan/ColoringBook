@@ -1,0 +1,49 @@
+# The sentence-checking backend for Haru (SCOPE.md sections 5 and 5B).
+#
+# There are no secrets in this file and there must never be any. The one
+# secret is set out of band:
+#
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put ANTHROPIC_API_KEY --env staging
+#
+# Deploy with `npm run deploy`, which refuses to ship if a test fails.
+
+name = "coloring-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "production"
+# The fuse: checks per UTC day across every subscriber. At about $0.00017 a
+# check this caps a day's bill near $0.85. Raise it as subscribers arrive.
+GLOBAL_DAILY_CAP = "5000"
+# Checks per UTC day shared by every sandbox transaction. App Review buys in
+# the sandbox and exercises the production Worker, so "0" here means the
+# reviewer sees the paid feature fail. See README.md, "Sandbox".
+SANDBOX_DAILY_CAP = "50"
+
+[[durable_objects.bindings]]
+name = "QUOTA"
+class_name = "QuotaCounter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuotaCounter"]
+
+# TestFlight and development builds. Their purchases are all sandbox ones.
+[env.staging]
+name = "coloring-api-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+GLOBAL_DAILY_CAP = "500"
+SANDBOX_DAILY_CAP = "500"
+
+[[env.staging.durable_objects.bindings]]
+name = "QUOTA"
+class_name = "QuotaCounter"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuotaCounter"]

@@ -1,0 +1,41 @@
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Secrets
+.env
+*.env
+.dev.vars
+
+# Cloudflare Worker
+node_modules/
+.wrangler/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Test photos and generated pages (real family photos, never commit)
+Tools/rnd/samples/
+Tools/rnd/out/
+*.jpeg
+*.jpg
+*.heic
+*.HEIC
+
+# Marketing material, kept out of git as in Haru
+Marketings/
