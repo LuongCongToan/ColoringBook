@@ -2,7 +2,7 @@ import PhotosUI
 import SwiftUI
 
 /// Pages to color. For now: R&D sample pages (Simulator, Debug only) and any
-/// line-art image imported from Photos. Saved books come later.
+/// line-art image imported from Photos, plus the shelf of saved books.
 struct PageLibraryView: View {
     @State private var samples: [SamplePage] = []
     @State private var pick: PhotosPickerItem?
@@ -10,6 +10,7 @@ struct PageLibraryView: View {
     @State private var error: String?
     @State private var store = PageStore.shared
     @State private var bookStore = BookStore.shared
+    @State private var bookToDelete: StoredBook?
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -54,7 +55,7 @@ struct PageLibraryView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Make a coloring book")
                                 .font(.title3.weight(.heavy))
-                            Text("PDF to print, with your child's name")
+                            Text("Read it in the app, save it as a PDF")
                                 .font(.subheadline.weight(.medium))
                                 .opacity(0.9)
                         }
@@ -75,23 +76,30 @@ struct PageLibraryView: View {
                 .padding(.top, 4)
 
                 if !bookStore.books.isEmpty {
-                    Text("My books")
-                        .font(.title2.weight(.bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("My books")
+                            .font(.title2.weight(.bold))
+                        Text("\(bookStore.books.count)")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        NavigationLink("See all") { BookListView() }
+                            .font(.headline)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
                             ForEach(bookStore.books) { book in
                                 NavigationLink {
                                     BookReaderView(bookID: book.id)
                                 } label: {
-                                    bookCover(book)
+                                    BookShelfCover(book: book, pages: store)
                                 }
                                 .buttonStyle(.plain)
                                 .contextMenu {
                                     Button("Delete book", systemImage: "trash", role: .destructive) {
-                                        bookStore.delete(book.id)
+                                        bookToDelete = book
                                     }
                                 }
                             }
@@ -116,6 +124,12 @@ struct PageLibraryView: View {
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
+                                #if DEBUG && targetEnvironment(simulator)
+                                Button(page.photo == nil ? "Debug: add test photo" : "Debug: remove photo",
+                                       systemImage: "photo") {
+                                    store.debugSetTestPhoto(page.photo == nil, for: [page.id])
+                                }
+                                #endif
                                 Button("Delete page", systemImage: "trash", role: .destructive) {
                                     store.delete(page.id)
                                 }
@@ -162,12 +176,32 @@ struct PageLibraryView: View {
             .toolbar {
                 #if DEBUG
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink("Photo prep") { PhotoPrepDebugView() }
+                    Menu("Debug") {
+                        NavigationLink("Photo prep") { PhotoPrepDebugView() }
+                        #if targetEnvironment(simulator)
+                        // Sample pages have no photo; these let the photo
+                        // layouts of books be seen.
+                        Button("Test photo on every page", systemImage: "photo.badge.plus") {
+                            store.debugSetTestPhoto(true, for: store.pages.map(\.id))
+                        }
+                        Button("Remove photo from every page", systemImage: "photo.badge.minus", role: .destructive) {
+                            store.debugSetTestPhoto(false, for: store.pages.map(\.id))
+                        }
+                        #endif
+                    }
                 }
                 #endif
             }
             .navigationDestination(item: $opened) { page in
                 ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
+            }
+            .confirmationDialog(bookToDelete.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
+                                isPresented: Binding(get: { bookToDelete != nil }, set: { if !$0 { bookToDelete = nil } }),
+                                titleVisibility: .visible,
+                                presenting: bookToDelete) { book in
+                Button("Delete book", role: .destructive) { withAnimation { bookStore.delete(book.id) } }
+            } message: { _ in
+                Text("The pages stay in My pages.")
             }
         }
         .task { samples = DevSamples.pages() }
@@ -191,38 +225,6 @@ struct PageLibraryView: View {
         .padding(8)
         .background(RoundedRectangle(cornerRadius: 16).fill(.white))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.black.opacity(0.08)))
-    }
-
-    /// A book on the shelf: its first page as the cover, the title on a band,
-    /// and a darker spine on the left.
-    private func bookCover(_ book: StoredBook) -> some View {
-        let first = book.pageIDs.lazy.compactMap { id in store.pages.first { $0.id == id } }.first
-        return ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 10).fill(.white)
-            AsyncImage(url: first?.thumbnail) { image in
-                image.resizable().scaledToFit()
-            } placeholder: {
-                Image(systemName: "book.closed").font(.largeTitle).foregroundStyle(.secondary)
-            }
-            .padding(10)
-            .padding(.bottom, 34)
-            Text(book.title)
-                .font(.caption.weight(.heavy))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-                .padding(6)
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(Color(red: 0.55, green: 0.36, blue: 0.86))
-        }
-        .frame(width: 130, height: 170)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .leading) {
-            Rectangle().fill(.black.opacity(0.18)).frame(width: 8)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10))
-        }
-        .shadow(color: .black.opacity(0.18), radius: 6, x: 2, y: 4)
-        .accessibilityLabel(book.title)
     }
 
     private func savedThumbnail(_ page: SavedPageInfo) -> some View {

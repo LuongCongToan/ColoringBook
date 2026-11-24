@@ -112,6 +112,20 @@ final class PageStore {
         return newID
     }
 
+    #if DEBUG && targetEnvironment(simulator)
+    /// Debug: gives a page the test photo (`tempdrawing_img/3nguoi`), or takes
+    /// its photo away, so the photo layouts can be seen with sample pages
+    /// that were not made from a photo.
+    func debugSetTestPhoto(_ on: Bool, for ids: [UUID]) {
+        let photo = on ? DebugBook.testPhotoJPEG() : nil
+        for id in ids {
+            let url = folder(id).appendingPathComponent("photo.jpg")
+            if let photo { try? photo.write(to: url, options: .atomic) } else { try? FileManager.default.removeItem(at: url) }
+        }
+        refresh()
+    }
+    #endif
+
     func delete(_ id: UUID) {
         try? FileManager.default.removeItem(at: folder(id))
         refresh()

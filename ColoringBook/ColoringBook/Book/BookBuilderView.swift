@@ -4,23 +4,16 @@ import SwiftUI
 ///
 /// One screen, top to bottom: the cover (live preview, name, frame), the
 /// pages (three rows that scroll sideways, plus an Arrange sheet for order),
-/// then the kind of book with its own options: a book in the app that turns
-/// like paper, or a PDF to preview and print. The main button stays at the
-/// bottom. A parent's screen, so it has words.
+/// and the book's options. It always saves a book in the app, where the
+/// pages can be reviewed one by one; the PDF is made from that book
+/// (BookReaderView, "Save PDF"). A parent's screen, so it has words.
 struct BookBuilderView: View {
-    enum Kind: String, CaseIterable, Identifiable {
-        case app, pdf
-        var id: String { rawValue }
-        var title: String { self == .app ? "Book in the app" : "PDF to print" }
-    }
-
     /// The in-app book being edited, if this was opened from one.
     private let editing: StoredBook?
 
     @State private var store = PageStore.shared
     @State private var selected: [UUID]
     @State private var options = BookOptions()
-    @State private var kind: Kind
     /// In-app book: start from fresh, uncolored copies of the pages.
     @State private var freshCopies = false
     @State private var pageSounds = true
@@ -28,26 +21,23 @@ struct BookBuilderView: View {
     @State private var arranging = false
     @State private var working = false
     @State private var progress = 0.0
-    @State private var pdf: BuiltBook?
     @State private var openBook: StoredBook?
-    @State private var showPlans = false
-    @State private var error: String?
     @AppStorage("bookChildName") private var savedName = ""
     @Environment(\.dismiss) private var dismiss
 
     private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
     private let rows = Array(repeating: GridItem(.fixed(78), spacing: 10), count: 3)
 
-    init(book: StoredBook? = nil, kind: Kind = .app) {
+    init(book: StoredBook? = nil) {
         editing = book
         _selected = State(initialValue: book?.pageIDs ?? [])
         var opts = BookOptions()
         opts.childName = book?.name ?? ""
         opts.coverFrame = book?.coverFrame ?? .stars
         opts.belongsToPage = book?.belongsToPage ?? true
+        opts.layout = book?.layout ?? .pagesOnly
         _options = State(initialValue: opts)
         _pageSounds = State(initialValue: book?.pageSounds ?? true)
-        _kind = State(initialValue: kind)
     }
 
     var body: some View {
@@ -55,14 +45,8 @@ struct BookBuilderView: View {
             VStack(spacing: 16) {
                 coverCard
                 pagesCard
-                Picker("Kind of book", selection: $kind) {
-                    ForEach(Kind.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                if kind == .app { appOptions } else { pdfOptions }
-                if let error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                }
+                layoutCard
+                appOptions
             }
             .padding(16)
         }
@@ -77,8 +61,6 @@ struct BookBuilderView: View {
         .onChange(of: options.childName) { _, name in savedName = name }
         .task(id: coverKey) { await renderCover() }
         .sheet(isPresented: $arranging) { ArrangeSheet(selected: $selected, store: store) }
-        .sheet(item: $pdf) { book in PDFPreviewView(book: book) }
-        .sheet(isPresented: $showPlans) { PaywallView { Task { await makePDF() } } }
         .navigationDestination(item: $openBook) { book in BookReaderView(bookID: book.id) }
     }
 
@@ -229,6 +211,61 @@ struct BookBuilderView: View {
         .accessibilityLabel(index.map { "Page, chosen as number \($0 + 1)" } ?? "Page, not chosen")
     }
 
+    // MARK: - Layout
+
+    /// Chosen pages made from a photo: only they can show one.
+    private var withPhoto: Int {
+        selected.filter { id in store.pages.first { $0.id == id }?.photo != nil }.count
+    }
+
+    private var layoutCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Page layout").font(.headline)
+            HStack(spacing: 10) {
+                ForEach(BookLayout.allCases) { layout in
+                    Button {
+                        SoundFX.shared.play(.tap)
+                        options.layout = layout
+                    } label: {
+                        VStack(spacing: 6) {
+                            LayoutSketch(layout: layout)
+                                .frame(height: 64)
+                            Text(layout.title)
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(options.layout == layout ? Self.accent : .clear, lineWidth: 3))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(options.layout == layout ? .isSelected : [])
+                }
+            }
+            Text(layoutNote)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemBackground)))
+    }
+
+    private var layoutNote: String {
+        var note: String
+        switch options.layout {
+        case .pagesOnly: note = "One picture on each page."
+        case .photoFacing: note = "The photo on one page, its picture to color on the next."
+        case .photoCorner: note = "The picture with its photo laid on the corner, like a snapshot."
+        }
+        if options.layout != .pagesOnly && selected.count > withPhoto {
+            note += " Pages not made from a photo show the picture alone."
+        }
+        return note + " You can change one page\u{2019}s layout inside the book."
+    }
+
     // MARK: - Options
 
     private var appOptions: some View {
@@ -251,49 +288,17 @@ struct BookBuilderView: View {
         .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemBackground)))
     }
 
-    private var pdfOptions: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Layout").font(.headline)
-            Picker("Layout", selection: $options.layout) {
-                ForEach(BookLayout.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            Text(layoutNote).font(.footnote).foregroundStyle(.secondary)
-            Text("Lines").font(.headline)
-            Picker("Lines", selection: $options.lines) {
-                ForEach(LineWeight.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            Toggle("Blank back after each page", isOn: $options.blankBacks)
-            Toggle("Include colors from the app", isOn: $options.includeColors)
-        }
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemBackground)))
-    }
-
-    private var layoutNote: String {
-        switch options.layout {
-        case .pagesOnly:
-            "US Letter, one picture per page with wide margins."
-        case .photoFacing:
-            "The photo in color on the left, its coloring page on the right. Pages without a photo print on their own."
-        case .photoCorner:
-            "A small color photo in the corner shows which colors to use, and saves ink."
-        }
-    }
-
     // MARK: - Main button
 
     private var mainButton: some View {
         Button {
-            Task { kind == .app ? await saveInApp() : await makePDF() }
+            Task { await saveInApp() }
         } label: {
             HStack {
                 if working {
                     ProgressView(value: progress).tint(.white).frame(width: 120)
                 } else {
-                    Label(kind == .app ? (editing == nil ? "Save book" : "Update book") : "Preview PDF",
-                          systemImage: kind == .app ? "books.vertical.fill" : "doc.richtext")
+                    Label(editing == nil ? "Save book" : "Update book", systemImage: "books.vertical.fill")
                 }
             }
             .font(.headline)
@@ -330,57 +335,11 @@ struct BookBuilderView: View {
         book.pageIDs = pageIDs
         book.coverFrame = options.coverFrame
         book.belongsToPage = options.belongsToPage
+        book.layout = options.layout
         book.pageSounds = pageSounds
         BookStore.shared.save(book)
         SoundFX.shared.play(.sticker)
         if editing != nil { dismiss() } else { openBook = book }
-    }
-
-    private func makePDF() async {
-        error = nil
-        // Exporting a book is a paid feature (brief 5): Pro or a book.
-        if StoreModel.shared.isAvailable, await StoreModel.shared.currentJWS() == nil {
-            showPlans = true
-            return
-        }
-        working = true
-        progress = 0
-        defer { working = false }
-
-        var sources: [BookPageSource] = []
-        for (i, id) in selected.enumerated() {
-            guard let (art, saved) = try? await store.load(id) else { continue }
-            let session = ColoringSession(art: art, pageID: id, restoring: saved)
-            guard let lines = session.renderLineArt().cgImage,
-                  let colored = session.renderImage().cgImage else { continue }
-            let photo = store.pages.first { $0.id == id }?.photo
-                .flatMap { UIImage(contentsOfFile: $0.path)?.cgImage }
-            sources.append(BookPageSource(lineArt: lines, colored: colored, photo: photo))
-            progress = Double(i + 1) / Double(selected.count) * 0.4
-        }
-        guard !sources.isEmpty else {
-            error = "These pages could not be opened."
-            return
-        }
-
-        let opts = options
-        let (data, kinds) = await Task.detached(priority: .userInitiated) {
-            BookRenderer.makePDF(pages: sources, options: opts)
-        }.value
-        progress = 1
-        let withoutPhoto = sources.filter { $0.photo == nil }.count
-
-        let name = opts.childName.trimmingCharacters(in: .whitespaces)
-        let title = name.isEmpty ? "Coloring Book" : "\(name)'s Coloring Book"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(title).pdf")
-        do {
-            try data.write(to: url, options: .atomic)
-            SoundFX.shared.play(.sticker)
-            pdf = BuiltBook(url: url, title: title, kinds: kinds, pictures: sources.count,
-                            withoutPhoto: withoutPhoto, options: opts)
-        } catch {
-            self.error = "The PDF could not be saved."
-        }
     }
 }
 

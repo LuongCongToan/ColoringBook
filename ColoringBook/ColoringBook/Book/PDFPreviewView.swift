@@ -4,7 +4,7 @@ import UIKit
 
 /// The PDF before it is saved, shared or printed: scroll through the pages
 /// as they will come out of the printer, read the summary and the notes, then
-/// save, share, print, or go back and change something.
+/// save, share or print. Made from a book in the app (BookReaderView).
 struct PDFPreviewView: View {
     let book: BuiltBook
     @Environment(\.dismiss) private var dismiss
@@ -33,7 +33,7 @@ struct PDFPreviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Edit") { dismiss() }
+                    Button("Back") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Print", systemImage: "printer") { print() }

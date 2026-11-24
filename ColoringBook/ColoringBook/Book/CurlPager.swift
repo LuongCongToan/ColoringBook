@@ -30,7 +30,9 @@ struct CurlPager: UIViewControllerRepresentable {
         guard let shown = pager.viewControllers?.first as? CurlPageController else { return }
         if coordinator.token != reloadToken {
             coordinator.token = reloadToken
-            pager.setViewControllers([coordinator.page(shown.index)], direction: .forward, animated: false)
+            // The page may have moved (a photo page added before it).
+            let target = (0..<count).contains(index) ? index : shown.index
+            pager.setViewControllers([coordinator.page(target)], direction: .forward, animated: false)
             return
         }
         // An arrow or thumbnail moved the index: turn to that page.

@@ -19,12 +19,24 @@ enum DebugBook {
     }
 
     /// Saves a few colored sample pages and an in-app book "Mia" made of them.
-    static func makeTestLibraryBook() async -> UUID? {
+    /// Pages drawn from 3nguoi get the photo, so the photo layouts show.
+    /// `-savePDF`: make the PDF as soon as the test book opens, once only,
+    /// so books opened later in the same run behave normally.
+    private static var autoSavePDFLeft = ProcessInfo.processInfo.arguments.contains("-savePDF")
+    static func takeAutoSavePDF() -> Bool {
+        defer { autoSavePDFLeft = false }
+        return autoSavePDFLeft
+    }
+
+    static var wantsBookList: Bool { ProcessInfo.processInfo.arguments.contains("-bookList") }
+
+    static func makeTestLibraryBook(name: String = "Mia") async -> UUID? {
         var ids: [UUID] = []
         let colors = [RGBA(hex: 0xFDD835), RGBA(hex: 0x42A5F5), RGBA(hex: 0xF06292), RGBA(hex: 0x7CB342)]
         for (i, sample) in DevSamples.pages().prefix(6).enumerated() {
             guard let data = try? Data(contentsOf: sample.url), let art = try? LineArt.load(data) else { continue }
-            let session = ColoringSession(art: art)
+            let fromPhoto = sample.url.lastPathComponent.contains("3nguoi")
+            let session = ColoringSession(art: art, photo: fromPhoto ? photoJPEG() : nil)
             session.color = colors[i % colors.count]
             session.fill(atPage: CGPoint(x: 200, y: 200))
             PageStore.shared.save(session)
@@ -33,7 +45,13 @@ enum DebugBook {
         // Saving finishes on a background task; give it a moment.
         try? await Task.sleep(for: .seconds(2))
         PageStore.shared.refresh()
-        let book = StoredBook(name: "Mia", pageIDs: ids)
+        var book = StoredBook(name: name, pageIDs: ids)
+        // `-bookLayout photoCorner` (or photoFacing) to see the photo layouts.
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-bookLayout"), i + 1 < args.count,
+           let layout = BookLayout(rawValue: args[i + 1]) {
+            book.layout = layout
+        }
         BookStore.shared.save(book)
         return book.id
     }
@@ -67,19 +85,32 @@ enum DebugBook {
                          withoutPhoto: sources.filter { $0.photo == nil }.count, options: options)
     }
 
-    private static func makeSources() -> [BookPageSource] {
-        let samples = DevSamples.pages()
-        guard !samples.isEmpty else { return [] }
+    /// The test photo, made once per run.
+    private static var testPhoto: Data??
+    static func testPhotoJPEG() -> Data? {
+        if let testPhoto { return testPhoto }
+        let made = photoJPEG()
+        testPhoto = made
+        return made
+    }
+
+    /// `tempdrawing_img/3nguoi` cropped like a real photo, as JPEG.
+    private static func photoJPEG() -> Data? {
         let folder = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()  // Debug
             .deletingLastPathComponent()  // ColoringBook (sources)
             .deletingLastPathComponent()  // ColoringBook (project)
             .deletingLastPathComponent()  // repo root
             .appendingPathComponent("tempdrawing_img")
-        let photo = ["3nguoi.jpeg", "3nguoi.jpg"].lazy
+        return ["3nguoi.jpeg", "3nguoi.jpg"].lazy
             .compactMap { try? Data(contentsOf: folder.appendingPathComponent($0)) }.first
-            .flatMap { try? PhotoPrep.prepare($0, lighten: false) }
-            .flatMap { UIImage(data: $0.jpeg)?.cgImage }
+            .flatMap { try? PhotoPrep.prepare($0, lighten: false) }?.jpeg
+    }
+
+    private static func makeSources() -> [BookPageSource] {
+        let samples = DevSamples.pages()
+        guard !samples.isEmpty else { return [] }
+        let photo = photoJPEG().flatMap { UIImage(data: $0)?.cgImage }
 
         var sources: [BookPageSource] = []
         for i in 0..<10 {

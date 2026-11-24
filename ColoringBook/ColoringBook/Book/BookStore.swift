@@ -14,6 +14,15 @@ struct StoredBook: Codable, Identifiable, Hashable {
     var belongsToPage = true
     /// Play a sound when a page turns.
     var pageSounds = true
+    /// How pages are laid out, in the app and in the PDF.
+    var layout: BookLayout = .pagesOnly
+    /// Pages laid out differently from the rest of the book.
+    var pageLayouts: [UUID: BookLayout] = [:]
+
+    /// The layout a page shows in, given whether it has a photo.
+    func layout(for id: UUID, hasPhoto: Bool) -> BookLayout {
+        (pageLayouts[id] ?? layout).on(hasPhoto: hasPhoto)
+    }
 
     init(name: String, pageIDs: [UUID]) {
         self.name = name
@@ -31,6 +40,8 @@ struct StoredBook: Codable, Identifiable, Hashable {
         coverFrame = try c.decodeIfPresent(PageFrame.self, forKey: .coverFrame) ?? .stars
         belongsToPage = try c.decodeIfPresent(Bool.self, forKey: .belongsToPage) ?? true
         pageSounds = try c.decodeIfPresent(Bool.self, forKey: .pageSounds) ?? true
+        layout = try c.decodeIfPresent(BookLayout.self, forKey: .layout) ?? .pagesOnly
+        pageLayouts = try c.decodeIfPresent([UUID: BookLayout].self, forKey: .pageLayouts) ?? [:]
     }
 
     var title: String {
@@ -71,6 +82,11 @@ final class BookStore {
 
     func delete(_ id: UUID) {
         books.removeAll { $0.id == id }
+        write()
+    }
+
+    func delete(_ ids: Set<UUID>) {
+        books.removeAll { ids.contains($0.id) }
         write()
     }
 
