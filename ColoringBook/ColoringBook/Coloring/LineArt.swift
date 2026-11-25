@@ -54,8 +54,10 @@ nonisolated struct LineArt: @unchecked Sendable {
         let height = Int((Double(image.height) * scale).rounded())
         let size = CGSize(width: width, height: height)
 
-        // The drawing, aspect-fit into the frame's inner area.
-        let inner = PageFrame.innerRect(in: size)
+        // The drawing, aspect-fit into the frame's inner area: the opening of
+        // a colored frame (a little inside it, so its edge line stays clear),
+        // or the fixed area inside the line frames.
+        let inner = pictureArea(for: frame, size: size)
         let fit = min(inner.width / CGFloat(image.width), inner.height / CGFloat(image.height))
         let drawn = CGSize(width: CGFloat(image.width) * fit, height: CGFloat(image.height) * fit)
         let art = CGRect(x: inner.midX - drawn.width / 2, y: inner.midY - drawn.height / 2,
@@ -125,7 +127,7 @@ nonisolated struct LineArt: @unchecked Sendable {
         if colorFrame != nil {
             // A colored frame is not for painting: only the picture area
             // inside it takes paint.
-            let inner = PageFrame.innerRect(in: size).integral
+            let inner = pictureArea(for: frame, size: size).insetBy(dx: -3, dy: -3).integral
             for y in 0..<height {
                 let inside = y >= Int(inner.minY) && y < Int(inner.maxY)
                 for x in 0..<width where !(inside && x >= Int(inner.minX) && x < Int(inner.maxX)) {
@@ -167,6 +169,16 @@ nonisolated struct LineArt: @unchecked Sendable {
         }
         let rows = pass(src, count: h, length: w) { y, x in y * w + x }
         return pass(rows, count: w, length: h) { x, y in y * w + x }
+    }
+
+    static func pictureArea(for frame: FrameChoice, size: CGSize) -> CGRect {
+        if case .image(let name) = frame,
+           let opening = FrameLibrary.opening(of: name, landscape: size.width >= size.height) {
+            let rect = CGRect(x: opening.minX * size.width, y: opening.minY * size.height,
+                              width: opening.width * size.width, height: opening.height * size.height)
+            return rect.insetBy(dx: 6, dy: 6)
+        }
+        return PageFrame.innerRect(in: size)
     }
 
     /// The frame artwork stretched to the page at working size, keeping its

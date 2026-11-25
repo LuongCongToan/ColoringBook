@@ -20,15 +20,18 @@ struct PageLibraryView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 14) {
                     header
                     // Opens the Create tab, so the tab bar shows where you are.
                     Button {
                         SoundFX.shared.play(.tap)
                         AppTabs.shared.selected = .create
                     } label: {
+                        // The camera art is taller than the book's: sized so the
+                        // camera body is ~80 pt wide, as in the design.
                         homeCard(title: "Make a coloring page", subtitle: "From your favorite photo",
-                                 color: Kid.yellow, art: "HomeCamera")
+                                 color: Kid.yellow, art: "HomeCamera", artSize: CGSize(width: 208, height: 136), artSlot: 236,
+                                 artOffset: CGSize(width: -3, height: -1.5))
                     }
                     .buttonStyle(SquishyStyle())
 
@@ -48,7 +51,7 @@ struct PageLibraryView: View {
                         Text(error).font(Kid.body(15)).foregroundStyle(Kid.coral)
                     }
                 }
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 13)
                 .padding(.bottom, 24)
             }
             .background(KidBackground())
@@ -94,7 +97,7 @@ struct PageLibraryView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text("Make something magical!")
-                    .font(Kid.body(16))
+                    .font(Kid.text(16))
                     .foregroundStyle(Kid.grape)
             }
             Spacer(minLength: 0)
@@ -111,7 +114,10 @@ struct PageLibraryView: View {
             .buttonStyle(SquishyStyle())
             .accessibilityLabel("Settings for grown-ups")
         }
-        .padding(.top, 6)
+        .padding(.leading, 20)
+        .padding(.trailing, 4)
+        .padding(.top, 2)
+        .padding(.bottom, -11)  // the design's card starts 88 pt below the mascot's top
         .overlay(alignment: .topLeading) { sparkles }
     }
 
@@ -132,35 +138,37 @@ struct PageLibraryView: View {
 
     /// A big rounded card: the illustration on the left, the words on the
     /// right, a white arrow button.
-    private func homeCard(title: String, subtitle: String, color: Color, art: String) -> some View {
-        HStack(spacing: 8) {
+    private func homeCard(title: String, subtitle: String, color: Color, art: String,
+                          artSize: CGSize = CGSize(width: 212, height: 112), artSlot: CGFloat? = nil,
+                          artOffset: CGSize = .zero) -> some View {
+        // Measured against the design (2026-11-25): card 414 × 124 pt, the
+        // illustration about 212 × 112 pt on the left half.
+        HStack(spacing: 6) {
             Image(art)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: 190, maxHeight: 120)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(Kid.titleBold(25))
-                    .foregroundStyle(Kid.ink)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.8)
-                Text(subtitle)
-                    .font(Kid.body(14))
-                    .foregroundStyle(Kid.ink.opacity(0.85))
+                .frame(width: artSize.width, height: artSize.height)
+                .offset(artOffset)
+                // The art may be taller than the card; it overhangs a little
+                // instead of making the card taller (card 124 pt as designed).
+                .frame(width: artSlot ?? artSize.width, height: min(artSize.height, 112), alignment: .leading)
+            VStack(alignment: .leading, spacing: 2) {
+                ExactText.cardTitle(title)
+                ExactText.cardSubtitle(subtitle)
             }
             .multilineTextAlignment(.leading)
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: "arrow.right")
-                .font(.system(size: 20, weight: .heavy))
+                .font(.system(size: 18, weight: .heavy))
                 .foregroundStyle(Kid.ink)
-                .frame(width: 46, height: 46)
+                .frame(width: 40, height: 40)
                 .background(Circle().fill(.white))
                 .shadow(color: Kid.ink.opacity(0.12), radius: 3, y: 2)
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 14)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, minHeight: 150)
+        .padding(.leading, 6)
+        .padding(.trailing, 12)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: 124)
         .background(
             RoundedRectangle(cornerRadius: Kid.radius + 6, style: .continuous)
                 .fill(LinearGradient(colors: [color.opacity(0.85), color], startPoint: .top, endPoint: .bottom)))
@@ -283,12 +291,12 @@ struct PageLibraryView: View {
     private func sectionTitle(_ text: String, symbol: String, color: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
-                .frame(width: 38, height: 38)
+                .frame(width: 34, height: 34)
                 .background(Circle().fill(color))
             Text(text)
-                .font(Kid.titleBold(27))
+                .font(Kid.titleBold(26))
                 .foregroundStyle(Kid.ink)
         }
     }

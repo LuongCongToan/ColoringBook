@@ -584,20 +584,31 @@ struct FramePreview: View {
 
     var body: some View {
         GeometryReader { geo in
-            let big = CGSize(width: geo.size.width * 3, height: geo.size.height * 3)
-            ZStack {
-                RoundedRectangle(cornerRadius: 4).fill(.white)
-                // The artwork at three times the size, as an overlay on a view
-                // the size of the button, so it is cut to the button.
-                Color.clear
-                    .overlay(alignment: .topLeading) { artwork(size: big).frame(width: big.width, height: big.height) }
-                    .clipped()
-                Image(systemName: "face.smiling")
-                    .font(.system(size: geo.size.height * 0.34))
-                    .foregroundStyle(.black.opacity(0.22))
-                    .position(x: geo.size.width * 0.72, y: geo.size.height * 0.68)
+            switch frame {
+            case .image(let name):
+                // A colored frame reads well whole, at button size.
+                if let art = FrameLibrary.imageFrame(named: name),
+                   let picture = FrameLibrary.image(at: art.landscape) {
+                    Image(decorative: picture, scale: 1)
+                        .resizable()
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+            case .builtIn:
+                // Line frames: the top-left corner three times as big.
+                let big = CGSize(width: geo.size.width * 3, height: geo.size.height * 3)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4).fill(.white)
+                    Color.clear
+                        .overlay(alignment: .topLeading) { artwork(size: big).frame(width: big.width, height: big.height) }
+                        .clipped()
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: geo.size.height * 0.34))
+                        .foregroundStyle(.black.opacity(0.22))
+                        .position(x: geo.size.width * 0.72, y: geo.size.height * 0.68)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }
 

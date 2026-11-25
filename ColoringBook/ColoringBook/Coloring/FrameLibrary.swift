@@ -26,8 +26,9 @@ nonisolated enum FrameChoice: Hashable, Codable, Sendable, Identifiable {
     }
 }
 
-/// Frame artwork from PNG files: black lines on transparent, 3200×2400 and
-/// 2400×3200, the band 2.5%–9% of the short side (docs/frame-art-spec.md).
+/// Frame artwork from PNG files: colored, transparent in the middle,
+/// 1600×1200 and 1200×1600 (docs/frame-art-spec.md). The picture goes in the
+/// transparent opening, measured from each file (`FrameLibrary.opening`).
 nonisolated struct ImageFrame: Sendable, Hashable {
     let name: String
     let landscape: URL
@@ -37,11 +38,62 @@ nonisolated struct ImageFrame: Sendable, Hashable {
 }
 
 nonisolated enum FrameLibrary {
-    /// Every frame on offer: the built-in ones, then artwork found in the app
-    /// bundle (and, in Debug on the Simulator, in `tempdrawing_img/`).
+    /// Every frame on offer: none (a plain line), then the colored artwork in
+    /// the app bundle (Frames/) and, in Debug on the Simulator,
+    /// `tempdrawing_img/`. The older line frames drawn in code are no longer
+    /// offered (2026-11-25); pages saved with one still show it.
     static func all() -> [FrameChoice] {
-        PageFrame.allCases.map(FrameChoice.builtIn) + imageFrames().map { .image($0.name) }
+        [.default] + imageFrames().filter { !$0.name.hasPrefix("test-") }.map { .image($0.name) }
     }
+
+    /// The transparent opening in the middle of a frame file, as a share of
+    /// the page (top-left origin): walked out from the center along a few
+    /// rows and columns until the artwork starts. Corner pictures may still
+    /// lie over the opening's corners; that is how the art is drawn.
+    static func opening(of name: String, landscape: Bool) -> CGRect? {
+        let key = "\(name)-\(landscape)"
+        lock.lock()
+        if let cached = openings[key] { lock.unlock(); return cached }
+        lock.unlock()
+        guard let file = imageFrame(named: name), let image = image(at: file.url(forLandscape: landscape)) else { return nil }
+        let w = 400, h = Int((Double(w) * Double(image.height) / Double(image.width)).rounded())
+        var rgba = [UInt8](repeating: 0, count: w * h * 4)
+        rgba.withUnsafeMutableBytes { raw in
+            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                                      bytesPerRow: w * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        // Memory rows run top to bottom.
+        func clear(_ x: Int, _ y: Int) -> Bool { rgba[(y * w + x) * 4 + 3] < 24 }
+        var left = 0, right = w - 1, top = 0, bottom = h - 1
+        for f in [0.4, 0.5, 0.6] {
+            let y = Int(Double(h) * f)
+            var x = w / 2
+            while x > 0 && clear(x - 1, y) { x -= 1 }
+            left = max(left, x)
+            x = w / 2
+            while x < w - 1 && clear(x + 1, y) { x += 1 }
+            right = min(right, x)
+        }
+        for f in [0.42, 0.5, 0.58] {
+            let x = Int(Double(w) * f)
+            var y = h / 2
+            while y > 0 && clear(x, y - 1) { y -= 1 }
+            top = max(top, y)
+            y = h / 2
+            while y < h - 1 && clear(x, y + 1) { y += 1 }
+            bottom = min(bottom, y)
+        }
+        let rect = CGRect(x: CGFloat(left) / CGFloat(w), y: CGFloat(top) / CGFloat(h),
+                          width: CGFloat(right - left + 1) / CGFloat(w), height: CGFloat(bottom - top + 1) / CGFloat(h))
+        // Too small an opening is not a frame made for pictures.
+        let result: CGRect? = rect.width > 0.4 && rect.height > 0.4 ? rect : nil
+        lock.lock(); openings[key] = result; lock.unlock()
+        return result
+    }
+
+    nonisolated(unsafe) private static var openings: [String: CGRect?] = [:]
 
     static func imageFrame(named name: String) -> ImageFrame? {
         imageFrames().first { $0.name == name }

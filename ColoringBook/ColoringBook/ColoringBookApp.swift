@@ -18,6 +18,9 @@ struct ColoringBookApp: App {
     var body: some Scene {
         WindowGroup {
             root
+                // Text without its own font is usually longer copy (lists,
+                // sheets, notes): Nunito, the second font.
+                .font(.custom("Nunito-Bold", size: 17, relativeTo: .body))
                 .fontDesign(.rounded)
                 .tint(Kid.ink)
                 .task {

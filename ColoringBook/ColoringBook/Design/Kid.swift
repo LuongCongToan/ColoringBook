@@ -25,19 +25,27 @@ enum Kid {
     static let grape = Color(hex: 0x9C6CF0)
     static let blush = Color(hex: 0xFF8C96)
 
-    // Type: Fredoka for titles, Nunito ExtraBold for everything else
-    // (Design/Fonts, SIL Open Font License; registered in KidFonts).
+    // Type (user, 2026-11-25): Fredoka is the main font, for titles,
+    // headings, buttons and short labels; Nunito is the second font, soft
+    // and easy to read, for descriptions and longer text (Design/Fonts, SIL
+    // Open Font License; registered in KidFonts).
     static func title(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
         .custom("Fredoka-SemiBold", size: size, relativeTo: style)
     }
     static func titleBold(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> Font {
         .custom("Fredoka-Bold", size: size, relativeTo: style)
     }
+    /// Short labels and buttons: Fredoka SemiBold.
     static func body(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom("Nunito-ExtraBold", size: size, relativeTo: style)
+        .custom("Fredoka-SemiBold", size: size, relativeTo: style)
     }
+    /// Descriptions, captions and notes: Nunito Bold.
     static func bodyBold(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
         .custom("Nunito-Bold", size: size, relativeTo: style)
+    }
+    /// Longer text that should stand out a little: Nunito ExtraBold.
+    static func text(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
+        .custom("Nunito-ExtraBold", size: size, relativeTo: style)
     }
 
     /// Card corners from the design sheet: 24–28 pt.
@@ -54,7 +62,7 @@ extension Color {
 /// Registers the bundled fonts once, without an Info.plist entry.
 enum KidFonts {
     static func register() {
-        for name in ["Fredoka-SemiBold", "Fredoka-Bold", "Nunito-Bold", "Nunito-ExtraBold"] {
+        for name in ["Fredoka-Medium", "Fredoka-SemiBold", "Fredoka-Bold", "Nunito-Bold", "Nunito-ExtraBold"] {
             guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else { continue }
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
@@ -458,4 +466,65 @@ extension ToolbarContent {
 
 extension View {
     func kidBackButton(hidden: Bool = false) -> some View { modifier(KidBackButton(hidden: hidden)) }
+}
+
+// MARK: - Text styles from the design sheet
+
+/// Text with an exact line height and letter spacing, which SwiftUI's Text
+/// cannot do (it ignores negative line spacing). Wraps a UILabel.
+struct ExactText: UIViewRepresentable {
+    let text: String
+    let font: UIFont
+    let lineHeight: CGFloat
+    var kerning: CGFloat = 0
+    var color: UIColor = UIColor(Kid.ink)
+    var lines = 0
+
+    func makeUIView(context: Context) -> UILabel {
+        let label = UILabel()
+        label.numberOfLines = lines
+        label.lineBreakMode = .byWordWrapping
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.setContentHuggingPriority(.required, for: .vertical)
+        return label
+    }
+
+    func updateUIView(_ label: UILabel, context: Context) {
+        label.numberOfLines = lines
+        label.attributedText = attributed
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView label: UILabel, context: Context) -> CGSize? {
+        let width = proposal.width ?? .greatestFiniteMagnitude
+        let fitted = label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: min(width, ceil(fitted.width)), height: ceil(fitted.height))
+    }
+
+    private var attributed: NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.alignment = .left
+        paragraph.lineBreakMode = .byWordWrapping
+        // Keep the glyphs centered in the shortened line.
+        let offset = (lineHeight - font.lineHeight) / 2
+        return NSAttributedString(string: text, attributes: [
+            .font: font, .foregroundColor: color, .kern: kerning,
+            .paragraphStyle: paragraph, .baselineOffset: offset,
+        ])
+    }
+}
+
+extension ExactText {
+    /// Big card titles ("Make a coloring page"): Fredoka Bold 24 pt, line
+    /// height 26 pt, letter spacing −0.5 pt, #28145C, left (design sheet).
+    static func cardTitle(_ text: String) -> ExactText {
+        ExactText(text: text, font: KidFonts.ui("Fredoka-Bold", 24), lineHeight: 26, kerning: -0.5, lines: 3)
+    }
+
+    /// Card descriptions ("From your favorite photo"): Nunito Bold 14 pt,
+    /// line height 18 pt, #28145C (design sheet).
+    static func cardSubtitle(_ text: String) -> ExactText {
+        ExactText(text: text, font: KidFonts.ui("Nunito-Bold", 14), lineHeight: 18, lines: 2)
+    }
 }
