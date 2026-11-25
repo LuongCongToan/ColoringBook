@@ -86,6 +86,10 @@ struct CreatePageView: View {
             preview = UIImage(data: data)
             style = .sketch
             await draw()
+            // `-sketchTest -openColor`: straight on to coloring it.
+            if ProcessInfo.processInfo.arguments.contains("-openColor"), case .done(let page, _) = phase {
+                await openColoring(page)
+            }
         }
         #endif
     }

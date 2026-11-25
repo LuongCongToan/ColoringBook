@@ -11,8 +11,10 @@ import ImageIO
 nonisolated struct LineArt: @unchecked Sendable {
     let width: Int
     let height: Int
-    /// Greyscale page at working size (drawing plus frame), shown with a
-    /// multiply blend on top of the colors so coloring can never cover a line.
+    /// The page at working size (drawing plus frame), shown with a multiply
+    /// blend on top of the colors so coloring can never cover a line. In
+    /// color, so tinted pages (a blue Sketch) keep their ink; black-and-white
+    /// pages look exactly as before.
     let lines: CGImage
     /// 1 where a fill must stop (a line), 0 where it may spread.
     let barrier: [UInt8]
@@ -55,13 +57,13 @@ nonisolated struct LineArt: @unchecked Sendable {
         let art = CGRect(x: inner.midX - drawn.width / 2, y: inner.midY - drawn.height / 2,
                          width: drawn.width, height: drawn.height)
 
-        var grey = [UInt8](repeating: 255, count: width * height)
-        let ok = grey.withUnsafeMutableBytes { raw -> Bool in
+        var rgba = [UInt8](repeating: 255, count: width * height * 4)
+        let ok = rgba.withUnsafeMutableBytes { raw -> Bool in
             guard let ctx = CGContext(
                 data: raw.baseAddress, width: width, height: height,
-                bitsPerComponent: 8, bytesPerRow: width,
-                space: CGColorSpaceCreateDeviceGray(),
-                bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+                bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
             ctx.setFillColor(gray: 1, alpha: 1)
             ctx.fill(CGRect(origin: .zero, size: size))
             // Page coordinates are top-left based; the context is not.
@@ -105,7 +107,13 @@ nonisolated struct LineArt: @unchecked Sendable {
             ctx.strokePath()
             return true
         }
-        guard ok, let lines = greyImage(grey, width: width, height: height) else { return nil }
+        guard ok, let lines = colorImage(rgba, width: width, height: height) else { return nil }
+        // Lightness decides what is a line, whatever the ink's color.
+        var grey = [UInt8](repeating: 255, count: width * height)
+        for i in 0..<grey.count {
+            let r = Int(rgba[i * 4]), g = Int(rgba[i * 4 + 1]), b = Int(rgba[i * 4 + 2])
+            grey[i] = UInt8((r * 77 + g * 150 + b * 29) >> 8)
+        }
 
         // Threshold, close gaps up to about six pixels (dilate, then erode
         // back so lines keep their width), then grow by one pixel so paint
@@ -152,12 +160,12 @@ nonisolated struct LineArt: @unchecked Sendable {
         return pass(rows, count: w, length: h) { x, y in y * w + x }
     }
 
-    private static func greyImage(_ pixels: [UInt8], width: Int, height: Int) -> CGImage? {
+    private static func colorImage(_ pixels: [UInt8], width: Int, height: Int) -> CGImage? {
         guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return nil }
         return CGImage(
-            width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8,
-            bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+            bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
             provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
     }
 }

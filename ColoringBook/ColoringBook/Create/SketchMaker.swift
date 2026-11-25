@@ -24,15 +24,28 @@ nonisolated enum SketchMaker {
     static let size: CGFloat = 1200
 
     enum Look: Sendable {
-        /// A pencil drawing of the photo itself (default): grey, inverted,
-        /// blurred and colour-dodged, the classic photo-to-pencil sketch.
+        /// The pencil drawing with the model's lines laid under it in grey
+        /// (default): it still looks like pencil, and the grey lines close
+        /// face, hair and clothes so the paint bucket stays inside them.
+        case pencilWithLines
+        /// A pencil drawing of the photo itself: grey, inverted, blurred and
+        /// colour-dodged, the classic photo-to-pencil sketch. Its strokes are
+        /// soft and open, so the paint bucket runs over the whole person.
         case pencil
         /// Clean black lines from the line-art model.
         case lines
     }
 
     struct Tuning: Sendable {
-        var look: Look = .pencil
+        var look: Look = .pencilWithLines
+        /// Pencil with lines: grey of the model's lines (0 black, 1 white).
+        /// Must stay darker than LineArt.threshold (200/255) after the trip
+        /// to sRGB, or the lines stop no paint: 0.7 let paint through.
+        var lineGrey: Double = 0.35
+        /// Color of the pencil (sRGB 0–1); black gives a grey pencil. Blue
+        /// was the user's pick (2026-11-25). Fills stop where the ink is
+        /// darker than LineArt.threshold in lightness.
+        var ink: (r: Double, g: Double, b: Double) = (0.10, 0.32, 0.72)
         /// Pencil: blur of the inverted photo, in pixels at `size`; wider
         /// gives bolder strokes.
         var pencilBlur: Double = 10
@@ -90,6 +103,21 @@ nonisolated enum SketchMaker {
         var lines: CIImage
         if tuning.look == .pencil {
             lines = pencil(subject, tuning: tuning)
+        } else if tuning.look == .pencilWithLines {
+            lines = pencil(subject, tuning: tuning)
+            var thin = tuning
+            thin.modelThicken = 1
+            if let drawn = modelLines(subject, tuning: thin) {
+                let g = tuning.lineGrey
+                let soft = drawn.applyingFilter("CIColorMatrix", parameters: [
+                    "inputRVector": CIVector(x: 1 - g, y: 0, z: 0, w: 0),
+                    "inputGVector": CIVector(x: 0, y: 1 - g, z: 0, w: 0),
+                    "inputBVector": CIVector(x: 0, y: 0, z: 1 - g, w: 0),
+                    "inputBiasVector": CIVector(x: g, y: g, z: g, w: 0),
+                ])
+                lines = soft.applyingFilter("CIMinimumCompositing", parameters: [kCIInputBackgroundImageKey: lines])
+                    .cropped(to: extent)
+            }
         } else if let drawn = modelLines(subject, tuning: tuning) {
             lines = drawn
         } else {
@@ -105,7 +133,7 @@ nonisolated enum SketchMaker {
             ])
             // A soft pencil grey for the pencil look (still dark enough to
             // stop fills), a bold black line for the line look.
-            let pencil = tuning.look == .pencil
+            let pencil = tuning.look != .lines
             var outline = mask
                 .applyingFilter("CIMorphologyGradient", parameters: [kCIInputRadiusKey: pencil ? 1.5 : 2.5])
                 .applyingFilter("CIColorInvert")
@@ -120,6 +148,7 @@ nonisolated enum SketchMaker {
             lines = outline.applyingFilter("CIMinimumCompositing", parameters: [kCIInputBackgroundImageKey: lines])
         }
         lines = lines.cropped(to: extent)
+        if tuning.look != .lines { lines = tinted(lines, ink: tuning.ink) }
 
         let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         guard let cg = context.createCGImage(lines, from: extent),
@@ -128,6 +157,17 @@ nonisolated enum SketchMaker {
     }
 
     // MARK: - Pencil
+
+    /// Grey drawing → the same drawing in `ink`: white stays white, black
+    /// becomes the ink, greys in between (v + (1 − v) · ink).
+    static func tinted(_ image: CIImage, ink: (r: Double, g: Double, b: Double)) -> CIImage {
+        image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 1 - ink.r, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 1 - ink.g, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 1 - ink.b, w: 0),
+            "inputBiasVector": CIVector(x: ink.r, y: ink.g, z: ink.b, w: 0),
+        ])
+    }
 
     /// The photo as a pencil drawing: grey ÷ (1 − blurred inverse), which
     /// leaves flat areas white and edges as soft grey strokes. The coloring
