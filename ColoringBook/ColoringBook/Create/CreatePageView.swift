@@ -18,6 +18,25 @@ struct CreatePageView: View {
     /// Guideline 5.1.2(i): ask before the first photo leaves the device
     /// (docs/privacy.md). Kept per install.
     @AppStorage("photoUploadConsent") private var consentGiven = false
+    /// Line colors, remembered for next time: blue for Sketch, black for the
+    /// AI's pages.
+    @AppStorage("sketchInk") private var sketchInk = SketchMaker.Ink.blue.rawValue
+    @AppStorage("aiInk") private var aiInk = SketchMaker.Ink.black.rawValue
+    /// The page as drawn, before coloring its lines, so another color needs
+    /// no new drawing.
+    @State private var baseLines: Data?
+    /// Bumped per recolor; only the latest result is shown (the color
+    /// picker sends many colors while the finger moves).
+    @State private var recolorTurn = 0
+
+    /// The stored line color for a style: a preset's name or "#RRGGBB".
+    private func storedInk(for style: PageStyle) -> String { style.onDevice ? sketchInk : aiInk }
+
+    private func ink(for style: PageStyle) -> SketchMaker.RGB {
+        SketchMaker.ink(from: storedInk(for: style), default: style.onDevice ? .blue : .black)
+    }
+
+    private func isPlainBlack(_ style: PageStyle) -> Bool { storedInk(for: style) == SketchMaker.Ink.black.rawValue }
 
     private let generator = PageGenerators.make()
 
@@ -78,13 +97,14 @@ struct CreatePageView: View {
         }
         #if DEBUG && targetEnvironment(simulator)
         .task {
-            // `-sketchTest`: draw a sketch of the test photo at once.
+            // `-sketchTest`: draw a page from the test photo at once.
             guard ProcessInfo.processInfo.arguments.contains("-sketchTest"), prepared == nil,
                   let data = DebugBook.testPhotoJPEG(), let result = try? await prepare(data) else { return }
             prepared = result
             colorPhoto = data
             preview = UIImage(data: data)
-            style = .sketch
+            // `-cartoon`: the (simulated) AI instead of a sketch.
+            style = ProcessInfo.processInfo.arguments.contains("-cartoon") ? .cartoon : .sketch
             await draw()
             // `-sketchTest -openColor`: straight on to coloring it.
             if ProcessInfo.processInfo.arguments.contains("-openColor"), case .done(let page, _) = phase {
@@ -160,6 +180,10 @@ struct CreatePageView: View {
                     }
                 }
             }
+            if style.onDevice {
+                inkPicker(for: style) { sketchInk = $0 }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
     }
 
@@ -190,6 +214,7 @@ struct CreatePageView: View {
                 .padding(10)
                 .background(.white, in: RoundedRectangle(cornerRadius: 20))
                 .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+            inkPicker(for: page.style) { recolor($0) }
             if let remaining = page.remaining {
                 Text("\(remaining) pages left this month")
                     .font(.footnote)
@@ -265,9 +290,15 @@ struct CreatePageView: View {
             if style.onDevice {
                 // The color crop, not the pale one made for the AI.
                 let photo = colorPhoto ?? prepared.jpeg
-                page = GeneratedPage(imageData: try await sketch(photo), style: style, remaining: nil)
+                let grey = try await sketch(photo)
+                baseLines = grey
+                page = GeneratedPage(imageData: try await tint(grey, ink(for: style)), style: style, remaining: nil)
             } else {
-                page = try await generator.generate(prepared, style: style)
+                let drawn = try await generator.generate(prepared, style: style)
+                baseLines = drawn.imageData
+                page = isPlainBlack(style) ? drawn
+                    : GeneratedPage(imageData: try await tint(drawn.imageData, ink(for: style)), style: drawn.style,
+                                    remaining: drawn.remaining)
             }
             guard let image = UIImage(data: page.imageData) else { throw GenerationError.server }
             SoundFX.shared.play(.sticker)
@@ -299,9 +330,87 @@ struct CreatePageView: View {
     private nonisolated func sketch(_ photo: Data) async throws -> Data {
         // A short pause so the drawing animation is seen, not flashed.
         async let pause: Void = try Task.sleep(for: .seconds(1.2))
-        let png = try SketchMaker.make(from: photo)
+        let png = try SketchMaker.make(from: photo, tint: false)
         try? await pause
         return png
+    }
+
+    @concurrent
+    private nonisolated func tint(_ grey: Data, _ ink: SketchMaker.RGB) async throws -> Data {
+        try SketchMaker.tint(grey, rgb: ink)
+    }
+
+    /// The finished page in another line color, straight away.
+    private func recolor(_ stored: String) {
+        guard let base = baseLines, case .done(let page, _) = phase else { return }
+        if page.style.onDevice { sketchInk = stored } else { aiInk = stored }
+        let rgb = ink(for: page.style)
+        let original = isPlainBlack(page.style) && !page.style.onDevice
+        recolorTurn += 1
+        let turn = recolorTurn
+        Task {
+            let data: Data?
+            if original {
+                data = base  // the AI's page exactly as it came
+            } else {
+                data = try? await tint(base, rgb)
+            }
+            guard turn == recolorTurn, let data, let image = UIImage(data: data) else { return }
+            phase = .done(GeneratedPage(imageData: data, style: page.style, remaining: page.remaining), image)
+        }
+    }
+
+    /// A row of line colors.
+    /// Presets, then the system color picker for any other color.
+    private func inkPicker(for style: PageStyle, _ choose: @escaping (String) -> Void) -> some View {
+        let stored = storedInk(for: style)
+        let custom = stored.hasPrefix("#")
+        let current = ink(for: style)
+        let customColor = Binding<Color>(
+            get: { Color(red: current.r, green: current.g, blue: current.b) },
+            set: { color in
+                let c = UIColor(color).cgColor.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                         intent: .defaultIntent, options: nil)?.components ?? [0, 0, 0]
+                let rgb = SketchMaker.usableInk((Double(c[0]), Double(c.count > 2 ? c[1] : c[0]),
+                                                 Double(c.count > 2 ? c[2] : c[0])))
+                choose(SketchMaker.hex(rgb))
+            })
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(style.onDevice ? "Pencil color" : "Line color")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            // Spread evenly over the full width.
+            HStack(spacing: 0) {
+                ForEach(SketchMaker.Ink.allCases) { option in
+                    let on = option.rawValue == stored
+                    Button {
+                        SoundFX.shared.play(.tap)
+                        choose(option.rawValue)
+                    } label: {
+                        Circle()
+                            .fill(Color(red: option.rgb.r, green: option.rgb.g, blue: option.rgb.b))
+                            .frame(width: 34, height: 34)
+                            .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+                            .overlay(Circle().strokeBorder(on ? Theme.accent : .clear, lineWidth: 3).padding(-4))
+                            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(option.title) lines")
+                    .accessibilityAddTraits(on ? .isSelected : [])
+                    .frame(maxWidth: .infinity)
+                }
+                // Any color: the system picker. Light colors are darkened
+                // just enough to keep the lines working.
+                ColorPicker("Other color", selection: customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .frame(width: 44, height: 44)
+                    .overlay(Circle().strokeBorder(custom ? Theme.accent : .clear, lineWidth: 3).frame(width: 42, height: 42))
+                    .accessibilityLabel("Other line color")
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @concurrent

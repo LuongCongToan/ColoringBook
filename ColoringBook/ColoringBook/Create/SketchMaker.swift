@@ -20,6 +20,34 @@ import Vision
 nonisolated enum SketchMaker {
     enum Failure: Error { case unreadable, failed }
 
+    /// Pencil colors a parent can pick. All dark enough that their lines
+    /// still stop the paint bucket (lightness under LineArt.threshold).
+    enum Ink: String, CaseIterable, Identifiable, Sendable {
+        case black, blue, brown, purple, green, pink
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .black: "Black"
+            case .blue: "Blue"
+            case .brown: "Brown"
+            case .purple: "Purple"
+            case .green: "Green"
+            case .pink: "Pink"
+            }
+        }
+        var rgb: (r: Double, g: Double, b: Double) {
+            switch self {
+            case .black: (0, 0, 0)
+            case .blue: (0.10, 0.32, 0.72)
+            case .brown: (0.40, 0.24, 0.12)
+            case .purple: (0.40, 0.20, 0.62)
+            case .green: (0.10, 0.42, 0.22)
+            case .pink: (0.78, 0.22, 0.48)
+            }
+        }
+    }
+
     /// Long side of the page it draws, in pixels.
     static let size: CGFloat = 1200
 
@@ -85,7 +113,9 @@ nonisolated enum SketchMaker {
     }
 
     /// PNG of black lines on white.
-    static func make(from photo: Data, tuning: Tuning = Tuning()) throws -> Data {
+    /// `tint: false` returns the grey drawing, to be colored with `tint(_:ink:)`
+    /// (switching colors then needs no new drawing).
+    static func make(from photo: Data, tuning: Tuning = Tuning(), tint: Bool = true) throws -> Data {
         guard var image = CIImage(data: photo, options: [.applyOrientationProperty: true]) else {
             throw Failure.unreadable
         }
@@ -148,10 +178,48 @@ nonisolated enum SketchMaker {
             lines = outline.applyingFilter("CIMinimumCompositing", parameters: [kCIInputBackgroundImageKey: lines])
         }
         lines = lines.cropped(to: extent)
-        if tuning.look != .lines { lines = tinted(lines, ink: tuning.ink) }
+        if tint && tuning.look != .lines { lines = tinted(lines, ink: tuning.ink) }
 
         let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         guard let cg = context.createCGImage(lines, from: extent),
+              let png = pngData(cg) else { throw Failure.failed }
+        return png
+    }
+
+    typealias RGB = (r: Double, g: Double, b: Double)
+
+    /// A color as a line color: kept, or darkened just enough that its lines
+    /// still stop the paint bucket (lightness ≤ 0.45; LineArt.threshold is
+    /// 200/255 and the pencil's grey lines lighten it further).
+    static func usableInk(_ c: RGB) -> RGB {
+        let lightness = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+        guard lightness > 0.45 else { return c }
+        let k = 0.45 / lightness
+        return (c.r * k, c.g * k, c.b * k)
+    }
+
+    /// Stored line color: a preset's name or "#RRGGBB" picked by the parent.
+    static func ink(from stored: String, default fallback: Ink) -> RGB {
+        if let preset = Ink(rawValue: stored) { return preset.rgb }
+        let hex = stored.hasPrefix("#") ? String(stored.dropFirst()) : stored
+        guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return fallback.rgb }
+        return usableInk((Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255))
+    }
+
+    static func hex(_ c: RGB) -> String {
+        func byte(_ x: Double) -> Int { Int((min(max(x, 0), 1) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", byte(c.r), byte(c.g), byte(c.b))
+    }
+
+    /// A black-and-white or grey drawing (a sketch from `make(tint: false)`,
+    /// or a page the AI drew) in another pencil color.
+    static func tint(_ grey: Data, ink: Ink) throws -> Data { try tint(grey, rgb: ink.rgb) }
+
+    static func tint(_ grey: Data, rgb: RGB) throws -> Data {
+        guard var image = CIImage(data: grey, options: [.applyOrientationProperty: true]) else { throw Failure.unreadable }
+        image = image.applyingFilter("CIPhotoEffectMono")
+        let context = CIContext(options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+        guard let cg = context.createCGImage(tinted(image, ink: usableInk(rgb)), from: image.extent),
               let png = pngData(cg) else { throw Failure.failed }
         return png
     }
