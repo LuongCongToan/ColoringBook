@@ -101,6 +101,7 @@ struct BookReaderView: View {
         }
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(book?.title ?? "Book")
+        .kidBackButton()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let book {

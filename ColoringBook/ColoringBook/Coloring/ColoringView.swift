@@ -22,16 +22,35 @@ struct ColoringView: View {
             let wide = geo.size.width > geo.size.height
             Group {
                 if wide {
-                    HStack(spacing: 0) {
-                        ToolRail(session: session, axis: .vertical)
-                            .frame(width: 100)
-                        canvas
-                        SidePanel(session: session)
-                            .frame(width: 200)
+                    VStack(spacing: 0) {
+                        header
+                        HStack(spacing: 0) {
+                            ToolRail(session: session, axis: .vertical)
+                                .frame(width: 100)
+                            canvas
+                                .overlay(alignment: .bottomTrailing) {
+                                    ZoomButtons(session: session).padding(14)
+                                }
+                            SidePanel(session: session)
+                                .frame(width: 200)
+                        }
                     }
                 } else {
+                    // As in the design: the page under the bar, zoom right
+                    // below it, the tools at the bottom.
+                    let aspect = CGFloat(session.art.width) / CGFloat(max(session.art.height, 1))
+                    let pageHeight = min(geo.size.width / aspect + 12, geo.size.height * 0.52)
                     VStack(spacing: 0) {
+                        header
                         canvas
+                            .frame(height: pageHeight)
+                        HStack {
+                            Spacer()
+                            ZoomButtons(session: session)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 6)
+                        Spacer(minLength: 0)
                         BottomPanel(session: session)
                     }
                 }
@@ -39,16 +58,7 @@ struct ColoringView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .environment(\.colorScheme, .light)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // Sharing is a grown-up action; it stays small and up in the
-            // corner, away from where children tap.
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Share", systemImage: "square.and.arrow.up") {
-                    exported = ExportedPage(image: session.renderImage())
-                }
-            }
-        }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $exported) { page in
             ShareSheet(items: [page.image])
         }
@@ -63,6 +73,10 @@ struct ColoringView: View {
             }
         }
         .onAppear {
+            #if DEBUG && targetEnvironment(simulator)
+            // `-brushTool`: open with the brush, to see the size row.
+            if ProcessInfo.processInfo.arguments.contains("-brushTool") { session.tool = .brush }
+            #endif
             // A page just made from a photo goes into "My pages" right away.
             PageStore.shared.save(session)
         }
@@ -77,14 +91,42 @@ struct ColoringView: View {
     private var canvas: some View {
         ColoringCanvas(session: session, revision: session.revision, tool: session.tool, zoom: session.zoom)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .topTrailing) {
-                UndoButton(session: session)
-                    .padding(14)
+    }
+
+    @Environment(\.dismiss) private var dismiss
+
+    /// The design's top bar: Back on the left, the title in the middle,
+    /// undo, redo and share (a grown-up action, in the corner) on the right.
+    private var header: some View {
+        // The title sits in the middle of the room between Back and the
+        // buttons on the right, as in the design.
+        HStack(spacing: 8) {
+            KidCircleButton(image: "BtnBack", size: 58, label: "Back") { dismiss() }
+            Spacer(minLength: 4)
+            Text("Let\u{2019}s color!")
+                .font(Kid.titleBold(26))
+                .foregroundStyle(Kid.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 4)
+            HStack(spacing: 0) {
+                KidCircleButton(image: "BtnUndo", size: 58, label: "Undo") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.undo() }
+                }
+                .opacity(session.canUndo ? 1 : 0.45)
+                .disabled(!session.canUndo)
+                KidCircleButton(image: "BtnRedo", size: 58, label: "Redo") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.redo() }
+                }
+                .opacity(session.canRedo ? 1 : 0.45)
+                .disabled(!session.canRedo)
+                KidCircleButton(image: "BtnShare", size: 58, label: "Share") {
+                    exported = ExportedPage(image: session.renderImage())
+                }
             }
-            .overlay(alignment: .bottomTrailing) {
-                ZoomButtons(session: session)
-                    .padding(14)
-            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
     }
 }
 
@@ -94,12 +136,15 @@ private struct BottomPanel: View {
     let session: ColoringSession
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             ToolRail(session: session, axis: .horizontal)
             if session.tool.usesSize {
+                PanelTitle(text: session.tool.sizeTitle)
                 SizePicker(session: session, axis: .horizontal)
+                    .frame(maxWidth: .infinity)
             }
             if session.tool.usesColor {
+                PanelTitle(text: "Colors")
                 ColorStrip(session: session, axis: .horizontal)
             }
             if session.tool == .sticker {
@@ -109,9 +154,8 @@ private struct BottomPanel: View {
                 FrameTray(session: session, axis: .horizontal)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(Theme.panel, in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
         .animation(.spring(duration: 0.3), value: session.tool)
     }
 }
@@ -152,14 +196,14 @@ private struct ToolRail: View {
 
     var body: some View {
         let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: 8))
-            : AnyLayout(VStackLayout(spacing: 14))
+            ? AnyLayout(HStackLayout(spacing: 5))
+            : AnyLayout(VStackLayout(spacing: 12))
         layout {
             ForEach(ColoringSession.Tool.allCases) { tool in
                 ToolButton(tool: tool, session: session)
             }
         }
-        .padding(.horizontal, axis == .horizontal ? 12 : 0)
+        .padding(.horizontal, axis == .horizontal ? 11 : 0)
         .padding(.vertical, axis == .vertical ? 16 : 0)
         .frame(maxHeight: axis == .vertical ? .infinity : nil, alignment: .top)
         .background(axis == .vertical ? Theme.panel : .clear)
@@ -177,54 +221,100 @@ private struct ToolButton: View {
             SoundFX.shared.play(.tap)
             withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { session.tool = tool }
         } label: {
-            icon
-                .font(.system(size: 32, weight: .bold))
-                .frame(maxWidth: 72, maxHeight: 72)
-                .aspectRatio(1, contentMode: .fit)
-                .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(selected ? Theme.selected : .white)
-                        .shadow(color: .black.opacity(selected ? 0.18 : 0.08), radius: selected ? 6 : 3, y: 2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(selected ? Theme.accent : .clear, lineWidth: 4))
-                .scaleEffect(selected ? 1.08 : 1)
+            VStack(spacing: 1) {
+                // The art has a clear margin; scaled up so it fills the
+                // card as in the design, without widening the card.
+                Image(tool.art)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 54, height: 54)
+                    // Each picture measured against the design (2026-11-25).
+                    .scaleEffect(tool.artScale)
+                    .offset(x: tool.artNudge, y: -2)
+                    .padding(.vertical, 3)
+                Text(tool.title)
+                    .font(Kid.titleBold(14, relativeTo: .caption))
+                    .foregroundStyle(Kid.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(.horizontal, 1)
+            .padding(.bottom, 4)
+            .frame(maxWidth: 72, minHeight: 84)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(selected ? Kid.yellow : .white)
+                    .shadow(color: Kid.ink.opacity(selected ? 0.16 : 0.07), radius: selected ? 5 : 3, y: 2))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(selected ? Kid.yellow.darker(0.08) : .clear, lineWidth: 3))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tool.accessibilityName)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
-
-    @ViewBuilder private var icon: some View {
-        let color = Color(uiColor: session.color.uiColor)
-        switch tool {
-        case .fill:
-            // A tipped paint pail pouring the color it will fill with.
-            PaintBucketIcon(paint: color)
-                .padding(3)
-        case .brush:
-            Image(systemName: "paintbrush.pointed.fill")
-                .foregroundStyle(color == .white ? Color.gray.opacity(0.4) : color)
-                .shadow(color: .black.opacity(0.25), radius: 0.5)
-        case .rainbow:
-            Image(systemName: "rainbow")
-                .symbolRenderingMode(.multicolor)
-        case .eraser:
-            Image(systemName: "eraser.fill")
-                .foregroundStyle(Color(red: 0.95, green: 0.45, blue: 0.55))
-        case .sticker:
-            Image(systemName: "star.fill")
-                .foregroundStyle(Color(red: 1, green: 0.78, blue: 0.1))
-                .shadow(color: .orange.opacity(0.5), radius: 0.5)
-        case .frame:
-            Image(systemName: "photo.artframe")
-                .foregroundStyle(Color(red: 0.55, green: 0.36, blue: 0.86))
-        }
-    }
 }
 
 private extension ColoringSession.Tool {
-    /// VoiceOver only; the screen itself has no words.
+    /// The design's picture for each tool (Assets, rawassets/coloring_editor_icons).
+    var art: String {
+        switch self {
+        case .fill: "EditorFill"
+        case .brush: "EditorBrush"
+        case .rainbow: "EditorRainbow"
+        case .eraser: "EditorEraser"
+        case .sticker: "EditorSticker"
+        case .frame: "EditorFrame"
+        }
+    }
+
+    /// How much each picture is enlarged in its 54 pt box so it shows as big
+    /// as in the design (measured: fill 49.6, brush 54.3, rainbow 50.7,
+    /// eraser 46, sticker 48.6, frame 47.6 pt wide). The art has clear
+    /// margins, and they differ per picture.
+    var artScale: CGFloat {
+        switch self {
+        case .fill: 1.41
+        case .brush: 1.25
+        case .rainbow: 1.24
+        case .eraser: 1.38
+        case .sticker: 1.27
+        case .frame: 1.15
+        }
+    }
+
+    /// Sideways nudge so each picture sits where the design puts it in its
+    /// card (measured; the art is not centered on its canvas).
+    var artNudge: CGFloat {
+        switch self {
+        case .fill: -2.3
+        case .brush: 0
+        case .rainbow: -1.6
+        case .eraser: -0.3
+        case .sticker: 5
+        case .frame: -2.3
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .fill: "Fill"
+        case .brush: "Brush"
+        case .rainbow: "Rainbow"
+        case .eraser: "Eraser"
+        case .sticker: "Sticker"
+        case .frame: "Frame"
+        }
+    }
+
+    var sizeTitle: String {
+        switch self {
+        case .eraser: "Eraser size"
+        case .rainbow: "Rainbow size"
+        default: "Brush size"
+        }
+    }
+
     var accessibilityName: String {
         switch self {
         case .fill: "Paint bucket"
@@ -244,11 +334,11 @@ private struct SizePicker: View {
     let session: ColoringSession
     let axis: Axis
 
-    private static let dots: [CGFloat] = [12, 20, 28, 38, 50]
+    private static let dots: [CGFloat] = [12, 18, 28, 39, 50]
 
     var body: some View {
         let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: 6))
+            ? AnyLayout(HStackLayout(spacing: 14))
             : AnyLayout(VStackLayout(spacing: 6))
         let tool = session.tool
         let current = session.sizeIndex[tool] ?? 1
@@ -259,12 +349,12 @@ private struct SizePicker: View {
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { session.sizeIndex[tool] = i }
                 } label: {
                     dot(diameter: Self.dots[i])
-                        .frame(width: 64, height: 64)
+                        .frame(width: 47, height: 47)
                         .background(
                             Circle()
-                                .fill(i == current ? Theme.selected : .clear)
-                                .overlay(Circle().strokeBorder(i == current ? Theme.accent : .clear, lineWidth: 3)))
-                        .scaleEffect(i == current ? 1.08 : 1)
+                                .fill(i == current ? .white : .clear)
+                                .overlay(Circle().strokeBorder(i == current ? Kid.ink : .clear, lineWidth: 3)))
+                        .frame(width: 52, height: 52)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Size \(i + 1) of \(Self.dots.count)")
@@ -289,9 +379,22 @@ private struct SizePicker: View {
         default:
             Circle()
                 .fill(Color(uiColor: session.color.uiColor))
-                .overlay(Circle().strokeBorder(Color.black.opacity(0.15), lineWidth: 1))
+                .overlay(Circle().strokeBorder(Color.black.opacity(0.1), lineWidth: 1))
                 .frame(width: diameter, height: diameter)
         }
+    }
+}
+
+/// "Brush size", "Colors": the panel's small headings.
+private struct PanelTitle: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(Kid.titleBold(19))
+            .foregroundStyle(Kid.ink)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
     }
 }
 
@@ -304,13 +407,20 @@ private struct ColorStrip: View {
     var body: some View {
         if axis == .horizontal {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) { swatches }
-                    .padding(.horizontal, 12)
+                HStack(spacing: 8) {
+                    swatches
+                    customColor
+                }
+                .padding(.horizontal, 13)
+                .padding(.vertical, 4)
             }
         } else {
             ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: [GridItem(.fixed(84)), GridItem(.fixed(84))], spacing: 4) { swatches }
-                    .padding(.vertical, 4)
+                LazyVGrid(columns: [GridItem(.fixed(84)), GridItem(.fixed(84))], spacing: 4) {
+                    swatches
+                    customColor
+                }
+                .padding(.vertical, 4)
             }
         }
     }
@@ -322,24 +432,48 @@ private struct ColorStrip: View {
                 SoundFX.shared.play(.tap)
                 withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) { session.color = color }
             } label: {
+                let shown = Color(uiColor: color.uiColor)
                 Circle()
-                    .fill(Color(uiColor: color.uiColor))
-                    .overlay(Circle().strokeBorder(Color.black.opacity(0.12), lineWidth: 1))
+                    .fill(shown)
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 3))
                     .overlay {
                         if selected {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 22, weight: .heavy))
-                                .foregroundStyle(color.isLight ? .black.opacity(0.6) : .white)
+                                .font(.system(size: 18, weight: .black))
+                                .foregroundStyle(color.isLight ? Kid.ink : .white)
                         }
                     }
-                    .frame(width: selected ? 66 : 56, height: selected ? 66 : 56)
-                    .shadow(color: .black.opacity(selected ? 0.25 : 0.1), radius: selected ? 5 : 2, y: 2)
-                    .frame(width: 76, height: 76)
+                    .frame(width: 44, height: 44)
+                    // The chosen color glows with a soft ring of itself.
+                    .background(Circle().fill(selected ? shown.opacity(0.35) : .clear).padding(-4))
+                    .shadow(color: .black.opacity(0.12), radius: 2, y: 2)
+                    .frame(width: 52, height: 52)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(color.accessibilityName)
             .accessibilityAddTraits(selected ? .isSelected : [])
         }
+    }
+}
+
+extension ColorStrip {
+    /// Any color at all: the system picker, last in the row.
+    var customColor: some View {
+        let isCustom = !Palette.colors.contains(session.color)
+        let binding = Binding<Color>(
+            get: { Color(uiColor: session.color.uiColor) },
+            set: { picked in
+                var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+                UIColor(picked).getRed(&r, green: &g, blue: &b, alpha: &a)
+                func byte(_ v: CGFloat) -> UInt8 { UInt8(max(0, min(255, (v * 255).rounded()))) }
+                session.color = RGBA(byte(r), byte(g), byte(b))
+            })
+        return ColorPicker("Any color", selection: binding, supportsOpacity: false)
+            .labelsHidden()
+            .scaleEffect(1.55)
+            .frame(width: 52, height: 52)
+            .background(Circle().fill(isCustom ? Color(uiColor: session.color.uiColor).opacity(0.35) : .clear))
+            .accessibilityLabel("Any color")
     }
 }
 
@@ -516,7 +650,7 @@ private struct ZoomButtons: View {
     let session: ColoringSession
 
     var body: some View {
-        VStack(spacing: 10) {
+        HStack(spacing: 10) {
             if session.zoom > 1.001 {
                 round("arrow.down.right.and.arrow.up.left", label: "Show whole page") {
                     SoundFX.shared.play(.zoomOut)
@@ -524,13 +658,13 @@ private struct ZoomButtons: View {
                 }
                     .transition(.scale.combined(with: .opacity))
             }
-            round("plus.magnifyingglass", label: "Zoom in", enabled: session.zoom < ColoringSession.maxZoom - 0.001) {
-                SoundFX.shared.play(.zoomIn)
-                session.zoomIn()
-            }
-            round("minus.magnifyingglass", label: "Zoom out", enabled: session.zoom > 1.001) {
+            round("BtnMinus", label: "Zoom out", enabled: session.zoom > 1.001) {
                 SoundFX.shared.play(.zoomOut)
                 session.zoomOut()
+            }
+            round("BtnPlus", label: "Zoom in", enabled: session.zoom < ColoringSession.maxZoom - 0.001) {
+                SoundFX.shared.play(.zoomIn)
+                session.zoomIn()
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: session.zoom > 1.001)
@@ -538,11 +672,20 @@ private struct ZoomButtons: View {
 
     private func round(_ symbol: String, label: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(Theme.accent)
-                .frame(width: 60, height: 60)
-                .background(Circle().fill(.white).shadow(color: .black.opacity(0.18), radius: 4, y: 2))
+            Group {
+                if UIImage(named: symbol) != nil {
+                    Image(symbol).resizable().scaledToFit()
+                } else {
+                    // "Fit" has no drawn button: a lavender circle.
+                    Image(systemName: symbol)
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(Kid.ink)
+                        .frame(width: 38, height: 38)
+                        .background(Circle().fill(Kid.lavender))
+                }
+            }
+            .frame(width: 52, height: 52)
+            .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
         }
         .buttonStyle(BounceButtonStyle())
         .opacity(enabled ? 1 : 0.35)
@@ -560,10 +703,10 @@ private struct BounceButtonStyle: ButtonStyle {
 }
 
 private enum Theme {
-    static let background = Color(red: 0.99, green: 0.96, blue: 0.90)
-    static let panel = Color(red: 1, green: 0.93, blue: 0.82)
-    static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
-    static let selected = Color(red: 1, green: 0.98, blue: 0.94)
+    static let background = Kid.background
+    static let panel = Color.white.opacity(0.6)
+    static let accent = Kid.yellow.darker(0.1)
+    static let selected = Kid.yellow
 }
 
 // MARK: - Paint bucket icon

@@ -787,7 +787,9 @@ User nhận xét UI và icon "nghiêm túc quá, không giống chibi, không gi
 - **Màn chính theo ảnh mẫu của user:** linh vật bút sáp + "Let's color!" + "Make something magical!", nút bánh răng (màn **Grown-ups** sau phép tính: gói mua, khôi phục, chính sách; menu Debug chuyển vào đây), thẻ vàng "Make a coloring page" và thẻ tím "Make a coloring book" có hình minh hoạ, "My books" (bìa màu xoay vòng vàng/san hô/mint/tím, đếm số sách, "See all →"), "My pages" (6 trang, viền màu, "See all →" mở `MyPagesView`), mục nhập trang. **Thanh tab:** Home, Create, My library (`RootTabView`; My library có Books/Pages).
 - **Hình minh hoạ tạm cắt từ ảnh mẫu** (`HomeMascot`, `HomeCamera`, `HomeBook`; tách nền bằng Vision trên Mac): ảnh mẫu chỉ rộng 900 px, cần bản to và riêng từng hình cho bản phát hành.
 - **Màn New page theo ảnh mẫu thứ hai:** thẻ ảnh viền vàng với hình máy ảnh + ảnh gia đình ("Choose a family photo"), 3 thẻ kiểu vẽ có hình riêng (`StyleCartoon/Chibi/Sketch`, viền vàng/lavender/mint), **chọn = viền vàng + dấu tick vàng** (tick sang góc trái ở Sketch vì góc phải có nhãn FREE xanh), nút vàng "Draw my page" có đũa phép, **mờ khi chưa có ảnh**. Thẻ "Make a coloring page" ở màn chính **chuyển sang tab Create** (`AppTabs`), nên thanh tab sáng ở Create. Hình lấy từ `rawassets/new_page_icons` (500–700 px, nền trong suốt).
-- Đã áp: màn chính, màn tạo trang. Chưa áp: màn tô màu, sách, dựng sách, paywall, sắp xếp trang.
+- **Màn kết quả (ảnh mẫu thứ ba):** linh vật bút sáp ăn mừng + "Your page is ready!", ảnh xem trước viền vàng nhạt, "Line color" với **dấu tick trắng trong ô màu đang chọn** và quầng nhạt cùng màu, nút chính vàng "Color it!" có hình cọ, nút phụ lavender "Try chibi style" có mặt chibi (hoặc "Try cartoon style" có hình Cartoon). Hình trong `rawassets/coloring_editor_icons` (512 px); các hình dụng cụ (thùng sơn, cọ, tẩy, cầu vồng, sticker, khung) đã vào Assets (`Editor*`) cho màn tô màu.
+- **Màn tô màu (ảnh mẫu thứ tư):** tiêu đề "Let's color!", nút tròn lavender back / undo / **redo** (mới có nút, logic đã có) / chia sẻ; nút −/+ tròn tím dưới trang; 6 thẻ dụng cụ có hình và chữ (Fill, Brush, Rainbow, Eraser, Sticker, Frame; thẻ đang chọn nền vàng); "Brush size" (hoặc Eraser/Rainbow size) với chấm theo màu đang chọn, chấm được chọn có vòng tím đậm; "Colors" với tick trắng + quầng nhạt cùng màu, **ô cuối là bảng chọn màu iOS** (màu tự chọn). Thùng sơn giờ dùng hình tĩnh của bản thiết kế thay cho thùng đổi màu theo màu đang chọn (`PaintBucketIcon` vẫn còn trong code).
+- Đã áp: màn chính, màn tạo trang, màn kết quả, màn tô màu. Chưa áp: sách, dựng sách, paywall, sắp xếp trang.
 
 ### Loading (2026-11-25)
 
@@ -847,6 +849,15 @@ Code ở `ColoringBook/ColoringBook/Book/`. Màn chính có thẻ "Make a colori
    - Kiểm fal có làm tròn lên 1MP không.
 7. Ghi lại chi phí thực tế mỗi tranh của từng model, và tỷ lệ tranh đạt ngay ở tầng rẻ, để tính lại chi phí phân tầng và lãi gộp ở mục 5.
 8. Chốt model mặc định, model dự phòng, kích thước ảnh, ngân sách AI cho mỗi gói và bộ gói IAP.
+
+### TODO trước khi phát hành
+
+- [ ] **Popup xin đánh giá** (user nhắc 2026-11-25): dùng `requestReview` của StoreKit (hộp thoại hệ thống, iOS tự giới hạn số lần). Chỉ hỏi sau lúc vui và ở chỗ phụ huynh đang dùng, ví dụ sau khi lưu sách hoặc Save PDF xong, hoặc sau vài trang đã tô; không hỏi bé giữa lúc tô, không tự làm hộp hỏi riêng trước hộp hệ thống. Kiểm lại quy định cho Kids Category (Guideline 1.3) trước khi bật.
+- [ ] Worker thật: deploy `coloring-api`, thay URL tạm trong `WorkerPageGenerator`, đặt key BFL mới bằng `wrangler secret`, endpoint `/credit`.
+- [ ] Đăng Privacy Policy, thay URL tạm trong `AppLinks`, khai App Privacy (Photos).
+- [ ] Thay mọi nền sách có bản quyền; vẽ khung PNG thật theo `docs/frame-art-spec.md`; hình minh hoạ giao diện bản to.
+- [ ] Thử trên iPhone thật: tách nền của Sketch, tốc độ, mua hàng StoreKit.
+- [ ] In thử PDF (trang Sketch: tóc có thành mảng đen không) trên giấy thật.
 
 ## 9. Rủi ro
 

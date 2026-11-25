@@ -380,3 +380,82 @@ struct PageTile: View {
         .shadow(color: tint.opacity(0.35), radius: 6, y: 4)
     }
 }
+
+// MARK: - Round buttons in the bar
+
+/// The design's round button: one of the drawn button images
+/// (rawassets/coloring_buttons) when `image` is set, else a lavender circle
+/// with a deep purple symbol.
+struct KidCircleButton: View {
+    var symbol: String = ""
+    var image: String? = nil
+    var size: CGFloat = 44
+    var label: String = ""
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            SoundFX.shared.play(.tap)
+            action()
+        } label: {
+            if let image {
+                Image(image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
+            } else {
+                circle
+            }
+        }
+        .buttonStyle(SquishyStyle())
+        .accessibilityLabel(label.isEmpty ? symbol : label)
+    }
+
+    private var circle: some View {
+            Image(systemName: symbol)
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(Kid.ink)
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(Kid.lavender))
+                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
+    }
+}
+
+/// Swaps the system Back for the round lavender one, on pushed screens.
+struct KidBackButton: ViewModifier {
+    /// Hide it for a while (Select mode in My books).
+    var hidden = false
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
+
+    func body(content: Content) -> some View {
+        content
+            .navigationBarBackButtonHidden(isPresented)
+            .toolbar {
+                if isPresented && !hidden {
+                    ToolbarItem(placement: .topBarLeading) {
+                        KidCircleButton(image: "BtnBack", label: "Back") { dismiss() }
+                    }
+                    .kidPlainBackground()
+                }
+            }
+    }
+}
+
+extension ToolbarContent {
+    /// No system glass behind our own round button (iOS 26).
+    @ToolbarContentBuilder
+    func kidPlainBackground() -> some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            sharedBackgroundVisibility(.hidden)
+        } else {
+            self
+        }
+    }
+}
+
+extension View {
+    func kidBackButton(hidden: Bool = false) -> some View { modifier(KidBackButton(hidden: hidden)) }
+}

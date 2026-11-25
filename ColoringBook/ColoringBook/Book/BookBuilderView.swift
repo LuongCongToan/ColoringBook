@@ -56,6 +56,7 @@ struct BookBuilderView: View {
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) { mainButton }
         .navigationTitle(editing == nil ? "Make a book" : "Edit book")
+        .kidBackButton()
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             store.refresh()

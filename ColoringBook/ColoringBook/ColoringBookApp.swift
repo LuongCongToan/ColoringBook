@@ -71,8 +71,9 @@ private struct DebugHomeRoot<Content: View>: View {
                 content()
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("Home", systemImage: "house") { home = true }
+                            KidCircleButton(symbol: "house.fill", label: "Home") { home = true }
                         }
+                        .kidPlainBackground()
                     }
             }
         }
@@ -95,8 +96,9 @@ private struct DebugReaderRoot: View {
                     BookReaderView(bookID: bookID, startPage: DebugBook.startPage)
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
-                                Button("Home", systemImage: "house") { home = true }
+                                KidCircleButton(symbol: "house.fill", label: "Home") { home = true }
                             }
+                            .kidPlainBackground()
                         }
                 } else {
                     ProgressView()

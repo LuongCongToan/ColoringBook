@@ -68,6 +68,7 @@ struct CreatePageView: View {
         }
         .background(KidBackground())
         .navigationTitle("New page")
+        .kidBackButton()
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
             if case .drawing = phase { DrawingWaitView().transition(.opacity) }
@@ -218,51 +219,94 @@ struct CreatePageView: View {
     }
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
-        VStack(spacing: 18) {
-            Text("Your coloring page is ready!")
-                .font(.title2.weight(.heavy))
+        let next: PageStyle = page.style == .cartoon ? .chibi : .cartoon
+        return VStack(spacing: 18) {
+            // The crayon cheering: the page worked.
+            HStack(spacing: 6) {
+                Image("EditorCelebration")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 118, height: 118)
+                    .rotationEffect(.degrees(-6))
+                Text("Your page\nis ready!")
+                    .font(Kid.titleBold(34))
+                    .foregroundStyle(Kid.ink)
+                    .lineSpacing(-4)
+                    .minimumScaleFactor(0.8)
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(Kid.yellow)
+                            .offset(x: 22, y: -4)
+                    }
+            }
+            .frame(maxWidth: .infinity)
+
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
                 .padding(10)
-                .background(.white, in: RoundedRectangle(cornerRadius: 20))
-                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous).fill(.white))
+                .overlay(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
+                    .strokeBorder(Kid.yellow.opacity(0.8), lineWidth: 3))
+                .shadow(color: Kid.yellow.opacity(0.35), radius: 8, y: 4)
+
             inkPicker(for: page.style) { recolor($0) }
             if let remaining = page.remaining {
                 Text("\(remaining) pages left this month")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(Kid.bodyBold(15))
+                    .foregroundStyle(Kid.ink.opacity(0.65))
             }
+
+            // Primary: yellow, the brush.
             Button {
                 SoundFX.shared.play(.tap)
                 Task { await openColoring(page) }
             } label: {
-                Label("Color it!", systemImage: "paintbrush.pointed.fill")
-                    .font(.title3.weight(.heavy))
-                    .frame(maxWidth: .infinity, minHeight: 64)
-                    .foregroundStyle(.white)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                kidButton("Color it!", art: "EditorBrush", color: Kid.yellow, size: 34, height: 80)
             }
-            .buttonStyle(BouncyStyle())
+            .buttonStyle(SquishyStyle())
 
+            // Secondary: lavender, the other AI style.
             Button {
                 SoundFX.shared.play(.tap)
-                style = page.style == .cartoon ? .chibi : .cartoon
+                style = next
                 startDrawing()
             } label: {
-                Label(page.style == .cartoon ? "Try chibi style" : "Try cartoon style",
-                      systemImage: "arrow.triangle.2.circlepath")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                kidButton(next == .chibi ? "Try chibi style" : "Try cartoon style",
+                          art: next == .chibi ? "EditorChibi" : "StyleCartoon",
+                          color: Kid.lavender, size: 26, height: 64)
+                    .padding(.horizontal, 16)
             }
-            .buttonStyle(BouncyStyle())
+            .buttonStyle(SquishyStyle())
             Text(page.style.onDevice
                  ? "Cartoon and chibi are drawn by AI, with cleaner lines."
                  : "Trying another style uses one more page.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                .font(Kid.bodyBold(14))
+                .foregroundStyle(Kid.ink.opacity(0.65))
         }
+    }
+
+    /// A big rounded button with an illustration on the left, as in the
+    /// design: white edge, a darker lip below.
+    private func kidButton(_ title: String, art: String, color: Color, size: CGFloat, height: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            Image(art)
+                .resizable()
+                .scaledToFit()
+                .frame(width: height * 0.95, height: height * 0.95)
+            Text(title)
+                .font(Kid.titleBold(size))
+                .foregroundStyle(Kid.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: height)
+        .background(RoundedRectangle(cornerRadius: height / 2, style: .continuous).fill(color))
+        .overlay(RoundedRectangle(cornerRadius: height / 2, style: .continuous).strokeBorder(.white, lineWidth: 3))
+        .background(RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+            .fill(color.darker(0.15)).offset(y: 6))
     }
 
     // MARK: - Work
@@ -390,8 +434,8 @@ struct CreatePageView: View {
             })
         return VStack(alignment: .leading, spacing: 8) {
             Text(style.onDevice ? "Pencil color" : "Line color")
-                .font(Kid.body(15))
-                .foregroundStyle(Kid.ink.opacity(0.7))
+                .font(Kid.titleBold(20))
+                .foregroundStyle(Kid.ink)
             // Spread evenly over the full width.
             HStack(spacing: 0) {
                 ForEach(SketchMaker.Ink.allCases) { option in
@@ -400,13 +444,21 @@ struct CreatePageView: View {
                         SoundFX.shared.play(.tap)
                         choose(option.rawValue)
                     } label: {
+                        let color = Color(red: option.rgb.r, green: option.rgb.g, blue: option.rgb.b)
                         Circle()
-                            .fill(Color(red: option.rgb.r, green: option.rgb.g, blue: option.rgb.b))
-                            .frame(width: 34, height: 34)
+                            .fill(color)
+                            .frame(width: 36, height: 36)
                             .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-                            .overlay(Circle().strokeBorder(on ? Theme.accent : .clear, lineWidth: 3).padding(-4))
+                            .overlay {
+                                if on {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 15, weight: .black))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .background(Circle().fill(on ? color.opacity(0.3) : .clear).padding(-6))
                             .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 46, height: 46)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(option.title) lines")

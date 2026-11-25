@@ -33,6 +33,7 @@ struct MyPagesView: View {
         }
         .background(KidBackground())
         .navigationTitle("My pages")
+        .kidBackButton()
         .loading(opening, "Opening the page…")
         .navigationDestination(item: $opened) { page in
             ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)

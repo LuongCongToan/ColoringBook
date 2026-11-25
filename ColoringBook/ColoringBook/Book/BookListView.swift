@@ -65,8 +65,8 @@ struct BookListView: View {
         }
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(selecting ? selectionTitle : "My books")
+        .kidBackButton(hidden: selecting)
         .navigationBarTitleDisplayMode(selecting ? .inline : .large)
-        .navigationBarBackButtonHidden(selecting)
         .toolbar {
             if !books.books.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
