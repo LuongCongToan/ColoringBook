@@ -76,6 +76,13 @@ struct ColoringView: View {
             #if DEBUG && targetEnvironment(simulator)
             // `-brushTool`: open with the brush, to see the size row.
             if ProcessInfo.processInfo.arguments.contains("-brushTool") { session.tool = .brush }
+            // `-frame <name>`: start with that picture frame (FrameLibrary).
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-frame"), i + 1 < args.count { session.setFrame(.image(args[i + 1])) }
+            // `-stickers`: drop a few stickers and open the sticker tray.
+            if args.contains("-stickers"), session.stickers.isEmpty {
+                for kind in [StickerKind.unicorn, .rainbow, .cupcake] { session.addSticker(kind) }
+            }
             #endif
             // A page just made from a photo goes into "My pages" right away.
             PageStore.shared.save(session)
@@ -518,7 +525,7 @@ private struct StickerTray: View {
                             .shadow(color: .black.opacity(0.08), radius: 3, y: 2))
             }
             .buttonStyle(BounceButtonStyle())
-            .accessibilityLabel(kind.rawValue.capitalized)
+            .accessibilityLabel(kind.title)
         }
     }
 }
@@ -755,16 +762,9 @@ struct StickerPreview: View {
     let kind: StickerKind
 
     var body: some View {
-        GeometryReader { geo in
-            let side = min(geo.size.width, geo.size.height)
-            let scale = CGAffineTransform(scaleX: side, y: side)
-            ZStack {
-                Path(kind.outline).applying(scale).fill(.white)
-                Path(kind.lines).applying(scale)
-                    .stroke(.black, style: StrokeStyle(lineWidth: StickerKind.lineWidth * side * 1.4, lineCap: .round, lineJoin: .round))
-            }
-            .frame(width: side, height: side)
-        }
+        Image(kind.assetName)
+            .resizable()
+            .scaledToFit()
     }
 }
 

@@ -88,7 +88,7 @@ nonisolated enum PageFrame: String, CaseIterable, Codable, Sendable, Identifiabl
     }
 
     /// Puts a sticker shape, upright, at evenly spaced points on the band.
-    private func place(_ kind: StickerKind, in path: CGMutablePath, along rect: CGRect, size: CGFloat, spacing: CGFloat) {
+    private func place(_ kind: LineMotif, in path: CGMutablePath, along rect: CGRect, size: CGFloat, spacing: CGFloat) {
         for c in Self.points(along: rect, spacing: spacing) {
             let t = CGAffineTransform(translationX: c.x - size / 2, y: c.y - size / 2).scaledBy(x: size, y: size)
             path.addPath(kind.lines, transform: t)

@@ -328,7 +328,8 @@ struct BookReaderView: View {
               let lines = session.renderLineArt().cgImage,
               let colored = session.renderImage().cgImage else { return nil }
         return BookPageSource(lineArt: lines, colored: colored, photo: photo ? loadPhoto(id) : nil,
-                              layout: book?.pageLayouts[id], placement: book?.pagePlacements[id])
+                              layout: book?.pageLayouts[id], placement: book?.pagePlacements[id],
+                              overlay: session.renderOverlay())
     }
 
     private func open(_ id: UUID) async {

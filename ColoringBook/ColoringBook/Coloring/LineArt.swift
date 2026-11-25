@@ -20,6 +20,10 @@ nonisolated struct LineArt: @unchecked Sendable {
     let barrier: [UInt8]
     /// The frame drawn around the picture.
     let frame: FrameChoice
+    /// A picture frame from a PNG (FrameLibrary): already colored, laid over
+    /// everything at working size, never painted. Nil for the built-in
+    /// line frames, which children color like the rest.
+    var colorFrame: CGImage? = nil
     /// The model's page as received, kept so the frame can be changed.
     let source: CGImage
     /// The same page as the bytes that arrived, for saving.
@@ -88,26 +92,20 @@ nonisolated struct LineArt: @unchecked Sendable {
             switch frame {
             case .builtIn(let style):
                 ctx.addPath(style.path(in: size))
-            case .image(let name):
-                // Artwork over the whole page; multiply keeps only its dark
-                // lines, whether the file is transparent or white.
-                if let art = FrameLibrary.imageFrame(named: name),
-                   let picture = FrameLibrary.image(at: art.url(forLandscape: width >= height)) {
-                    ctx.saveGState()
-                    ctx.setBlendMode(.multiply)
-                    ctx.translateBy(x: 0, y: size.height)
-                    ctx.scaleBy(x: 1, y: -1)
-                    ctx.draw(picture, in: CGRect(origin: .zero, size: size))
-                    ctx.restoreGState()
-                }
-                // The inner line, always: the picture stays closed off even
-                // if the artwork's own line is off by a few pixels.
-                ctx.addPath(PageFrame.plain.path(in: size))
+            case .image:
+                // Colored artwork: drawn on its own layer below, not into
+                // the lines, and nothing to stroke here.
+                break
             }
             ctx.strokePath()
             return true
         }
         guard ok, let lines = colorImage(rgba, width: width, height: height) else { return nil }
+        var colorFrame: CGImage?
+        if case .image(let name) = frame, let file = FrameLibrary.imageFrame(named: name),
+           let picture = FrameLibrary.image(at: file.url(forLandscape: width >= height)) {
+            colorFrame = framed(picture, width: width, height: height)
+        }
         // Lightness decides what is a line, whatever the ink's color.
         var grey = [UInt8](repeating: 255, count: width * height)
         for i in 0..<grey.count {
@@ -124,8 +122,19 @@ nonisolated struct LineArt: @unchecked Sendable {
         mask = morph(mask, width: width, height: height, radius: closeRadius, grow: true)
         mask = morph(mask, width: width, height: height, radius: closeRadius, grow: false)
         mask = morph(mask, width: width, height: height, radius: 1, grow: true)
+        if colorFrame != nil {
+            // A colored frame is not for painting: only the picture area
+            // inside it takes paint.
+            let inner = PageFrame.innerRect(in: size).integral
+            for y in 0..<height {
+                let inside = y >= Int(inner.minY) && y < Int(inner.maxY)
+                for x in 0..<width where !(inside && x >= Int(inner.minX) && x < Int(inner.maxX)) {
+                    mask[y * width + x] = 1
+                }
+            }
+        }
         return LineArt(width: width, height: height, lines: lines, barrier: mask, frame: frame,
-                       source: image, sourceData: data)
+                       colorFrame: colorFrame, source: image, sourceData: data)
     }
 
     static let closeRadius = 3
@@ -158,6 +167,17 @@ nonisolated struct LineArt: @unchecked Sendable {
         }
         let rows = pass(src, count: h, length: w) { y, x in y * w + x }
         return pass(rows, count: w, length: h) { x, y in y * w + x }
+    }
+
+    /// The frame artwork stretched to the page at working size, keeping its
+    /// transparency (its middle shows the picture).
+    private static func framed(_ picture: CGImage, width: Int, height: Int) -> CGImage? {
+        guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                  bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(picture, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return ctx.makeImage()
     }
 
     private static func colorImage(_ pixels: [UInt8], width: Int, height: Int) -> CGImage? {

@@ -850,6 +850,14 @@ Code ở `ColoringBook/ColoringBook/Book/`. Màn chính có thẻ "Make a colori
 7. Ghi lại chi phí thực tế mỗi tranh của từng model, và tỷ lệ tranh đạt ngay ở tầng rẻ, để tính lại chi phí phân tầng và lãi gộp ở mục 5.
 8. Chốt model mặc định, model dự phòng, kích thước ảnh, ngân sách AI cho mỗi gói và bộ gói IAP.
 
+### Khung tranh tô màu sẵn (2026-11-25)
+
+User quyết định khung dạng ảnh **tô màu sẵn, bé không tô khung**; user tự làm khoảng 10 khung. Quy cách mới (cỡ **1600×1200 / 1200×1600**, PNG màu, nền trong suốt, vùng tranh từ 108 px vào trong suốt) trong `docs/frame-art-spec.md`. App: khung PNG nằm trên lớp riêng trên cùng (`LineArt.colorFrame`, trên lớp màu và nét, dưới sticker), thùng sơn bị chặn ở mọi điểm ngoài vùng tranh, bản in vẽ khung màu đè lên tranh đã chuyển đen trắng (`BookPageSource.frame`). Bảy khung nét vẽ bằng code vẫn để bé tô. Thử bằng khung giả `tempdrawing_img/frame-test-candy-*` và `-sketchTest -openColor -frame test-candy`.
+
+### Sticker màu (2026-11-25)
+
+User chọn **sticker có màu sẵn, không tô**: 20 sticker kawaii trong `rawassets/color_stickers` (512 px, nền trong suốt) → assets `Sticker-<tên>` (star, heart, flower, rainbow, sun, moon, crown, balloons, gift, cupcake, strawberry, cherries, butterfly, rocket, unicorn, cat, dog, bear, panda, rabbit). Đã bỏ hết sticker nét cũ: `StickerKind` giờ là sticker ảnh (chạm trúng theo khung hình có màu), không còn tô bên trong (bỏ `StickerRaster`, `stickerImages`); thùng sơn chạm lên sticker thì không làm gì. Hình nét cũ đổi tên thành `LineMotif`, chỉ còn dùng cho 7 khung vẽ bằng code. Trang đã lưu với sticker cũ vẫn mở được (cùng tên giữ nguyên, balloon → balloons, cloud/fish → star). Khi in: khung màu và sticker nằm trong `ColoringSession.renderOverlay()` → `BookPageSource.overlay`, in màu đè lên tranh đen trắng. Thử nhanh: `-sketchTest -openColor -stickers`.
+
 ### TODO trước khi phát hành
 
 - [ ] **Popup xin đánh giá** (user nhắc 2026-11-25): dùng `requestReview` của StoreKit (hộp thoại hệ thống, iOS tự giới hạn số lần). Chỉ hỏi sau lúc vui và ở chỗ phụ huynh đang dùng, ví dụ sau khi lưu sách hoặc Save PDF xong, hoặc sau vài trang đã tô; không hỏi bé giữa lúc tô, không tự làm hộp hỏi riêng trước hộp hệ thống. Kiểm lại quy định cho Kids Category (Guideline 1.3) trước khi bật.

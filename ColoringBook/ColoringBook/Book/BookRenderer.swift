@@ -73,6 +73,9 @@ nonisolated struct BookPageSource: @unchecked Sendable {
     var layout: BookLayout? = nil
     /// Where a parent moved the picture and the photo; nil lays them out.
     var placement: PagePlacement? = nil
+    /// What is printed in color over the lines: a picture frame and the
+    /// stickers (ColoringSession.renderOverlay); `lineArt` contains neither.
+    var overlay: CGImage? = nil
 }
 
 /// Where a parent put things on one page (PageArrangeView), in sheet points.
@@ -336,8 +339,14 @@ nonisolated enum BookRenderer {
         ctx.saveGState()
         ctx.translateBy(x: center.x, y: center.y)
         if landscape { ctx.rotate(by: -.pi / 2) }
-        UIImage(cgImage: picture).draw(in: CGRect(x: -drawn.width / 2, y: -drawn.height / 2,
-                                                  width: drawn.width, height: drawn.height))
+        let pictureRect = CGRect(x: -drawn.width / 2, y: -drawn.height / 2, width: drawn.width, height: drawn.height)
+        UIImage(cgImage: picture).draw(in: pictureRect)
+        // The colored frame and stickers keep their colors on paper: laid
+        // over the black and white picture.
+        if let overlay = page.overlay {
+            ctx.interpolationQuality = .high
+            UIImage(cgImage: overlay).draw(in: pictureRect)
+        }
         ctx.restoreGState()
 
         if let photo {

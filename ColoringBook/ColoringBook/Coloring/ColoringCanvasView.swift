@@ -19,6 +19,8 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
     private let paintView = UIImageView()
     private let liveView = LiveStrokeView()
     private let linesView = UIImageView()
+    /// A colored picture frame, over the lines and the paint (normal blend).
+    private let frameView = UIImageView()
     private let stickerLayer = UIView()
     private var stickerViews: [UUID: StickerView] = [:]
 
@@ -83,6 +85,9 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
         // they always sit on top of the color.
         linesView.layer.compositingFilter = "multiplyBlendMode"
         page.addSubview(linesView)
+        frameView.contentMode = .scaleToFill
+        frameView.isUserInteractionEnabled = false
+        page.addSubview(frameView)
 
         page.addSubview(stickerLayer)
 
@@ -115,7 +120,7 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
             fitScale = fit
             pageSize = size
             page.frame = CGRect(origin: .zero, size: size)
-            for view in [paintView, liveView, linesView, stickerLayer] { view.frame = page.bounds }
+            for view in [paintView, liveView, linesView, frameView, stickerLayer] { view.frame = page.bounds }
             liveView.scale = fit
             scrollView.contentSize = size
             if session.zoom != 1 { session.zoom = 1 }
@@ -175,6 +180,7 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
         if shownLines !== session.art.lines {
             shownLines = session.art.lines
             linesView.image = UIImage(cgImage: session.art.lines)
+            frameView.image = session.art.colorFrame.map { UIImage(cgImage: $0) }
         }
         let image = session.pageImage.map { UIImage(cgImage: $0) }
         if let fill = session.lastFill, fill.serial != shownFillSerial {
@@ -235,7 +241,7 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
             // Order follows the session: last is on top.
             stickerLayer.addSubview(view)
             view.update(
-                image: session.stickerImages[sticker.id],
+                image: sticker.kind.image,
                 side: sticker.size * fitScale,
                 center: CGPoint(x: sticker.center.x * fitScale, y: sticker.center.y * fitScale),
                 rotation: sticker.rotation,
@@ -519,8 +525,8 @@ private final class LiveStrokeView: UIView {
 /// The corner handle for resizing and turning a sticker.
 private final class HandleView: UIView {}
 
-/// One sticker: its own fill bitmap, its vector outline on top, and while
-/// selected, a delete button and a resize handle.
+/// One sticker: its colored picture, and while selected, a delete button
+/// and a resize handle.
 private final class StickerView: UIView {
     private let kind: StickerKind
     private let fill = UIImageView()
@@ -595,10 +601,8 @@ private final class StickerView: UIView {
 
         fill.image = image.map { UIImage(cgImage: $0) }
         fill.frame = bounds
-        var toView = CGAffineTransform(scaleX: side, y: side)
-        outline.path = kind.lines.copy(using: &toView)
-        outline.lineWidth = StickerKind.lineWidth * side
-        outline.frame = bounds
+        // The picture is the sticker; no outline is drawn over it.
+        outline.path = nil
 
         // Selection and controls are sized for the screen, not the page:
         // divide by the zoom so they look the same at any magnification.

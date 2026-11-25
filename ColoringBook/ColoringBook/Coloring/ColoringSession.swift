@@ -46,10 +46,8 @@ final class ColoringSession {
     /// The last bucket tap, so the canvas can play the spreading animation.
     private(set) var lastFill: (serial: Int, point: CGPoint)?
     private(set) var pageImage: CGImage?
-    private(set) var stickerImages: [UUID: CGImage] = [:]
 
     private var paint: PagePaint
-    private var stickerLayers: [UUID: FillLayer] = [:]
 
     private struct Snapshot {
         var actions: [PaintAction]
@@ -80,7 +78,6 @@ final class ColoringSession {
         if let saved {
             paint.set(saved.actions)
             stickers = saved.stickers
-            for sticker in stickers { stickerImages[sticker.id] = stickerLayer(for: sticker).makeImage() }
         }
         self.pageImage = paint.layer.makeImage()
     }
@@ -140,28 +137,15 @@ final class ColoringSession {
 
     // MARK: - Fill
 
-    /// A bucket tap at a page pixel: inside the topmost sticker under it, or
-    /// on the page.
+    /// A bucket tap at a page pixel. Stickers come colored, so a tap on one
+    /// does nothing.
     func fill(atPage point: CGPoint) {
-        if let index = stickers.lastIndex(where: { $0.contains(pagePoint: point) }) {
-            let sticker = stickers[index]
-            let unit = sticker.unitPoint(fromPage: point)
-            let n = CGFloat(StickerRaster.resolution)
-            var layer = stickerLayer(for: sticker)
-            guard let (x, y) = layer.seed(nearX: Int(unit.x * n), y: Int(unit.y * n)) else { return }
-            let op = FillOp(x: x, y: y, color: color)
-            record()
-            layer.fill(op)
-            stickers[index].ops.append(op)
-            stickerLayers[sticker.id] = layer
-            stickerImages[sticker.id] = layer.makeImage()
-        } else {
-            guard let (x, y) = paint.layer.seed(nearX: Int(point.x), y: Int(point.y)) else { return }
-            record()
-            paint.apply(.fill(FillOp(x: x, y: y, color: color)))
-            pageImage = paint.layer.makeImage()
-            lastFill = ((lastFill?.serial ?? 0) + 1, CGPoint(x: x, y: y))
-        }
+        guard !stickers.contains(where: { $0.contains(pagePoint: point) }),
+              let (x, y) = paint.layer.seed(nearX: Int(point.x), y: Int(point.y)) else { return }
+        record()
+        paint.apply(.fill(FillOp(x: x, y: y, color: color)))
+        pageImage = paint.layer.makeImage()
+        lastFill = ((lastFill?.serial ?? 0) + 1, CGPoint(x: x, y: y))
         revision += 1
     }
 
@@ -189,7 +173,6 @@ final class ColoringSession {
             center: CGPoint(x: CGFloat(art.width) / 2 + offset, y: CGFloat(art.height) / 2 + offset),
             size: size, rotation: 0)
         stickers.append(sticker)
-        stickerImages[sticker.id] = stickerLayer(for: sticker).makeImage()
         selectedSticker = sticker.id
         tool = .sticker
         revision += 1
@@ -226,8 +209,6 @@ final class ColoringSession {
         guard stickers.contains(where: { $0.id == id }) else { return }
         record()
         stickers.removeAll { $0.id == id }
-        stickerLayers[id] = nil
-        stickerImages[id] = nil
         if selectedSticker == id { selectedSticker = nil }
         revision += 1
     }
@@ -237,14 +218,6 @@ final class ColoringSession {
         guard let i = stickers.firstIndex(where: { $0.id == id }), i != stickers.count - 1 else { return }
         stickers.append(stickers.remove(at: i))
         revision += 1
-    }
-
-    private func stickerLayer(for sticker: PlacedSticker) -> FillLayer {
-        if let layer = stickerLayers[sticker.id] { return layer }
-        var layer = StickerRaster.layer(for: sticker.kind)
-        layer.replay(sticker.ops)
-        stickerLayers[sticker.id] = layer
-        return layer
     }
 
     // MARK: - Undo
@@ -283,32 +256,16 @@ final class ColoringSession {
             repaint = true
         }
         if repaint { pageImage = paint.layer.makeImage() }
-        let old = Dictionary(uniqueKeysWithValues: stickers.map { ($0.id, $0) })
         stickers = s.stickers
-        var layers: [UUID: FillLayer] = [:]
-        var images: [UUID: CGImage] = [:]
-        for sticker in stickers {
-            if let before = old[sticker.id], before.ops == sticker.ops, before.kind == sticker.kind,
-               let layer = stickerLayers[sticker.id], let image = stickerImages[sticker.id] {
-                layers[sticker.id] = layer
-                images[sticker.id] = image
-            } else {
-                var layer = StickerRaster.layer(for: sticker.kind)
-                layer.replay(sticker.ops)
-                layers[sticker.id] = layer
-                images[sticker.id] = layer.makeImage()
-            }
-        }
-        stickerLayers = layers
-        stickerImages = images
         if let selected = selectedSticker, !stickers.contains(where: { $0.id == selected }) { selectedSticker = nil }
         revision += 1
     }
 
     // MARK: - Export
 
-    /// The page for printing as a coloring page: lines and stickers, with
-    /// no color, at working size. Stickers keep their white insides.
+    /// The page for printing as a coloring page: just the lines, no color,
+    /// at working size. The colored frame and the stickers are in
+    /// `renderOverlay()`, printed in color on top.
     func renderLineArt() -> UIImage {
         let size = CGSize(width: art.width, height: art.height)
         let format = UIGraphicsImageRendererFormat()
@@ -319,21 +276,32 @@ final class ColoringSession {
             UIColor.white.setFill()
             context.fill(rect)
             UIImage(cgImage: art.lines).draw(in: rect)
-            let cg = context.cgContext
-            for sticker in stickers {
-                cg.saveGState()
-                cg.concatenate(sticker.transform)
-                cg.setFillColor(UIColor.white.cgColor)
-                cg.addPath(sticker.kind.outline)
-                cg.fillPath()
-                cg.setStrokeColor(UIColor.black.cgColor)
-                cg.setLineWidth(StickerKind.lineWidth)
-                cg.setLineJoin(.round)
-                cg.setLineCap(.round)
-                cg.addPath(sticker.kind.lines)
-                cg.strokePath()
-                cg.restoreGState()
-            }
+        }
+    }
+
+    /// What lies over the page in color: a picture frame and the stickers,
+    /// transparent elsewhere. Nil when there are neither.
+    func renderOverlay() -> CGImage? {
+        guard art.colorFrame != nil || !stickers.isEmpty else { return nil }
+        let size = CGSize(width: art.width, height: art.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            let rect = CGRect(origin: .zero, size: size)
+            if let frame = art.colorFrame { UIImage(cgImage: frame).draw(in: rect) }
+            drawStickers(in: context.cgContext)
+        }.cgImage
+    }
+
+    /// The stickers, each in its square on the page.
+    private func drawStickers(in cg: CGContext) {
+        for sticker in stickers {
+            guard let image = sticker.kind.image else { continue }
+            cg.saveGState()
+            cg.concatenate(sticker.transform)
+            UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            cg.restoreGState()
         }
     }
 
@@ -349,22 +317,9 @@ final class ColoringSession {
             context.fill(rect)
             if let pageImage { UIImage(cgImage: pageImage).draw(in: rect) }
             UIImage(cgImage: art.lines).draw(in: rect, blendMode: .multiply, alpha: 1)
+            if let frame = art.colorFrame { UIImage(cgImage: frame).draw(in: rect) }
 
-            let cg = context.cgContext
-            for sticker in stickers {
-                cg.saveGState()
-                cg.concatenate(sticker.transform)
-                if let image = stickerImages[sticker.id] {
-                    UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: 1, height: 1))
-                }
-                cg.setStrokeColor(UIColor.black.cgColor)
-                cg.setLineWidth(StickerKind.lineWidth)
-                cg.setLineJoin(.round)
-                cg.setLineCap(.round)
-                cg.addPath(sticker.kind.lines)
-                cg.strokePath()
-                cg.restoreGState()
-            }
+            drawStickers(in: context.cgContext)
         }
     }
 }

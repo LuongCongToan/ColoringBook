@@ -1,12 +1,80 @@
 import CoreGraphics
 import Foundation
+import UIKit
 
-/// Line-art stickers, drawn as vector paths in a unit square (origin top-left).
-///
-/// Placeholders until the real set exists (brief 6, "Sticker": 40–60 drawn or
-/// generated once and vectorised). Each one follows the same rules: closed
-/// outlines, white inside, inner lines that make separate regions to color.
-nonisolated enum StickerKind: String, CaseIterable, Codable, Sendable, Identifiable {
+/// Stickers: colored kawaii pictures (rawassets/color_stickers, assets
+/// "Sticker-<name>"), placed on the page, moved, resized and turned. Not
+/// for coloring (decided 2026-11-25): they are the reward, already colored.
+nonisolated enum StickerKind: String, CaseIterable, Sendable, Identifiable {
+    case star, heart, flower, rainbow, sun, moon, crown, balloons, gift, cupcake,
+         strawberry, cherries, butterfly, rocket, unicorn, cat, dog, bear, panda, rabbit
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var assetName: String { "Sticker-\(rawValue)" }
+
+    /// The picture, 512 px, transparent around it.
+    var image: CGImage? { Self.images[self] ?? nil }
+
+    /// The part of the unit square the picture covers: taps outside it fall
+    /// through to the page.
+    var hitBox: CGRect { Self.boxes[self] ?? CGRect(x: 0, y: 0, width: 1, height: 1) }
+
+    private static let images: [StickerKind: CGImage?] = {
+        var out: [StickerKind: CGImage?] = [:]
+        for kind in allCases { out[kind] = UIImage(named: kind.assetName)?.cgImage }
+        return out
+    }()
+
+    /// Bounding box of the opaque pixels, in the unit square (top-left).
+    private static let boxes: [StickerKind: CGRect] = {
+        var out: [StickerKind: CGRect] = [:]
+        for kind in allCases {
+            guard let image = images[kind] ?? nil else { continue }
+            let n = 64
+            var rgba = [UInt8](repeating: 0, count: n * n * 4)
+            rgba.withUnsafeMutableBytes { raw in
+                guard let ctx = CGContext(data: raw.baseAddress, width: n, height: n, bitsPerComponent: 8,
+                                          bytesPerRow: n * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+                ctx.draw(image, in: CGRect(x: 0, y: 0, width: n, height: n))
+            }
+            let alpha = (0..<(n * n)).map { rgba[$0 * 4 + 3] }
+            var minX = n, minY = n, maxX = -1, maxY = -1
+            for y in 0..<n { for x in 0..<n where alpha[y * n + x] > 24 {
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            } }
+            if maxX >= minX {
+                // Rows in memory run top to bottom, like the unit square.
+                out[kind] = CGRect(x: CGFloat(minX) / CGFloat(n), y: CGFloat(minY) / CGFloat(n),
+                                   width: CGFloat(maxX - minX + 1) / CGFloat(n),
+                                   height: CGFloat(maxY - minY + 1) / CGFloat(n))
+            }
+        }
+        return out
+    }()
+}
+
+extension StickerKind: Codable {
+    /// Pages saved with the old line stickers still open: same names map
+    /// across, the rest become a star (or balloons).
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw {
+        case "balloon": self = .balloons
+        default: self = StickerKind(rawValue: raw) ?? .star
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(rawValue)
+    }
+}
+
+/// Vector motifs in a unit square (origin top-left), for the built-in line
+/// frames (PageFrame). These were the first, line-art stickers.
+nonisolated enum LineMotif: String, CaseIterable, Sendable, Identifiable {
     case heart, star, flower, balloon, sun, cloud, moon, crown, rainbow, fish
 
     var id: String { rawValue }
@@ -20,8 +88,8 @@ nonisolated enum StickerKind: String, CaseIterable, Codable, Sendable, Identifia
     /// Line width as a share of the sticker's width.
     static let lineWidth: CGFloat = 0.03
 
-    private static let cache: [StickerKind: (outline: CGPath, lines: CGPath)] = {
-        var out: [StickerKind: (CGPath, CGPath)] = [:]
+    private static let cache: [LineMotif: (outline: CGPath, lines: CGPath)] = {
+        var out: [LineMotif: (CGPath, CGPath)] = [:]
         for kind in allCases { out[kind] = kind.build() }
         return out
     }()
@@ -159,7 +227,7 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
     var center: CGPoint
     var size: CGFloat
     var rotation: CGFloat
-    /// Fills inside this sticker, in its own bitmap.
+    /// Fills inside the old line stickers; kept only so saved pages decode.
     var ops: [FillOp] = []
 
     /// Page pixel → unit square of the sticker (0...1 inside).
@@ -170,7 +238,7 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
     }
 
     func contains(pagePoint p: CGPoint) -> Bool {
-        kind.outline.contains(unitPoint(fromPage: p))
+        kind.hitBox.contains(unitPoint(fromPage: p))
     }
 
     /// Unit square → page pixels.
@@ -180,69 +248,4 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
             .scaledBy(x: size, y: size)
             .translatedBy(x: -0.5, y: -0.5)
     }
-}
-
-/// The fillable bitmap of a sticker kind: white inside the silhouette,
-/// transparent outside, barrier on the lines and outside.
-nonisolated enum StickerRaster {
-    static let resolution = 400
-
-    static func layer(for kind: StickerKind) -> FillLayer {
-        if let cached = cache[kind] { return cached }
-        let n = resolution
-        let toPixels = CGAffineTransform(scaleX: CGFloat(n), y: CGFloat(n))
-        let outline = kind.outline.copy(using: [toPixels]) ?? kind.outline
-        let lines = kind.lines.copy(using: [toPixels]) ?? kind.lines
-        let lineWidth = StickerKind.lineWidth * CGFloat(n)
-
-        // Barrier: everything, minus the inside, plus the lines.
-        var grey = [UInt8](repeating: 0, count: n * n)
-        grey.withUnsafeMutableBytes { raw in
-            guard let ctx = CGContext(
-                data: raw.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n,
-                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return }
-            flip(ctx, n)
-            ctx.setFillColor(gray: 1, alpha: 1)
-            ctx.addPath(outline)
-            ctx.fillPath()
-            ctx.setStrokeColor(gray: 0, alpha: 1)
-            ctx.setLineWidth(lineWidth)
-            ctx.setLineJoin(.round)
-            ctx.setLineCap(.round)
-            ctx.addPath(lines)
-            ctx.strokePath()
-        }
-        let barrier = grey.map { $0 < 128 ? UInt8(1) : 0 }
-
-        // Base paint: opaque white inside the silhouette.
-        var base = [UInt8](repeating: 0, count: n * n * 4)
-        base.withUnsafeMutableBytes { raw in
-            guard let ctx = CGContext(
-                data: raw.baseAddress, width: n, height: n, bitsPerComponent: 8, bytesPerRow: n * 4,
-                space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
-            flip(ctx, n)
-            ctx.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-            ctx.addPath(outline)
-            ctx.fillPath()
-            // Cover the outer half of the stroke too, so no page shows
-            // between the white and the vector outline drawn on top.
-            ctx.setStrokeColor(red: 1, green: 1, blue: 1, alpha: 1)
-            ctx.setLineWidth(lineWidth)
-            ctx.addPath(outline)
-            ctx.strokePath()
-        }
-
-        let layer = FillLayer(width: n, height: n, barrier: barrier, base: base)
-        cache[kind] = layer
-        return layer
-    }
-
-    /// Paths are top-left based; bitmap contexts are bottom-left based.
-    private static func flip(_ ctx: CGContext, _ n: Int) {
-        ctx.translateBy(x: 0, y: CGFloat(n))
-        ctx.scaleBy(x: 1, y: -1)
-    }
-
-    nonisolated(unsafe) private static var cache: [StickerKind: FillLayer] = [:]
 }
