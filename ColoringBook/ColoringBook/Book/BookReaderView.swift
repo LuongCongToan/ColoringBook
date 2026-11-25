@@ -99,6 +99,7 @@ struct BookReaderView: View {
             }
             .padding(.bottom, 12)
         }
+        .kidTabBarClearance()
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(book?.title ?? "Book")
         .kidBackButton()

@@ -55,6 +55,7 @@ struct PageLibraryView: View {
                 .padding(.horizontal, 13)
                 .padding(.bottom, 24)
             }
+        .kidTabBarClearance()
             .background(KidBackground())
             .toolbar(.hidden, for: .navigationBar)
             .loading(opening, "Opening the page…")

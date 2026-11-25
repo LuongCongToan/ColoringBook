@@ -56,6 +56,7 @@ struct ColoringView: View {
                 }
             }
         }
+        .kidTabBarClearance()
         .background(Theme.background.ignoresSafeArea())
         .environment(\.colorScheme, .light)
         .toolbar(.hidden, for: .navigationBar)

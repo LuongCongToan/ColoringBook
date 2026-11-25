@@ -50,6 +50,7 @@ struct MyPagesView: View {
             }
             .padding(18)
         }
+        .kidTabBarClearance()
         .background(KidBackground())
         .navigationTitle(selecting ? selectionTitle : "My pages")
         .kidBackButton(hidden: selecting)

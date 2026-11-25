@@ -22,8 +22,23 @@ final class AppTabs {
 /// floating at the bottom, the current tab on a soft yellow pill.
 struct RootTabView: View {
     @State private var tabs = AppTabs.shared
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
+        // The bar floats over the tabs. TabView resets the safe area of its
+        // tabs, so padding from out here never reaches the screens; instead
+        // each screen reads the bar's height and keeps clear of it
+        // (`kidTabBarClearance()`).
+        ZStack(alignment: .bottom) {
+            tabView
+                .environment(\.kidTabBarHeight,
+                             (verticalSizeClass == .compact ? KidTabBar.compactHeight : KidTabBar.height) + 8)
+            KidTabBar(selected: $tabs.selected)
+        }
+        .ignoresSafeArea(.keyboard)
+    }
+
+    private var tabView: some View {
         TabView(selection: $tabs.selected) {
             Tab(value: AppTab.home) {
                 PageLibraryView().kidTabBarSpace()
@@ -35,10 +50,6 @@ struct RootTabView: View {
                 NavigationStack { LibraryView() }.kidTabBarSpace()
             }
         }
-        .overlay(alignment: .bottom) {
-            KidTabBar(selected: $tabs.selected)
-        }
-        .ignoresSafeArea(.keyboard)
     }
 }
 
@@ -48,6 +59,10 @@ struct RootTabView: View {
 struct KidTabBar: View {
     @Binding var selected: AppTab
     static let height: CGFloat = 70
+    /// Phone on its side: icon beside the word, a lower bar.
+    static let compactHeight: CGFloat = 50
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    private var compact: Bool { verticalSizeClass == .compact }
 
     private let items: [(AppTab, String, String)] = [
         (.home, "Home", "house.fill"),
@@ -63,19 +78,20 @@ struct KidTabBar: View {
                     SoundFX.shared.play(.tap)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selected = tab }
                 } label: {
-                    VStack(spacing: 2) {
+                    let layout = compact ? AnyLayout(HStackLayout(spacing: 6)) : AnyLayout(VStackLayout(spacing: 2))
+                    layout {
                         Image(systemName: symbol)
-                            .font(.system(size: 24, weight: .bold))
+                            .font(.system(size: compact ? 20 : 24, weight: .bold))
                         Text(title)
                             .font(Kid.title(15, relativeTo: .caption))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
                     .foregroundStyle(Kid.ink)
-                    .frame(width: 108.6, height: 58.9)
+                    .frame(width: compact ? 150 : 108.6, height: compact ? 40 : 58.9)
                     .background {
                         if on {
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            RoundedRectangle(cornerRadius: compact ? 18 : 22, style: .continuous)
                                 .fill(Color(hex: 0xFBE18F))
                                 .matchedGeometryEffect(id: "pill", in: pill)
                         }
@@ -89,9 +105,10 @@ struct KidTabBar: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(height: Self.height)
+        .frame(height: compact ? Self.compactHeight : Self.height)
+        .frame(maxWidth: compact ? 560 : .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: compact ? 24 : 30, style: .continuous)
                 .fill(.white)
                 .shadow(color: Kid.ink.opacity(0.10), radius: 10, y: 3))
         .padding(.horizontal, 16.5)
@@ -101,15 +118,34 @@ struct KidTabBar: View {
     @Namespace private var pill
 }
 
+extension EnvironmentValues {
+    /// Room the floating tab bar takes at the bottom; 0 outside the tabs.
+    @Entry var kidTabBarHeight: CGFloat = 0
+}
+
+private struct KidTabBarClearance: ViewModifier {
+    @Environment(\.kidTabBarHeight) private var height
+
+    func body(content: Content) -> some View {
+        content.safeAreaPadding(.bottom, height)
+    }
+}
+
+private struct KidTabBarSpace: ViewModifier {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar(.hidden, for: .tabBar)
+    }
+}
+
 extension View {
     /// Hides the system tab bar and keeps content clear of KidTabBar.
-    func kidTabBarSpace() -> some View {
-        self
-            .toolbar(.hidden, for: .tabBar)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: KidTabBar.height + 8)
-            }
-    }
+    func kidTabBarSpace() -> some View { modifier(KidTabBarSpace()) }
+    /// On a screen's root: keeps its bottom buttons and scrolling content
+    /// above the floating tab bar.
+    func kidTabBarClearance() -> some View { modifier(KidTabBarClearance()) }
 }
 
 /// Books and pages together: a switch at the top picks which.

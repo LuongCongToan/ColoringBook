@@ -53,6 +53,7 @@ struct BookBuilderView: View {
             }
             .padding(16)
         }
+        .kidTabBarClearance()
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) { mainButton }
         .navigationTitle(editing == nil ? "Make a book" : "Edit book")

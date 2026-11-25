@@ -872,6 +872,7 @@ User chọn **sticker có màu sẵn, không tô**: 20 sticker kawaii trong `raw
 - [ ] Thay mọi nền sách có bản quyền; vẽ khung PNG thật theo `docs/frame-art-spec.md`; hình minh hoạ giao diện bản to.
 - [ ] Thử trên iPhone thật: tách nền của Sketch, tốc độ, mua hàng StoreKit.
 - [ ] In thử PDF (trang Sketch: tóc có thành mảng đen không) trên giấy thật.
+- [ ] **Thử mọi màn ở cả dọc và ngang, trên iPhone và iPad** (user nhắc 2026-11-25, sau lỗi nút "Draw my page" bị thanh tab che khi xoay ngang). Đặc biệt: nút ghim ở đáy (Draw my page, Save book, thanh chọn khi xoá), thanh dụng cụ màn tô màu, thanh tab riêng (`KidTabBar`, bản thấp khi xoay ngang), màn Arrange, PDF preview, paywall. Lưu ý: TabView đặt lại vùng an toàn của các tab, nên mỗi màn trong tab phải gọi `kidTabBarClearance()` mới không bị thanh tab che.
 
 ## 9. Rủi ro
 

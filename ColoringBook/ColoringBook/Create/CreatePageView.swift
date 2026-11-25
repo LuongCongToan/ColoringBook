@@ -6,6 +6,8 @@ import SwiftUI
 /// buttons still work for a child sitting alongside.
 struct CreatePageView: View {
     @State private var pick: PhotosPickerItem?
+    /// The photo picker opened from "Draw my page" before a photo is chosen.
+    @State private var choosingPhoto = false
     @State private var prepared: PhotoPrep.Result?
     @State private var preview: UIImage?
     /// The same crop in color, kept with the page for the book layouts.
@@ -40,6 +42,23 @@ struct CreatePageView: View {
 
     private let generator = PageGenerators.make()
 
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// A phone on its side: little height, lay things side by side.
+    private var wide: Bool { verticalSizeClass == .compact }
+
+    private var isDone: Bool {
+        if case .done = phase { return true }
+        return false
+    }
+
+    @ViewBuilder private var failure: some View {
+        if case .failed(let message) = phase {
+            Label(message, systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+                .multilineTextAlignment(.leading)
+        }
+    }
+
     private enum Phase {
         case choosing
         case preparing
@@ -53,19 +72,43 @@ struct CreatePageView: View {
             VStack(spacing: 22) {
                 if case .done(let page, let image) = phase {
                     result(page, image)
+                } else if wide {
+                    // Phone on its side: the photo left, the choices right,
+                    // so nothing has to scroll out of a short screen.
+                    HStack(alignment: .top, spacing: 18) {
+                        photoCard
+                            .frame(maxWidth: .infinity)
+                        VStack(spacing: 16) {
+                            styleCards
+                            failure
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
                 } else {
                     photoCard
                     styleCards
-                    drawButton
-                    if case .failed(let message) = phase {
-                        Label(message, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                            .multilineTextAlignment(.leading)
-                    }
+                    failure
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, wide ? 8 : 20)
+            .padding(.bottom, 12)
         }
+        // "Draw my page" stays in sight above the tab bar, whatever the
+        // screen's height (it was pushed under the bar in landscape).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !isDone {
+                drawButton
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    // Content scrolls under a soft fade, not through the button.
+                    .background(
+                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                                       startPoint: .top, endPoint: .bottom))
+            }
+        }
+        .kidTabBarClearance()
         .background(KidBackground())
         .navigationTitle("New page")
         .kidBackButton()
@@ -148,7 +191,7 @@ struct CreatePageView: View {
                         Image("NewPagePhoto")
                             .resizable()
                             .scaledToFit()
-                            .frame(maxWidth: 250, maxHeight: 190)
+                            .frame(maxWidth: 250, maxHeight: wide ? 120 : 190)
                         Text("Choose a family photo")
                             .font(Kid.titleBold(26))
                             .foregroundStyle(Kid.ink)
@@ -162,7 +205,7 @@ struct CreatePageView: View {
                     .padding(.vertical, 22)
                 }
             }
-            .frame(minHeight: 260)
+            .frame(minHeight: wide ? 200 : 260)
         }
         .buttonStyle(SquishyStyle())
         .overlay(alignment: .bottom) {
@@ -202,20 +245,24 @@ struct CreatePageView: View {
     private var drawButton: some View {
         Button {
             SoundFX.shared.play(.tap)
-            startDrawing()
+            // No photo yet: a pale button that did nothing looked broken
+            // (user, 2026-11-25); it opens the photo picker instead.
+            if prepared == nil { choosingPhoto = true } else { startDrawing() }
         } label: {
             Label("Draw my page", systemImage: "wand.and.stars")
                 .font(Kid.titleBold(24))
-                .frame(maxWidth: .infinity, minHeight: 66)
-                .foregroundStyle(Kid.ink)
-                .background(Kid.yellow, in: RoundedRectangle(cornerRadius: Kid.radius, style: .continuous))
+                .frame(maxWidth: .infinity, minHeight: wide ? 52 : 66)
+                // Waiting for a photo: a pale, solid button (not see-through),
+                // like the design's disabled state.
+                .foregroundStyle(prepared == nil ? Kid.ink.opacity(0.45) : Kid.ink)
+                .background(prepared == nil ? Color(hex: 0xFBE8AE) : Kid.yellow,
+                            in: RoundedRectangle(cornerRadius: Kid.radius, style: .continuous))
                 .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
-                    .fill(Kid.yellow.darker(0.15)).offset(y: 6))
+                    .fill(prepared == nil ? Color(hex: 0xF1DB9A) : Kid.yellow.darker(0.15)).offset(y: 6))
         }
         .buttonStyle(SquishyStyle())
-        .disabled(prepared == nil)
-        // Waiting for a photo: pale, like the design's disabled button.
-        .opacity(prepared == nil ? 0.5 : 1)
+        .disabled(phaseKey == 1)  // while the photo is being prepared
+        .photosPicker(isPresented: $choosingPhoto, selection: $pick, matching: .images)
     }
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
@@ -696,4 +743,9 @@ private struct ArtToColor: Identifiable, Hashable {
 
     static func == (a: Self, b: Self) -> Bool { a.id == b.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+#Preview("New page, landscape", traits: .landscapeLeft) {
+    RootTabView()
+        .onAppear { AppTabs.shared.selected = .create }
 }
