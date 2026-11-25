@@ -66,7 +66,7 @@ struct CreatePageView: View {
             }
             .padding(20)
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(KidBackground())
         .navigationTitle("New page")
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -105,6 +105,8 @@ struct CreatePageView: View {
             preview = UIImage(data: data)
             // `-cartoon`: the (simulated) AI instead of a sketch.
             style = ProcessInfo.processInfo.arguments.contains("-cartoon") ? .cartoon : .sketch
+            // `-noDraw`: stop at the choosing screen, photo in place.
+            if ProcessInfo.processInfo.arguments.contains("-noDraw") { return }
             await draw()
             // `-sketchTest -openColor`: straight on to coloring it.
             if ProcessInfo.processInfo.arguments.contains("-openColor"), case .done(let page, _) = phase {
@@ -121,7 +123,9 @@ struct CreatePageView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(.white)
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+                    .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Kid.yellow, lineWidth: 5))
+                    .background(RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(Kid.ink.opacity(0.07)).offset(y: 7))
                 if let preview {
                     Image(uiImage: preview)
                         .resizable()
@@ -130,7 +134,8 @@ struct CreatePageView: View {
                         .padding(14)
                         .overlay(alignment: .bottomTrailing) {
                             Label("Change", systemImage: "arrow.triangle.2.circlepath")
-                                .font(.subheadline.weight(.bold))
+                                .font(Kid.body(15))
+                                .foregroundStyle(Kid.ink)
                                 .padding(.horizontal, 14).padding(.vertical, 8)
                                 .background(.thinMaterial, in: Capsule())
                                 .padding(24)
@@ -138,22 +143,27 @@ struct CreatePageView: View {
                 } else if case .preparing = phase {
                     ProgressView().controlSize(.large)
                 } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 54, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
+                    VStack(spacing: 10) {
+                        Image("NewPagePhoto")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 250, maxHeight: 190)
                         Text("Choose a family photo")
-                            .font(.title3.weight(.bold))
+                            .font(Kid.titleBold(26))
+                            .foregroundStyle(Kid.ink)
+                            .multilineTextAlignment(.center)
                         Text("People and pets, close up, work best.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(Kid.bodyBold(15))
+                            .foregroundStyle(Kid.ink.opacity(0.65))
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(30)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 22)
                 }
             }
             .frame(minHeight: 260)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SquishyStyle())
         .overlay(alignment: .bottom) {
             if prepared?.faceTouchesEdge == true {
                 Label("A face is at the edge. A photo with more space around it draws better.",
@@ -171,7 +181,8 @@ struct CreatePageView: View {
     private var styleCards: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Drawing style")
-                .font(.headline)
+                .font(Kid.titleBold(24))
+                .foregroundStyle(Kid.ink)
             HStack(spacing: 10) {
                 ForEach(PageStyle.allCases) { s in
                     StyleCard(style: s, selected: style == s) {
@@ -193,15 +204,17 @@ struct CreatePageView: View {
             startDrawing()
         } label: {
             Label("Draw my page", systemImage: "wand.and.stars")
-                .font(.title3.weight(.heavy))
-                .frame(maxWidth: .infinity, minHeight: 64)
-                .foregroundStyle(.white)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: Theme.accent.opacity(0.35), radius: 8, y: 4)
+                .font(Kid.titleBold(24))
+                .frame(maxWidth: .infinity, minHeight: 66)
+                .foregroundStyle(Kid.ink)
+                .background(Kid.yellow, in: RoundedRectangle(cornerRadius: Kid.radius, style: .continuous))
+                .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
+                    .fill(Kid.yellow.darker(0.15)).offset(y: 6))
         }
-        .buttonStyle(BouncyStyle())
+        .buttonStyle(SquishyStyle())
         .disabled(prepared == nil)
-        .opacity(prepared == nil ? 0.45 : 1)
+        // Waiting for a photo: pale, like the design's disabled button.
+        .opacity(prepared == nil ? 0.5 : 1)
     }
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
@@ -377,8 +390,8 @@ struct CreatePageView: View {
             })
         return VStack(alignment: .leading, spacing: 8) {
             Text(style.onDevice ? "Pencil color" : "Line color")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(Kid.body(15))
+                .foregroundStyle(Kid.ink.opacity(0.7))
             // Spread evenly over the full width.
             HStack(spacing: 0) {
                 ForEach(SketchMaker.Ink.allCases) { option in
@@ -456,11 +469,11 @@ private struct StyleCard: View {
     let selected: Bool
     let action: () -> Void
 
-    private var icon: String {
+    private var art: String {
         switch style {
-        case .cartoon: "face.smiling"
-        case .chibi: "face.smiling.inverse"
-        case .sketch: "pencil.and.scribble"
+        case .cartoon: "StyleCartoon"
+        case .chibi: "StyleChibi"
+        case .sketch: "StyleSketch"
         }
     }
 
@@ -474,51 +487,73 @@ private struct StyleCard: View {
 
     private var caption: String {
         switch style {
-        case .cartoon: "Friendly drawing, keeps everyone's age"
-        case .chibi: "Everyone becomes a cute little character"
-        case .sketch: "Drawn on this phone. Simpler lines"
+        case .cartoon: "Fun & friendly"
+        case .chibi: "Tiny & cute"
+        case .sketch: "Simple lines"
+        }
+    }
+
+    /// Each style's own pastel edge; the chosen one turns yellow.
+    private var edge: Color {
+        if selected { return Kid.yellow }
+        switch style {
+        case .cartoon: return Kid.yellow.opacity(0.55)
+        case .chibi: return Kid.lavender
+        case .sketch: return Kid.mint
         }
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: style == .chibi ? 46 : 38, weight: .semibold))
-                    .frame(height: 52)
-                    .foregroundStyle(selected ? Theme.accent : .secondary)
+            VStack(spacing: 4) {
+                Image(art)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 92)
                 Text(title)
-                    .font(.headline.weight(.bold))
+                    .font(Kid.titleBold(20))
+                    .foregroundStyle(Kid.ink)
                 Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(Kid.bodyBold(13))
+                    .foregroundStyle(Kid.ink.opacity(0.65))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: 170, alignment: .top)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(.white)
-                    .shadow(color: .black.opacity(selected ? 0.14 : 0.06), radius: selected ? 8 : 4, y: 3))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(selected ? Theme.accent : .clear, lineWidth: 4))
+            .padding(.horizontal, 6)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous).fill(.white))
+            .overlay(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
+                .strokeBorder(edge, lineWidth: selected ? 5 : 3))
+            .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
+                .fill(edge.opacity(0.45)).offset(y: 6))
             .overlay(alignment: .topTrailing) {
                 if style.onDevice {
                     Text("FREE")
-                        .font(.caption2.weight(.heavy))
+                        .font(Kid.body(12))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Capsule().fill(Color.green))
-                        .offset(x: 4, y: -6)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(Capsule().fill(Color(hex: 0x2BBF6A)))
+                        .offset(x: 4, y: -10)
                 }
             }
-            .scaleEffect(selected ? 1.03 : 1)
+            // The tick: top right, or top left where FREE sits.
+            .overlay(alignment: style.onDevice ? .topLeading : .topTrailing) {
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundStyle(Kid.ink)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Kid.yellow))
+                        .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                        .offset(x: style.onDevice ? -6 : 6, y: -8)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SquishyStyle())
         .accessibilityLabel(style.onDevice ? "\(title), free" : title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -598,8 +633,8 @@ private struct BouncyStyle: ButtonStyle {
 }
 
 private enum Theme {
-    static let background = Color(red: 0.99, green: 0.96, blue: 0.90)
-    static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
+    static let background = Kid.background
+    static let accent = Kid.coral
 }
 
 private struct ArtToColor: Identifiable, Hashable {

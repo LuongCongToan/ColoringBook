@@ -776,6 +776,19 @@ Code ở `ColoringBook/ColoringBook/Create/`. Màn chính có thẻ "Make a colo
 - **Simulator không tách được nền** (Vision cần Neural Engine), nên trên Simulator cả phòng phía sau cũng được vẽ. Cần thử trên iPhone thật.
 - Thử nhanh: `-sketchTest` mở New page và vẽ Sketch từ ảnh thử ngay (thêm `-openColor` để mở luôn màn tô màu).
 
+### Giao diện vui cho bé (bắt đầu 2026-11-25)
+
+User nhận xét UI và icon "nghiêm túc quá, không giống chibi, không giống cartoon". Hướng mới, trong `Design/Kid.swift`:
+- **Font tròn** (SF Rounded, đậm) cho toàn app, cả tiêu đề thanh điều hướng; chữ màu nâu đậm thay cho đen.
+- **Màu kẹo ngọt:** cam, hồng, xanh trời, bạc hà, vàng chanh, tím nho; nền kem có đốm màu nhạt và chấm bi (`KidBackground`).
+- **Thẻ sticker** (`.sticker(color)`): viền trắng 4 pt, bóng cứng phía dưới, hơi nghiêng; nút nhấn lún kiểu đồ chơi (`SquishyStyle`).
+- **Icon kawaii tự vẽ bằng SwiftUI** (mắt bóng, má hồng, miệng cười, viền nâu): máy ảnh (tạo trang), cuốn sách (tạo sách), mặt cười (Cartoon), nhân vật đầu to (Chibi), bút chì (Sketch).
+- **Bảng thiết kế của user (2026-11-25):** nền Cream #FFF8EB, chữ Deep Purple #28145C, thẻ trang Yellow #FFD54A, thẻ sách Lavender #D8B9FF, nhấn Coral #FF7078, phụ Mint #70DCC1, bo góc 24–28 pt, font **Fredoka** (tiêu đề) và **Nunito ExtraBold** (chữ). Font tải từ kho google/fonts (OFL, giấy phép đi kèm trong `Design/Fonts/`), tách bản cố định bằng fonttools, đăng ký lúc chạy (`KidFonts.register`, không cần Info.plist).
+- **Màn chính theo ảnh mẫu của user:** linh vật bút sáp + "Let's color!" + "Make something magical!", nút bánh răng (màn **Grown-ups** sau phép tính: gói mua, khôi phục, chính sách; menu Debug chuyển vào đây), thẻ vàng "Make a coloring page" và thẻ tím "Make a coloring book" có hình minh hoạ, "My books" (bìa màu xoay vòng vàng/san hô/mint/tím, đếm số sách, "See all →"), "My pages" (6 trang, viền màu, "See all →" mở `MyPagesView`), mục nhập trang. **Thanh tab:** Home, Create, My library (`RootTabView`; My library có Books/Pages).
+- **Hình minh hoạ tạm cắt từ ảnh mẫu** (`HomeMascot`, `HomeCamera`, `HomeBook`; tách nền bằng Vision trên Mac): ảnh mẫu chỉ rộng 900 px, cần bản to và riêng từng hình cho bản phát hành.
+- **Màn New page theo ảnh mẫu thứ hai:** thẻ ảnh viền vàng với hình máy ảnh + ảnh gia đình ("Choose a family photo"), 3 thẻ kiểu vẽ có hình riêng (`StyleCartoon/Chibi/Sketch`, viền vàng/lavender/mint), **chọn = viền vàng + dấu tick vàng** (tick sang góc trái ở Sketch vì góc phải có nhãn FREE xanh), nút vàng "Draw my page" có đũa phép, **mờ khi chưa có ảnh**. Thẻ "Make a coloring page" ở màn chính **chuyển sang tab Create** (`AppTabs`), nên thanh tab sáng ở Create. Hình lấy từ `rawassets/new_page_icons` (500–700 px, nền trong suốt).
+- Đã áp: màn chính, màn tạo trang. Chưa áp: màn tô màu, sách, dựng sách, paywall, sắp xếp trang.
+
 ### Loading (2026-11-25)
 
 `LoadingOverlay` / `.loading(_:_:)` dùng chung: mở một trang từ My pages, chạm trang trong sách để tô, Save PDF (có thanh tiến trình). Màn chờ vẽ (AI và Sketch), spinner từng trang khi lật sách, ảnh bìa trong Make a book, danh sách nền (nạp ở luồng phụ) và màn Arrange đều có chỉ báo riêng.

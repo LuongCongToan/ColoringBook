@@ -32,7 +32,7 @@ struct BookListView: View {
                             Button {
                                 toggle(book.id)
                             } label: {
-                                BookShelfCover(book: book, pages: pages)
+                                BookShelfCover(book: book, pages: pages, tint: Kid.coverTint(books.books.firstIndex(of: book) ?? 0))
                                     .overlay(alignment: .topTrailing) { checkmark(selection.contains(book.id)) }
                             }
                             .buttonStyle(.plain)
@@ -41,7 +41,7 @@ struct BookListView: View {
                             NavigationLink {
                                 BookReaderView(bookID: book.id)
                             } label: {
-                                BookShelfCover(book: book, pages: pages)
+                                BookShelfCover(book: book, pages: pages, tint: Kid.coverTint(books.books.firstIndex(of: book) ?? 0))
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
@@ -200,39 +200,43 @@ struct BookListView: View {
     }
 }
 
-/// A book on a shelf: its first page as the cover, the title on a band,
-/// and a darker spine on the left.
+/// A book on a shelf, as in the design: a colored cover, the title at the
+/// top, the first page as the picture, a darker spine on the left.
 struct BookShelfCover: View {
     let book: StoredBook
     let pages: PageStore
+    var tint: Color = Kid.lavender
 
     var body: some View {
         let first = book.pageIDs.lazy.compactMap { id in pages.pages.first { $0.id == id } }.first
-        ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: 10).fill(.white)
+        VStack(spacing: 4) {
+            Text(book.title)
+                .font(Kid.title(14, relativeTo: .caption))
+                .foregroundStyle(Kid.ink)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .frame(height: 36)
             AsyncImage(url: first?.thumbnail) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
-                Image(systemName: "book.closed").font(.largeTitle).foregroundStyle(.secondary)
+                Image(systemName: "book.closed").font(.largeTitle).foregroundStyle(Kid.ink.opacity(0.3))
             }
-            .padding(10)
-            .padding(.bottom, 34)
-            Text(book.title)
-                .font(.caption.weight(.heavy))
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
-                .padding(6)
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(Color(red: 0.55, green: 0.36, blue: 0.86))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 130, height: 170)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(alignment: .leading) {
-            Rectangle().fill(.black.opacity(0.18)).frame(width: 8)
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10))
-        }
-        .shadow(color: .black.opacity(0.18), radius: 6, x: 2, y: 4)
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white))
+        .padding(.leading, 14)
+        .padding([.top, .trailing], 8)
+        .padding(.bottom, 12)
+        .frame(width: 140, height: 160)
+        .background(
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(tint)
+                Rectangle().fill(tint.darker(0.12)).frame(width: 9)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)))
+        .shadow(color: tint.opacity(0.45), radius: 6, y: 4)
         .accessibilityLabel(book.title)
     }
 }

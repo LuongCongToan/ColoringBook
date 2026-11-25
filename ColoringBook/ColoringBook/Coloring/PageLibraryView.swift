@@ -13,190 +13,51 @@ struct PageLibraryView: View {
     @State private var bookToDelete: StoredBook?
     @State private var opening = false
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
+    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                NavigationLink {
-                    CreatePageView()
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "wand.and.stars")
-                            .font(.system(size: 40, weight: .bold))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Make a coloring page")
-                                .font(.title3.weight(.heavy))
-                            Text("From a family photo")
-                                .font(.subheadline.weight(.medium))
-                                .opacity(0.9)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.headline.weight(.bold))
+                VStack(alignment: .leading, spacing: 22) {
+                    header
+                    // Opens the Create tab, so the tab bar shows where you are.
+                    Button {
+                        SoundFX.shared.play(.tap)
+                        AppTabs.shared.selected = .create
+                    } label: {
+                        homeCard(title: "Make a coloring page", subtitle: "From your favorite photo",
+                                 color: Kid.yellow, art: "HomeCamera")
                     }
-                    .foregroundStyle(.white)
-                    .padding(22)
-                    .background(
-                        LinearGradient(colors: [Color(red: 0.98, green: 0.45, blue: 0.20), Color(red: 0.95, green: 0.30, blue: 0.45)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .shadow(color: .orange.opacity(0.3), radius: 10, y: 4)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                    .buttonStyle(SquishyStyle())
 
-                NavigationLink {
-                    BookBuilderView()
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: 34, weight: .bold))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Make a coloring book")
-                                .font(.title3.weight(.heavy))
-                            Text("Read it in the app, save it as a PDF")
-                                .font(.subheadline.weight(.medium))
-                                .opacity(0.9)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.headline.weight(.bold))
+                    NavigationLink {
+                        BookBuilderView()
+                    } label: {
+                        homeCard(title: "Make a coloring book", subtitle: "Create, read & print",
+                                 color: Kid.lavender, art: "HomeBook")
                     }
-                    .foregroundStyle(.white)
-                    .padding(20)
-                    .background(
-                        LinearGradient(colors: [Color(red: 0.36, green: 0.55, blue: 0.95), Color(red: 0.55, green: 0.36, blue: 0.86)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing),
-                        in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-                    .shadow(color: .blue.opacity(0.25), radius: 10, y: 4)
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
+                    .buttonStyle(SquishyStyle())
 
-                if !bookStore.books.isEmpty {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("My books")
-                            .font(.title2.weight(.bold))
-                        Text("\(bookStore.books.count)")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        NavigationLink("See all") { BookListView() }
-                            .font(.headline)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(bookStore.books) { book in
-                                NavigationLink {
-                                    BookReaderView(bookID: book.id)
-                                } label: {
-                                    BookShelfCover(book: book, pages: store)
-                                }
-                                .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button("Delete book", systemImage: "trash", role: .destructive) {
-                                        bookToDelete = book
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
+                    if !bookStore.books.isEmpty { booksSection }
+                    if !store.pages.isEmpty { pagesSection }
+                    samplesSection
+
+                    if let error {
+                        Text(error).font(Kid.body(15)).foregroundStyle(Kid.coral)
                     }
                 }
-
-                if !store.pages.isEmpty {
-                    Text("My pages")
-                        .font(.title2.weight(.bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(store.pages) { page in
-                            Button {
-                                Task { await openSaved(page.id) }
-                            } label: {
-                                savedThumbnail(page)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                #if DEBUG && targetEnvironment(simulator)
-                                Button(page.photo == nil ? "Debug: add test photo" : "Debug: remove photo",
-                                       systemImage: "photo") {
-                                    store.debugSetTestPhoto(page.photo == nil, for: [page.id])
-                                }
-                                #endif
-                                Button("Delete page", systemImage: "trash", role: .destructive) {
-                                    store.delete(page.id)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    Text("Samples")
-                        .font(.title2.weight(.bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                }
-
-                LazyVGrid(columns: columns, spacing: 16) {
-                    PhotosPicker(selection: $pick, matching: .images) {
-                        VStack(spacing: 8) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 34, weight: .semibold))
-                            Text("Import a page")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 150)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
-                    }
-                    .buttonStyle(.plain)
-
-                    ForEach(samples) { sample in
-                        Button {
-                            Task { await open(sample.url) }
-                        } label: {
-                            thumbnail(sample)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(16)
-
-                if let error {
-                    Text(error).foregroundStyle(.red).padding()
-                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Color a page")
-            .toolbar {
-                #if DEBUG
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu("Debug") {
-                        NavigationLink("Photo prep") { PhotoPrepDebugView() }
-                        #if targetEnvironment(simulator)
-                        // Sample pages have no photo; these let the photo
-                        // layouts of books be seen.
-                        Button("Test photo on every page", systemImage: "photo.badge.plus") {
-                            store.debugSetTestPhoto(true, for: store.pages.map(\.id))
-                        }
-                        Button("Remove photo from every page", systemImage: "photo.badge.minus", role: .destructive) {
-                            store.debugSetTestPhoto(false, for: store.pages.map(\.id))
-                        }
-                        #endif
-                    }
-                }
-                #endif
-            }
+            .background(KidBackground())
+            .toolbar(.hidden, for: .navigationBar)
             .loading(opening, "Opening the page…")
             .navigationDestination(item: $opened) { page in
                 ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
             }
+            .sheet(isPresented: $showSettings) { SettingsView() }
             .confirmationDialog(bookToDelete.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
                                 isPresented: Binding(get: { bookToDelete != nil }, set: { if !$0 { bookToDelete = nil } }),
                                 titleVisibility: .visible,
@@ -217,31 +78,219 @@ struct PageLibraryView: View {
         }
     }
 
-    private func thumbnail(_ sample: SamplePage) -> some View {
-        AsyncImage(url: sample.url) { image in
-            image.resizable().scaledToFit()
-        } placeholder: {
-            Color.white
+    // MARK: - Header
+
+    private var header: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image("HomeMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 78, height: 88)
+                .rotationEffect(.degrees(-8))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Let\u{2019}s color!")
+                    .font(Kid.titleBold(38))
+                    .foregroundStyle(Kid.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text("Make something magical!")
+                    .font(Kid.body(16))
+                    .foregroundStyle(Kid.grape)
+            }
+            Spacer(minLength: 0)
+            Button {
+                SoundFX.shared.play(.tap)
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(Kid.ink)
+                    .frame(width: 50, height: 50)
+                    .background(Circle().fill(Kid.lavender.opacity(0.7)))
+            }
+            .buttonStyle(SquishyStyle())
+            .accessibilityLabel("Settings for grown-ups")
         }
-        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.white))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.black.opacity(0.08)))
+        .padding(.top, 6)
+        .overlay(alignment: .topLeading) { sparkles }
     }
 
-    private func savedThumbnail(_ page: SavedPageInfo) -> some View {
-        AsyncImage(url: page.thumbnail) { image in
-            image.resizable().scaledToFit()
-        } placeholder: {
-            Color.white
+    /// A few little stars around the title, as in the design.
+    private var sparkles: some View {
+        ZStack {
+            Image(systemName: "star.fill").foregroundStyle(Kid.coral.opacity(0.8)).font(.system(size: 13))
+                .offset(x: -4, y: 4)
+            Image(systemName: "star.fill").foregroundStyle(Kid.yellow).font(.system(size: 12))
+                .offset(x: 160, y: -4)
+            Image(systemName: "star.fill").foregroundStyle(Kid.mint).font(.system(size: 15))
+                .offset(x: 250, y: 92)
         }
-        // A new thumbnail is written on every save; key on the time so the
-        // grid shows the latest one.
-        .id(page.updated)
-        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: 150)
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.white))
-        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.orange.opacity(0.35), lineWidth: 2))
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Cards
+
+    /// A big rounded card: the illustration on the left, the words on the
+    /// right, a white arrow button.
+    private func homeCard(title: String, subtitle: String, color: Color, art: String) -> some View {
+        HStack(spacing: 8) {
+            Image(art)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 190, maxHeight: 120)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(Kid.titleBold(25))
+                    .foregroundStyle(Kid.ink)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.8)
+                Text(subtitle)
+                    .font(Kid.body(14))
+                    .foregroundStyle(Kid.ink.opacity(0.85))
+            }
+            .multilineTextAlignment(.leading)
+            Spacer(minLength: 0)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 20, weight: .heavy))
+                .foregroundStyle(Kid.ink)
+                .frame(width: 46, height: 46)
+                .background(Circle().fill(.white))
+                .shadow(color: Kid.ink.opacity(0.12), radius: 3, y: 2)
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 14)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 150)
+        .background(
+            RoundedRectangle(cornerRadius: Kid.radius + 6, style: .continuous)
+                .fill(LinearGradient(colors: [color.opacity(0.85), color], startPoint: .top, endPoint: .bottom)))
+        .background(
+            RoundedRectangle(cornerRadius: Kid.radius + 6, style: .continuous)
+                .fill(color.darker(0.12))
+                .offset(y: 6))
+    }
+
+    // MARK: - Sections
+
+    private var booksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                sectionTitle("My books", symbol: "books.vertical.fill", color: Kid.grape)
+                Text("\(bookStore.books.count)")
+                    .font(Kid.body(16))
+                    .foregroundStyle(Kid.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Kid.lavender.opacity(0.55)))
+                Spacer()
+                NavigationLink { BookListView() } label: { seeAll }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(Array(bookStore.books.enumerated()), id: \.element.id) { index, book in
+                        NavigationLink {
+                            BookReaderView(bookID: book.id)
+                        } label: {
+                            BookShelfCover(book: book, pages: store, tint: Kid.coverTint(index))
+                        }
+                        .buttonStyle(SquishyStyle())
+                        .contextMenu {
+                            Button("Delete book", systemImage: "trash", role: .destructive) {
+                                bookToDelete = book
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private var pagesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionTitle("My pages", symbol: "paintpalette.fill", color: Kid.coral)
+                Spacer()
+                NavigationLink { MyPagesView() } label: { seeAll }
+            }
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(Array(store.pages.prefix(6).enumerated()), id: \.element.id) { index, page in
+                    Button {
+                        Task { await openSaved(page.id) }
+                    } label: {
+                        PageTile(url: page.thumbnail, updated: page.updated, tint: Kid.coverTint(index))
+                    }
+                    .buttonStyle(SquishyStyle())
+                    .contextMenu {
+                        #if DEBUG && targetEnvironment(simulator)
+                        Button(page.photo == nil ? "Debug: add test photo" : "Debug: remove photo",
+                               systemImage: "photo") {
+                            store.debugSetTestPhoto(page.photo == nil, for: [page.id])
+                        }
+                        #endif
+                        Button("Delete page", systemImage: "trash", role: .destructive) {
+                            store.delete(page.id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Ready-made pages (R&D samples in Debug) and importing a line drawing.
+    private var samplesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle(samples.isEmpty ? "Import a page" : "Try these", symbol: "star.fill", color: Kid.mint)
+            LazyVGrid(columns: columns, spacing: 16) {
+                PhotosPicker(selection: $pick, matching: .images) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 34, weight: .bold))
+                        Text("Import a page")
+                            .font(Kid.body(15))
+                    }
+                    .foregroundStyle(Kid.mint.darker(0.25))
+                    .frame(maxWidth: .infinity, minHeight: 150)
+                    .background(RoundedRectangle(cornerRadius: Kid.radius).fill(.white.opacity(0.75)))
+                    .overlay(RoundedRectangle(cornerRadius: Kid.radius)
+                        .strokeBorder(Kid.mint, style: StrokeStyle(lineWidth: 3, dash: [9, 6])))
+                }
+                .buttonStyle(SquishyStyle())
+
+                ForEach(Array(samples.enumerated()), id: \.element.id) { index, sample in
+                    Button {
+                        Task { await open(sample.url) }
+                    } label: {
+                        PageTile(url: sample.url, updated: .distantPast, tint: Kid.coverTint(index + 1))
+                    }
+                    .buttonStyle(SquishyStyle())
+                }
+            }
+        }
+    }
+
+    private var seeAll: some View {
+        HStack(spacing: 4) {
+            Text("See all")
+            Image(systemName: "arrow.right")
+        }
+        .font(Kid.body(17))
+        .foregroundStyle(Kid.coral)
+    }
+
+    /// A section title with a little colored badge.
+    private func sectionTitle(_ text: String, symbol: String, color: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(Circle().fill(color))
+            Text(text)
+                .font(Kid.titleBold(27))
+                .foregroundStyle(Kid.ink)
+        }
     }
 
     private func openSaved(_ id: UUID) async {
