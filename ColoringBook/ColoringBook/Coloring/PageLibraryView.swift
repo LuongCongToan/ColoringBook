@@ -11,6 +11,7 @@ struct PageLibraryView: View {
     @State private var store = PageStore.shared
     @State private var bookStore = BookStore.shared
     @State private var bookToDelete: StoredBook?
+    @State private var opening = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 16)]
 
@@ -192,6 +193,7 @@ struct PageLibraryView: View {
                 }
                 #endif
             }
+            .loading(opening, "Opening the page…")
             .navigationDestination(item: $opened) { page in
                 ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
             }
@@ -243,6 +245,8 @@ struct PageLibraryView: View {
     }
 
     private func openSaved(_ id: UUID) async {
+        opening = true
+        defer { opening = false }
         do {
             let (art, saved) = try await store.load(id)
             opened = OpenedPage(art: art, pageID: id, saved: saved)
@@ -253,6 +257,8 @@ struct PageLibraryView: View {
     }
 
     private func open(_ url: URL) async {
+        opening = true
+        defer { opening = false }
         guard let data = try? Data(contentsOf: url) else { error = "Could not read this page."; return }
         await open(data)
     }

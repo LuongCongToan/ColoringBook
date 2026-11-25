@@ -760,6 +760,24 @@ Code ở `ColoringBook/ColoringBook/Create/`. Màn chính có thẻ "Make a colo
 - **Gọi Worker thật:** `WorkerPageGenerator` gửi `POST /generate` kèm JWS của gói Pro hoặc gói sách. Endpoint đang là `coloring-api-staging.pt-team2011.workers.dev` (giả định; sửa sau khi deploy). Chưa có màn mua hàng nên bản thật sẽ báo cần mua.
 - Đã chạy thử đủ luồng trên simulator với ảnh `3nguoi` (ảnh được thêm vào thư viện Ảnh của simulator bằng `simctl addmedia`, không vào repo).
 
+### Chế độ Sketch miễn phí (làm ngày 2026-11-25)
+
+- Màn "New page" có thêm thẻ **Sketch** (nhãn FREE) cạnh Cartoon và Chibi. Vẽ ngay trên máy (`Create/SketchMaker.swift`): **ảnh không rời điện thoại**, nên không cần hỏi đồng ý gửi ảnh, không cần mua, không tính lượt.
+- **Kiểu chì (mặc định, user chốt 2026-11-25: "mode free không cần chuyển cartoon, chỉ cần nét vẽ chì"):** Vision tách người → đặt lên nền trắng → xám, median → **chia ảnh xám cho (1 − ảnh đảo mờ σ 10)** (color dodge, cách "ảnh thành tranh chì" cổ điển của OpenCV) → viền ngoài xám nhạt 1.5 px để khép vùng. Không làm đậm thêm (gamma 1): user chọn bản này trong bảng so sánh. Khoảng 0.26 giây trên Mac. Màn tô màu hiển thị nguyên nét chì xám (multiply), chỉ dùng ngưỡng 200 để chặn đổ màu; vùng tóc tối chặn đổ màu nhưng vẫn tô bằng cọ được.
+- **Kiểu nét (model, `Look.lines`, chưa có trên giao diện):** nét đen sạch từ model, giữ lại để dùng sau.
+- **Model:** Informative Drawings, bộ `anime_style` (**MIT**, Caroline Chan 2022; file giấy phép đi kèm app: `Create/Models/LICENSE-informative-drawings.txt`), chuyển sang Core ML: `Create/Models/SketchLines.mlpackage`, 8.2 MB, fp16, đầu vào **cố định 1024×768** ngang. Ảnh dọc được xoay ngang trước khi chạy rồi xoay lại. Model nhận nhiều cỡ đầu vào (EnumeratedShapes) làm Core ML crash trên CPU (libBNNS), nên chỉ dùng cỡ cố định.
+- **Quy trình:** Vision tách người (`VNGenerateForegroundInstanceMaskRequest`, dự phòng `VNGeneratePersonSegmentationRequest`) → đặt người lên nền trắng → **chuyển xám, tương phản 1.2** → median 3×3 hai lần (giảm khoảng một nửa vùng li ti) → **unsharp mask 1.2 (bán kính 2.5)** → model → đen nếu xám < 0.75 → bỏ cụm nét dưới 40 điểm ảnh → làm dày **1.6 px** → bỏ hết ngoài người, vẽ viền ngoài 2–3 px để khép vùng. Làm nhạt ảnh không có tác dụng với model này (lớp đầu là InstanceNorm). Mac M5: khoảng 0.7 giây cả quy trình (model 79 ms trên Neural Engine).
+- **Chất lượng trên `3nguoi`:** nhận ra cả 3 khuôn mặt (nụ cười, kính), tóc là nét viền không bị tô kín, viền ngoài khép. Áo hoa văn ra nhiều hình nhỏ, viền trong quần áo hay hở; khoảng 350 vùng li ti ở 1024 px, nên Sketch cần ngưỡng kiểm tra chất lượng riêng. Kém Cartoon (FLUX) nhưng đủ cho bản miễn phí.
+- **Chỉnh đầu vào** (user góp ý "chưa rõ", thử 2026-11-25 trên `3nguoi`): ảnh xám + tương phản + làm sắc cho mặt và tóc rõ nhất; hạ ngưỡng mực xuống 0.6 làm mất mắt và kính; cách kiểu OpenCV (adaptive threshold trên ảnh xám làm mịn) nét đậm, mặt rõ nhưng nét đứt, vùng tô hở. Các thông số nằm trong `SketchMaker.Tuning`.
+- **Model khác đã xét** (R&D 2026-11-25): Anime2Sketch (MIT) nét quá mờ, gần mất mặt, nặng 192–218 MB → loại. PiDiNet: giấy phép chỉ cho nghiên cứu → loại. DexiNed (MIT): dò cạnh, chưa thử. `contour_style` nét đậm nhưng mất nhận dạng (mất kính).
+- **Dự phòng:** nếu model không nạp được, hiệu hai lớp Gaussian vẽ nét (thô hơn).
+- **Simulator không tách được nền** (Vision cần Neural Engine), nên trên Simulator cả phòng phía sau cũng được vẽ. Cần thử trên iPhone thật.
+- Thử nhanh: `-sketchTest` mở New page và vẽ Sketch từ ảnh thử ngay.
+
+### Loading (2026-11-25)
+
+`LoadingOverlay` / `.loading(_:_:)` dùng chung: mở một trang từ My pages, chạm trang trong sách để tô, Save PDF (có thanh tiến trình). Màn chờ vẽ (AI và Sketch), spinner từng trang khi lật sách, ảnh bìa trong Make a book, danh sách nền (nạp ở luồng phụ) và màn Arrange đều có chỉ báo riêng.
+
 ### Mua hàng, lưu tranh, khung từ PNG (làm ngày 2026-11-24)
 
 - **Mua hàng** (`Store/`): `StoreModel` (StoreKit 2: tải sản phẩm, mua, khôi phục, theo dõi `Transaction.updates`, lấy JWS cho Worker) và `PaywallView`. Màn mua có giá theo kỳ, dùng thử 3 ngày (chỉ hiện khi StoreKit xác nhận còn quyền), nhãn tiết kiệm tính từ giá thật, điều khoản gia hạn, Restore, Terms, Privacy (Guideline 3.1.2), và **khoá phụ huynh** (một phép nhân) trước khi mua. Màn tạo trang mở màn mua khi Worker báo chưa có quyền, mua xong thì tự vẽ tiếp. Đã thử mua gói năm bằng `Products.storekit` khi chạy app từ Xcode. Gói sách gọi `finish()` ngay; Worker tạo bộ đếm theo `transactionId` ở lần tạo tranh đầu. Khi có `/credit` thì đổi sang finish sau khi Worker ghi nhận. URL Privacy đang là chỗ giữ chỗ.

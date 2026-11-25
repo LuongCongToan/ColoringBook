@@ -33,7 +33,7 @@ struct BookListView: View {
                                 toggle(book.id)
                             } label: {
                                 BookShelfCover(book: book, pages: pages)
-                                    .overlay(alignment: .bottomTrailing) { checkmark(selection.contains(book.id)) }
+                                    .overlay(alignment: .topTrailing) { checkmark(selection.contains(book.id)) }
                             }
                             .buttonStyle(.plain)
                             .accessibilityAddTraits(selection.contains(book.id) ? .isSelected : [])
@@ -82,17 +82,6 @@ struct BookListView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
-        }
-        .confirmationDialog(deleteTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
-            Button(selection.count == 1 ? "Delete book" : "Delete \(selection.count) books", role: .destructive) {
-                withAnimation {
-                    books.delete(selection)
-                    selection = []
-                    selecting = false
-                }
-            }
-        } message: {
-            Text("The pages stay in My pages.")
         }
         .confirmationDialog(single.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
                             isPresented: Binding(get: { single != nil }, set: { if !$0 { single = nil } }),
@@ -157,6 +146,18 @@ struct BookListView: View {
             .tint(.red)
             .disabled(selection.isEmpty)
             .accessibilityLabel("Delete selected books")
+            // On the trash button, so the question pops up next to it.
+            .confirmationDialog(deleteTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button(selection.count == 1 ? "Delete book" : "Delete \(selection.count) books", role: .destructive) {
+                    withAnimation {
+                        books.delete(selection)
+                        selection = []
+                        selecting = false
+                    }
+                }
+            } message: {
+                Text("The pages stay in My pages.")
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)

@@ -21,6 +21,7 @@ struct BookReaderView: View {
     @State private var showPlans = false
     @State private var exportError: String?
     @State private var arranging: ArrangeTarget?
+    @State private var opening = false
 
     private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
 
@@ -125,16 +126,8 @@ struct BookReaderView: View {
                 }
             }
         }
-        .overlay {
-            if exporting {
-                VStack(spacing: 12) {
-                    Text("Making the PDF…").font(.headline)
-                    ProgressView(value: exportProgress).frame(width: 200)
-                }
-                .padding(24)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-            }
-        }
+        .loading(exporting, "Making the PDF…", progress: exportProgress)
+        .loading(opening, "Opening the page…")
         .alert("Save PDF", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -338,6 +331,8 @@ struct BookReaderView: View {
     }
 
     private func open(_ id: UUID) async {
+        opening = true
+        defer { opening = false }
         guard let (art, saved) = try? await pages.load(id) else { return }
         SoundFX.shared.play(.tap)
         coloring = PageToColor(art: art, pageID: id, saved: saved)

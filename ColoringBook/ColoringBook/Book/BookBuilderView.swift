@@ -46,7 +46,7 @@ struct BookBuilderView: View {
         ScrollView {
             VStack(spacing: 16) {
                 coverCard
-                if !backgrounds.isEmpty { backgroundCard }
+                if backgrounds == nil || backgrounds?.isEmpty == false { backgroundCard }
                 pagesCard
                 layoutCard
                 appOptions
@@ -63,6 +63,11 @@ struct BookBuilderView: View {
         }
         .onChange(of: options.childName) { _, name in savedName = name }
         .task(id: coverKey) { await renderCover() }
+        .task {
+            if backgrounds == nil {
+                backgrounds = await Task.detached(priority: .userInitiated) { BackgroundLibrary.all() }.value
+            }
+        }
         .sheet(isPresented: $arranging) { ArrangeSheet(selected: $selected, store: store) }
         .navigationDestination(item: $openBook) { book in BookReaderView(bookID: book.id) }
     }
@@ -142,7 +147,9 @@ struct BookBuilderView: View {
 
     // MARK: - Background
 
-    private let backgrounds = BackgroundLibrary.all()
+    /// Loaded off the main thread: finding each background's middle takes
+    /// a moment the first time. Nil while loading.
+    @State private var backgrounds: [BookBackground]?
 
     private var backgroundCard: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -150,7 +157,11 @@ struct BookBuilderView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     backgroundChip(nil)
-                    ForEach(backgrounds) { backgroundChip($0) }
+                    if let backgrounds {
+                        ForEach(backgrounds) { backgroundChip($0) }
+                    } else {
+                        ProgressView().frame(width: 58, height: 75)
+                    }
                 }
                 .padding(3)
             }

@@ -1,11 +1,15 @@
 import Foundation
 
-/// The drawing styles the Worker knows (Worker/src/config.ts, PROMPTS).
-/// The app sends only the key; the prompt lives on the server.
+/// Drawing styles. Cartoon and chibi are drawn by the AI on the Worker
+/// (Worker/src/config.ts, PROMPTS; the app sends only the key). Sketch is
+/// drawn on the device (SketchMaker), free, and the photo never leaves it.
 enum PageStyle: String, CaseIterable, Identifiable, Sendable {
-    case cartoon, chibi
+    case cartoon, chibi, sketch
 
     var id: String { rawValue }
+
+    /// Drawn on the phone: free, no upload, no consent needed.
+    var onDevice: Bool { self == .sketch }
 }
 
 /// A coloring page the AI drew.

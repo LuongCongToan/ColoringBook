@@ -18,6 +18,8 @@ struct ColoringBookApp: App {
         #if DEBUG && targetEnvironment(simulator)
         if DebugBook.wantsReview, let book = DebugBook.reviewBook() {
             PDFPreviewView(book: book)
+        } else if ProcessInfo.processInfo.arguments.contains("-sketchTest") {
+            NavigationStack { CreatePageView() }
         } else if DebugBook.wantsBookList {
             NavigationStack { BookListView() }
                 .task {

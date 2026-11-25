@@ -76,6 +76,18 @@ struct CreatePageView: View {
         .navigationDestination(item: $coloring) { item in
             ColoringView(art: item.art, photo: item.photo)
         }
+        #if DEBUG && targetEnvironment(simulator)
+        .task {
+            // `-sketchTest`: draw a sketch of the test photo at once.
+            guard ProcessInfo.processInfo.arguments.contains("-sketchTest"), prepared == nil,
+                  let data = DebugBook.testPhotoJPEG(), let result = try? await prepare(data) else { return }
+            prepared = result
+            colorPhoto = data
+            preview = UIImage(data: data)
+            style = .sketch
+            await draw()
+        }
+        #endif
     }
 
     // MARK: - Steps
@@ -136,7 +148,7 @@ struct CreatePageView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Drawing style")
                 .font(.headline)
-            HStack(spacing: 14) {
+            HStack(spacing: 10) {
                 ForEach(PageStyle.allCases) { s in
                     StyleCard(style: s, selected: style == s) {
                         SoundFX.shared.play(.tap)
@@ -150,11 +162,7 @@ struct CreatePageView: View {
     private var drawButton: some View {
         Button {
             SoundFX.shared.play(.tap)
-            if consentGiven {
-                Task { await draw() }
-            } else {
-                askConsent = true
-            }
+            startDrawing()
         } label: {
             Label("Draw my page", systemImage: "wand.and.stars")
                 .font(.title3.weight(.heavy))
@@ -198,7 +206,7 @@ struct CreatePageView: View {
             Button {
                 SoundFX.shared.play(.tap)
                 style = page.style == .cartoon ? .chibi : .cartoon
-                Task { await draw() }
+                startDrawing()
             } label: {
                 Label(page.style == .cartoon ? "Try chibi style" : "Try cartoon style",
                       systemImage: "arrow.triangle.2.circlepath")
@@ -207,7 +215,9 @@ struct CreatePageView: View {
                     .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(BouncyStyle())
-            Text("Trying another style uses one more page.")
+            Text(page.style.onDevice
+                 ? "Cartoon and chibi are drawn by AI, with cleaner lines."
+                 : "Trying another style uses one more page.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -233,11 +243,28 @@ struct CreatePageView: View {
         phase = .choosing
     }
 
+    /// Asks for consent before the first photo goes to the AI; a sketch
+    /// stays on the phone, so it needs none.
+    private func startDrawing() {
+        if consentGiven || style.onDevice {
+            Task { await draw() }
+        } else {
+            askConsent = true
+        }
+    }
+
     private func draw() async {
         guard let prepared else { return }
         phase = .drawing
         do {
-            let page = try await generator.generate(prepared, style: style)
+            let page: GeneratedPage
+            if style.onDevice {
+                // The color crop, not the pale one made for the AI.
+                let photo = colorPhoto ?? prepared.jpeg
+                page = GeneratedPage(imageData: try await sketch(photo), style: style, remaining: nil)
+            } else {
+                page = try await generator.generate(prepared, style: style)
+            }
             guard let image = UIImage(data: page.imageData) else { throw GenerationError.server }
             SoundFX.shared.play(.sticker)
             phase = .done(page, image)
@@ -262,6 +289,15 @@ struct CreatePageView: View {
     @concurrent
     private nonisolated func prepare(_ data: Data, lighten: Bool = true) async throws -> PhotoPrep.Result {
         try PhotoPrep.prepare(data, lighten: lighten)
+    }
+
+    @concurrent
+    private nonisolated func sketch(_ photo: Data) async throws -> Data {
+        // A short pause so the drawing animation is seen, not flashed.
+        async let pause: Void = try Task.sleep(for: .seconds(1.2))
+        let png = try SketchMaker.make(from: photo)
+        try? await pause
+        return png
     }
 
     @concurrent
@@ -307,25 +343,48 @@ private struct StyleCard: View {
     let selected: Bool
     let action: () -> Void
 
+    private var icon: String {
+        switch style {
+        case .cartoon: "face.smiling"
+        case .chibi: "face.smiling.inverse"
+        case .sketch: "pencil.and.scribble"
+        }
+    }
+
+    private var title: String {
+        switch style {
+        case .cartoon: "Cartoon"
+        case .chibi: "Chibi"
+        case .sketch: "Sketch"
+        }
+    }
+
+    private var caption: String {
+        switch style {
+        case .cartoon: "Friendly drawing, keeps everyone's age"
+        case .chibi: "Everyone becomes a cute little character"
+        case .sketch: "Drawn on this phone. Simpler lines"
+        }
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Image(systemName: style == .cartoon ? "face.smiling" : "face.smiling.inverse")
-                    .font(.system(size: style == .cartoon ? 40 : 50, weight: .semibold))
-                    .frame(height: 56)
+                Image(systemName: icon)
+                    .font(.system(size: style == .chibi ? 46 : 38, weight: .semibold))
+                    .frame(height: 52)
                     .foregroundStyle(selected ? Theme.accent : .secondary)
-                Text(style == .cartoon ? "Cartoon" : "Chibi")
+                Text(title)
                     .font(.headline.weight(.bold))
-                Text(style == .cartoon
-                     ? "Friendly drawing, keeps everyone's age"
-                     : "Everyone becomes a cute little character")
+                Text(caption)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 170)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 170, alignment: .top)
             .background(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(.white)
@@ -333,9 +392,21 @@ private struct StyleCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(selected ? Theme.accent : .clear, lineWidth: 4))
+            .overlay(alignment: .topTrailing) {
+                if style.onDevice {
+                    Text("FREE")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color.green))
+                        .offset(x: 4, y: -6)
+                }
+            }
             .scaleEffect(selected ? 1.03 : 1)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(style.onDevice ? "\(title), free" : title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

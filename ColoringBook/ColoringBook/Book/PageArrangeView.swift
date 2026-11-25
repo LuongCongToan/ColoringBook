@@ -89,22 +89,27 @@ struct PageArrangeView: View {
 
     private func canvas(k: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            // A tap on empty paper drops the selection.
-            Color.white.onTapGesture { selected = nil }
-            if let picture { pictureLayer(picture, k: k) }
-            if showsPhoto, let photo { photoLayer(photo, k: k) }
-            if let background {
-                Image(decorative: background.overlay, scale: 1)
-                    .resizable()
-                    .allowsHitTesting(false)
+            ZStack(alignment: .topLeading) {
+                // A tap on empty paper drops the selection.
+                Color.white.onTapGesture { selected = nil }
+                if let picture { pictureLayer(picture, k: k) }
+                // The photo's place depends on the picture's: wait for it,
+                // or the photo jumps when the picture arrives.
+                if showsPhoto, let photo, picture != nil { photoLayer(photo, k: k) }
+                if let background {
+                    Image(decorative: background.overlay, scale: 1)
+                        .resizable()
+                        .allowsHitTesting(false)
+                }
+                if picture == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
             }
-            // Handles above the background, so decorations never hide them.
+            .clipped()
+            // Handles above the background and outside the clip, so neither
+            // decorations nor the page edge hide them.
             if let picture, selected == .picture { pictureHandles(picture, k: k) }
-            if showsPhoto, let photo, selected == .photo { photoHandles(photo, k: k) }
-            if picture == nil { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+            if showsPhoto, let photo, picture != nil, selected == .photo { photoHandles(photo, k: k) }
         }
         .coordinateSpace(name: "canvas")
-        .clipped()
         .contentShape(Rectangle())
     }
 
@@ -129,8 +134,8 @@ struct PageArrangeView: View {
                     .onEnded { value in
                         selected = .picture
                         let now = BookRenderer.pictureRect(image.size, background: background, placement: placement)
-                        placement.pictureCenter = CGPoint(x: now.midX + value.translation.width / k,
-                                                          y: now.midY + value.translation.height / k)
+                        placement.pictureCenter = onPage(CGPoint(x: now.midX + value.translation.width / k,
+                                                                 y: now.midY + value.translation.height / k))
                     }
                     .simultaneously(with: MagnifyGesture()
                         .updating($pictureZoom) { value, state, _ in state = value.magnification }
@@ -176,12 +181,12 @@ struct PageArrangeView: View {
                 .updating($photoDrag) { value, state, _ in state = value.translation }
                 .onEnded { value in
                     selected = .photo
-                    placement.photoCenter = CGPoint(x: live.snap.center.x + value.translation.width / k,
-                                                    y: live.snap.center.y + value.translation.height / k)
+                    placement.photoCenter = onPage(CGPoint(x: live.snap.center.x + value.translation.width / k,
+                                                           y: live.snap.center.y + value.translation.height / k))
                 }
                 .simultaneously(with: MagnifyGesture()
                     .updating($photoZoom) { value, state, _ in state = value.magnification }
-                    .onEnded { value in placement.photoScale = clampScale(live.snap.scale * value.magnification) })
+                    .onEnded { value in placement.photoScale = clampPhoto(live.snap.scale * value.magnification, image.size) })
                 .simultaneously(with: RotateGesture()
                     .updating($photoTurn) { value, state, _ in state = value.rotation }
                     .onEnded { value in placement.photoAngle = live.snap.angle + value.rotation.degrees })
@@ -209,7 +214,7 @@ struct PageArrangeView: View {
         let size = CGSize(width: base.print.width * live.scale * k, height: base.print.height * live.scale * k)
         return SelectionBox(size: size, turns: true,
                             resize: resizeGesture(center: center) { factor in
-                                placement.photoScale = clampScale(live.snap.scale * factor)
+                                placement.photoScale = clampPhoto(live.snap.scale * factor, image.size)
                             },
                             turn: turnGesture(center: center) { delta in
                                 placement.photoAngle = live.snap.angle + delta.degrees
@@ -248,6 +253,17 @@ struct PageArrangeView: View {
     }
 
     private func clampScale(_ s: CGFloat) -> CGFloat { min(max(s, 0.3), 3) }
+
+    /// The photo print stays narrower than 85% of the page.
+    private func clampPhoto(_ s: CGFloat, _ size: CGSize) -> CGFloat {
+        let widest = sheet.width * 0.85 / BookRenderer.snapshotBase(size).print.width
+        return min(clampScale(s), widest)
+    }
+
+    /// Keeps a center on the page, so the item can always be grabbed again.
+    private func onPage(_ p: CGPoint) -> CGPoint {
+        CGPoint(x: min(max(p.x, 20), sheet.width - 20), y: min(max(p.y, 20), sheet.height - 20))
+    }
 
     // MARK: - Work
 
