@@ -211,8 +211,9 @@ struct BookShelfCover: View {
     var body: some View {
         let first = book.pageIDs.lazy.compactMap { id in pages.pages.first { $0.id == id } }.first
         VStack(spacing: 2) {
+            // Design sheet: Fredoka SemiBold 16 pt, #28145C.
             Text(book.title)
-                .font(Kid.titleBold(15, relativeTo: .caption))
+                .font(Kid.title(16, relativeTo: .caption))
                 .foregroundStyle(Kid.ink)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)

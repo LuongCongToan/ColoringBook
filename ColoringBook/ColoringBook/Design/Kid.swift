@@ -497,8 +497,13 @@ struct ExactText: UIViewRepresentable {
     func sizeThatFits(_ proposal: ProposedViewSize, uiView label: UILabel, context: Context) -> CGSize? {
         let width = proposal.width ?? .greatestFiniteMagnitude
         let fitted = label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
-        return CGSize(width: min(width, ceil(fitted.width)), height: ceil(fitted.height))
+        // Lines shorter than the font's own leave ascenders and descenders
+        // hanging out of the box; room for them above and below (the label
+        // centers its text, so it lands in the middle).
+        return CGSize(width: min(width, ceil(fitted.width)), height: ceil(fitted.height + 2 * overhang))
     }
+
+    private var overhang: CGFloat { max(0, font.lineHeight - lineHeight) / 2 }
 
     private var attributed: NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
@@ -506,25 +511,45 @@ struct ExactText: UIViewRepresentable {
         paragraph.maximumLineHeight = lineHeight
         paragraph.alignment = .left
         paragraph.lineBreakMode = .byWordWrapping
-        // Keep the glyphs centered in the shortened line.
-        let offset = (lineHeight - font.lineHeight) / 2
         return NSAttributedString(string: text, attributes: [
-            .font: font, .foregroundColor: color, .kern: kerning,
-            .paragraphStyle: paragraph, .baselineOffset: offset,
+            .font: font, .foregroundColor: color, .kern: kerning, .paragraphStyle: paragraph,
         ])
     }
 }
 
 extension ExactText {
     /// Big card titles ("Make a coloring page"): Fredoka Bold 24 pt, line
-    /// height 26 pt, letter spacing −0.5 pt, #28145C, left (design sheet).
+    /// height 26 pt, letter spacing +0.5 pt (opened up from the sheet's −0.5),
+    /// #28145C, left.
     static func cardTitle(_ text: String) -> ExactText {
-        ExactText(text: text, font: KidFonts.ui("Fredoka-Bold", 24), lineHeight: 26, kerning: -0.5, lines: 3)
+        // The sheet says letter spacing −0.5, but Fredoka Bold then sets
+        // "Make" with its letters touching (user, 2026-11-25); the concept
+        // image is spaced more openly. +0.5 pt keeps the letters apart.
+        ExactText(text: text, font: KidFonts.ui("Fredoka-Bold", 24), lineHeight: 26, kerning: 0.5, lines: 3)
     }
 
     /// Card descriptions ("From your favorite photo"): Nunito Bold 14 pt,
     /// line height 18 pt, #28145C (design sheet).
     static func cardSubtitle(_ text: String) -> ExactText {
         ExactText(text: text, font: KidFonts.ui("Nunito-Bold", 14), lineHeight: 18, lines: 2)
+    }
+}
+
+/// The round check on a tile in Select mode (My books, My pages).
+struct SelectCheck: View {
+    let on: Bool
+
+    var body: some View {
+        ZStack {
+            Circle().fill(on ? Color.blue : Color.black.opacity(0.25))
+            Circle().strokeBorder(.white, lineWidth: 2)
+            if on {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: 28, height: 28)
+        .shadow(color: .black.opacity(0.25), radius: 2)
     }
 }

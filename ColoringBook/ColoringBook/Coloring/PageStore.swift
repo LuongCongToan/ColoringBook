@@ -130,4 +130,14 @@ final class PageStore {
         try? FileManager.default.removeItem(at: folder(id))
         refresh()
     }
+
+    func delete(_ ids: Set<UUID>) {
+        for id in ids { try? FileManager.default.removeItem(at: folder(id)) }
+        refresh()
+    }
+
+    /// How many books use any of these pages (they drop out of those books).
+    func booksUsing(_ ids: Set<UUID>) -> Int {
+        BookStore.shared.books.filter { !ids.isDisjoint(with: $0.pageIDs) }.count
+    }
 }

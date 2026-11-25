@@ -21,7 +21,8 @@ struct ColoringBookApp: App {
                 // Text without its own font is usually longer copy (lists,
                 // sheets, notes): Nunito, the second font.
                 .font(.custom("Nunito-Bold", size: 17, relativeTo: .body))
-                .fontDesign(.rounded)
+                // No .fontDesign(.rounded) here: it swaps every custom font
+                // (Fredoka, Nunito) for SF Rounded.
                 .tint(Kid.ink)
                 .task {
                     StoreModel.shared.start()

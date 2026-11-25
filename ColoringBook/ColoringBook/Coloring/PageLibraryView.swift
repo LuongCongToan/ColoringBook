@@ -11,6 +11,7 @@ struct PageLibraryView: View {
     @State private var store = PageStore.shared
     @State private var bookStore = BookStore.shared
     @State private var bookToDelete: StoredBook?
+    @State private var pageToDelete: UUID?
     @State private var opening = false
 
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
@@ -68,6 +69,15 @@ struct PageLibraryView: View {
                 Button("Delete book", role: .destructive) { withAnimation { bookStore.delete(book.id) } }
             } message: { _ in
                 Text("The pages stay in My pages.")
+            }
+            .confirmationDialog("Delete this page?",
+                                isPresented: Binding(get: { pageToDelete != nil }, set: { if !$0 { pageToDelete = nil } }),
+                                titleVisibility: .visible) {
+                Button("Delete page", role: .destructive) {
+                    if let pageToDelete { withAnimation { store.delete(pageToDelete) } }
+                }
+            } message: {
+                Text("The coloring cannot be brought back.")
             }
         }
         .task { samples = DevSamples.pages() }
@@ -152,7 +162,7 @@ struct PageLibraryView: View {
                 // The art may be taller than the card; it overhangs a little
                 // instead of making the card taller (card 124 pt as designed).
                 .frame(width: artSlot ?? artSize.width, height: min(artSize.height, 112), alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
                 ExactText.cardTitle(title)
                 ExactText.cardSubtitle(subtitle)
             }
@@ -184,8 +194,9 @@ struct PageLibraryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
                 sectionTitle("My books", symbol: "books.vertical.fill", color: Kid.grape)
+                // Design sheet: Fredoka SemiBold 18 pt, #28145C.
                 Text("\(bookStore.books.count)")
-                    .font(Kid.body(16))
+                    .font(Kid.body(18))
                     .foregroundStyle(Kid.ink)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 3)
@@ -238,7 +249,7 @@ struct PageLibraryView: View {
                         }
                         #endif
                         Button("Delete page", systemImage: "trash", role: .destructive) {
-                            store.delete(page.id)
+                            pageToDelete = page.id
                         }
                     }
                 }
@@ -279,12 +290,14 @@ struct PageLibraryView: View {
     }
 
     private var seeAll: some View {
+        // Design sheet: Nunito ExtraBold 16 pt, #FF4545.
         HStack(spacing: 4) {
             Text("See all")
             Image(systemName: "arrow.right")
+                .font(.system(size: 14, weight: .heavy))
         }
-        .font(Kid.body(17))
-        .foregroundStyle(Kid.coral)
+        .font(Kid.text(16))
+        .foregroundStyle(Color(hex: 0xFF4545))
     }
 
     /// A section title with a little colored badge.
@@ -295,8 +308,9 @@ struct PageLibraryView: View {
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(color))
+            // Design sheet: Fredoka Bold 22 pt, #28145C.
             Text(text)
-                .font(Kid.titleBold(26))
+                .font(Kid.titleBold(22))
                 .foregroundStyle(Kid.ink)
         }
     }
