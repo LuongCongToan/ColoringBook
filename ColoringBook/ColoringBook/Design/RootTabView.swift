@@ -17,23 +17,98 @@ final class AppTabs {
     }
 }
 
-/// The app's three tabs, as in the design: Home, Create, My library.
+/// The app's three tabs, as in the design: Home, Create, My library. The
+/// system tab bar is hidden for the design's own: a white rounded bar
+/// floating at the bottom, the current tab on a soft yellow pill.
 struct RootTabView: View {
     @State private var tabs = AppTabs.shared
 
     var body: some View {
         TabView(selection: $tabs.selected) {
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                PageLibraryView()
+            Tab(value: AppTab.home) {
+                PageLibraryView().kidTabBarSpace()
             }
-            Tab("Create", systemImage: "plus.circle.fill", value: AppTab.create) {
-                NavigationStack { CreatePageView() }
+            Tab(value: AppTab.create) {
+                NavigationStack { CreatePageView() }.kidTabBarSpace()
             }
-            Tab("My library", systemImage: "books.vertical.fill", value: AppTab.library) {
-                NavigationStack { LibraryView() }
+            Tab(value: AppTab.library) {
+                NavigationStack { LibraryView() }.kidTabBarSpace()
             }
         }
-        .tint(Kid.ink)
+        .overlay(alignment: .bottom) {
+            KidTabBar(selected: $tabs.selected)
+        }
+        .ignoresSafeArea(.keyboard)
+    }
+}
+
+/// Measured on the concept (2026-11-25): bar 406 pt wide (16.5 pt in from
+/// the sides), the pill 108.6 × 58.9 pt in #FBE18F, icons and labels deep
+/// purple.
+struct KidTabBar: View {
+    @Binding var selected: AppTab
+    static let height: CGFloat = 70
+
+    private let items: [(AppTab, String, String)] = [
+        (.home, "Home", "house.fill"),
+        (.create, "Create", "plus.circle.fill"),
+        (.library, "My library", "books.vertical.fill"),
+    ]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(items, id: \.0) { tab, title, symbol in
+                let on = selected == tab
+                Button {
+                    SoundFX.shared.play(.tap)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selected = tab }
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: symbol)
+                            .font(.system(size: 24, weight: .bold))
+                        Text(title)
+                            .font(Kid.title(15, relativeTo: .caption))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(Kid.ink)
+                    .frame(width: 108.6, height: 58.9)
+                    .background {
+                        if on {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(Color(hex: 0xFBE18F))
+                                .matchedGeometryEffect(id: "pill", in: pill)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+                .accessibilityAddTraits(on ? [.isSelected, .isButton] : .isButton)
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: Self.height)
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(.white)
+                .shadow(color: Kid.ink.opacity(0.10), radius: 10, y: 3))
+        .padding(.horizontal, 16.5)
+        .padding(.bottom, 4)
+    }
+
+    @Namespace private var pill
+}
+
+extension View {
+    /// Hides the system tab bar and keeps content clear of KidTabBar.
+    func kidTabBarSpace() -> some View {
+        self
+            .toolbar(.hidden, for: .tabBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: KidTabBar.height + 8)
+            }
     }
 }
 
