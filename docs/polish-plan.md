@@ -58,7 +58,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 
 ## Đổi giao diện bằng code (không cần hình mới)
 
-34. **Các màn chưa đổi giao diện:** Make a book, đọc sách, xem trước PDF, paywall, cổng phụ huynh, Arrange, lớp loading, hộp hỏi đồng ý. Vẫn dùng màu cam cũ, nền hệ thống, font SF và nút mặc định. Đổi sang bảng màu Kid, Fredoka/Nunito, thẻ sticker, nút viên thuốc.
+34. **Các màn chưa đổi giao diện:** ~~Make a book~~ (xong 2026-11-26), đọc sách, xem trước PDF, paywall, màn Grown-ups, Arrange, lớp loading, hộp hỏi đồng ý. Vẫn dùng màu cam cũ, nền hệ thống, font SF và nút mặc định. Đổi sang bảng màu Kid, Fredoka/Nunito, thẻ sticker, nút viên thuốc.
 35. **Font:** thay `.font(.headline/.caption/.footnote…)` bằng `Kid.title/body/bodyBold`.
 36. **Điều khiển hệ thống:** bộ chọn dạng tab (Books/Pages, As colored/Fresh), công tắc, ô nhập tên, danh sách Grown-ups và Arrange: vẽ lại theo phong cách app.
 37. **Đường chọn sticker:** đổi từ xanh hệ thống sang tím.
@@ -109,11 +109,10 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 | TileImportPage | Trang trắng cười kèm dấu cộng | Ô "Import a page" |
 | ConsentLock | Ổ khoá/khiên có mặt ôm một tấm ảnh | Hộp hỏi đồng ý gửi ảnh |
 | PaywallHero | Linh vật cầm đũa phép, sách và trang | Đầu paywall |
-| GrownUpGate | Bố mẹ và bé kèm ổ khoá | Cổng phụ huynh |
 
 ### Ưu tiên thấp
 
-IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); IconBackspace (bàn phím cổng phụ huynh); HandleTurn (nút xoay ảnh trong Arrange).
+IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); HandleTurn (nút xoay ảnh trong Arrange).
 
 ### Dùng lại hình đã có
 

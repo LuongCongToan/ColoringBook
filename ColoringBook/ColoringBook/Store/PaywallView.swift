@@ -4,69 +4,95 @@ import SwiftUI
 /// The plans, for a parent. Guideline 3.1.2 (app #1 was rejected twice for
 /// it): before the buy button, each plan's price and period, the trial's
 /// terms, that it renews and how to cancel, and links to the terms and the
-/// privacy policy. Behind a parental gate, since children use this app.
+/// privacy policy. No parental gate (user, 2026-11-26): the app is not in
+/// the Kids Category (docs/brief.md), and Apple's own purchase sheet asks
+/// for Face ID or the Apple ID password (Ask to Buy on a child's account).
 struct PaywallView: View {
     var onPurchased: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
-    @State private var store = StoreModel.shared
-    @State private var selected = ProductID.yearly
-    @State private var gate = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
                     header
-                    if store.isLoading && !store.isAvailable {
-                        ProgressView().padding(40)
-                    } else if !store.isAvailable {
-                        Text("Plans could not be loaded. Check the connection and try again.")
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                        Button("Try again") { Task { await store.load() } }
-                    } else {
-                        plans
-                        buyButton
-                        terms
-                    }
-                    if let message = store.message {
-                        Text(message).font(.footnote).foregroundStyle(.orange).multilineTextAlignment(.center)
+                    PlansPanel(showLinks: true) {
+                        onPurchased()
+                        dismiss()
                     }
                 }
                 .padding(20)
             }
-            .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
+            .background(Kid.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Close", systemImage: "xmark") { dismiss() }
+                    KidCircleButton(symbol: "xmark", label: "Close") { dismiss() }
                 }
+                .kidPlainBackground()
             }
-            .sheet(isPresented: $gate) {
-                ParentalGate {
-                    gate = false
-                    Task { await buy() }
-                }
-                .presentationDetents([.medium, .large])
-            }
-            .task { await store.load() }
         }
     }
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image(systemName: "wand.and.stars")
-                .font(.system(size: 50, weight: .bold))
-                .foregroundStyle(Color(red: 0.98, green: 0.45, blue: 0.20))
+            Image("HomeMascot").resizable().scaledToFit().frame(height: 110)
+                .accessibilityHidden(true)
             Text("Make more coloring pages")
-                .font(.title2.weight(.heavy))
+                .font(Kid.titleBold(26))
+                .foregroundStyle(Kid.ink)
                 .multilineTextAlignment(.center)
             Text("Turn family photos into pages, build books with your child's name, and print them.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(Kid.bodyBold(15))
+                .foregroundStyle(PlansPanel.hint)
                 .multilineTextAlignment(.center)
         }
+    }
+}
+
+/// The plans and the buy button, for the paywall and the Grown-ups screen.
+/// Guideline 3.1.2 (app #1 was rejected twice for it): before the buy
+/// button, each plan's price and period, the trial's terms, that it renews
+/// and how to cancel, and links to the terms and the privacy policy.
+struct PlansPanel: View {
+    /// Restore, Terms and Privacy under the terms (the Grown-ups screen has
+    /// its own rows for them).
+    var showLinks = true
+    var onPurchased: () -> Void = {}
+
+    @Environment(\.openURL) private var openURL
+    @State private var store = StoreModel.shared
+    @State private var selected = ProductID.yearly
+
+    static let hint = Color(hex: 0x796790)
+
+    var body: some View {
+        VStack(spacing: 14) {
+            if store.isLoading && !store.isAvailable {
+                ProgressView().tint(Kid.ink).padding(30)
+            } else if !store.isAvailable {
+                Text("Plans could not be loaded. Check the connection and try again.")
+                    .font(Kid.bodyBold(15))
+                    .foregroundStyle(Self.hint)
+                    .multilineTextAlignment(.center)
+                Button {
+                    Task { await store.load() }
+                } label: {
+                    Text("Try again").font(Kid.bodyBold(16)).foregroundStyle(Kid.ink)
+                        .padding(.horizontal, 16).frame(height: 36)
+                        .background(Capsule().fill(Color(hex: 0xEFE1FC)))
+                }
+                .buttonStyle(SquishyStyle())
+            } else {
+                plans
+                buyButton
+                terms
+            }
+            if let message = store.message {
+                Text(message).font(Kid.bodyBold(14)).foregroundStyle(Kid.coral).multilineTextAlignment(.center)
+            }
+        }
+        .task { await store.load() }
     }
 
     private var plans: some View {
@@ -104,36 +130,48 @@ struct PaywallView: View {
         return "Subscribe"
     }
 
+    /// The big yellow button, like Save book.
     private var buyButton: some View {
         Button {
             SoundFX.shared.play(.tap)
-            gate = true
+            Task { await buy() }
         } label: {
-            Group {
-                if store.isPurchasing { ProgressView().tint(.white) } else { Text(buyTitle) }
+            HStack(spacing: 10) {
+                if store.isPurchasing {
+                    ProgressView().tint(Kid.ink)
+                } else {
+                    Image(systemName: "wand.and.stars").font(.system(size: 22, weight: .bold))
+                    Text(buyTitle).font(Kid.titleBold(24))
+                }
             }
-            .font(.title3.weight(.heavy))
-            .frame(maxWidth: .infinity, minHeight: 60)
-            .foregroundStyle(.white)
-            .background(Color(red: 0.98, green: 0.45, blue: 0.20), in: RoundedRectangle(cornerRadius: 20))
+            .foregroundStyle(Kid.ink)
+            .frame(maxWidth: .infinity)
+            .frame(height: 60)
+            .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous).fill(Kid.yellow))
+            .overlay(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous).strokeBorder(.white, lineWidth: 3))
+            .shadow(color: Kid.ink.opacity(0.15), radius: 6, y: 3)
         }
+        .buttonStyle(SquishyStyle())
         .disabled(store.isPurchasing)
     }
 
     private var terms: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
             Text("Pro plans renew automatically unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple Account at confirmation, or when the free trial ends. Manage or cancel anytime in your Apple Account settings. Pro can be shared with your family through Family Sharing.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Kid.bodyBold(12))
+                .foregroundStyle(Self.hint)
                 .multilineTextAlignment(.center)
-            HStack(spacing: 18) {
-                Button("Restore Purchases") { Task { await store.restore() } }
-                Button("Terms of Use") { openURL(AppLinks.terms) }
-                Button("Privacy Policy") { openURL(AppLinks.privacy) }
+            if showLinks {
+                HStack(spacing: 18) {
+                    Button("Restore Purchases") { Task { await store.restore() } }
+                    Button("Terms of Use") { openURL(AppLinks.terms) }
+                    Button("Privacy Policy") { openURL(AppLinks.privacy) }
+                }
+                .font(Kid.bodyBold(13))
+                .foregroundStyle(Kid.ink)
+                // 44 pt targets: small type, not small to tap.
+                .frame(minHeight: 44)
             }
-            .font(.caption.weight(.semibold))
-            // 44 pt targets: small type, not small to tap.
-            .frame(minHeight: 44)
         }
     }
 
@@ -142,11 +180,11 @@ struct PaywallView: View {
         if await store.purchase(product) {
             SoundFX.shared.play(.sticker)
             onPurchased()
-            dismiss()
         }
     }
 }
 
+/// One plan: a white card, the chosen one with a yellow edge and tick.
 private struct PlanCard: View {
     let title: String
     let price: String
@@ -156,39 +194,50 @@ private struct PlanCard: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            SoundFX.shared.play(.tap)
+            action()
+        } label: {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(selected ? Color(red: 0.98, green: 0.45, blue: 0.20) : .secondary)
+                ZStack {
+                    Circle().fill(selected ? Kid.yellow : .white)
+                    Circle().strokeBorder(selected ? .white : Color(hex: 0xDCB9F3), lineWidth: selected ? 2 : 2.5)
+                    if selected {
+                        Image(systemName: "checkmark").font(.system(size: 13, weight: .black)).foregroundStyle(Kid.ink)
+                    }
+                }
+                .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(title).font(.headline)
+                    HStack(spacing: 8) {
+                        Text(title).font(Kid.titleBold(19)).foregroundStyle(Kid.ink)
                         if let badge {
                             Text(badge)
-                                .font(.caption.weight(.bold))
-                                .padding(.horizontal, 8).padding(.vertical, 3)
-                                .background(Color.green.opacity(0.18), in: Capsule())
+                                .font(Kid.bodyBold(13))
+                                .foregroundStyle(Kid.ink)
+                                .padding(.horizontal, 8).frame(height: 22)
+                                .background(Capsule().fill(Kid.mint.opacity(0.45)))
                         }
                     }
-                    Text(price).font(.title3.weight(.bold))
-                    Text(detail).font(.footnote).foregroundStyle(.secondary)
+                    Text(price).font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
+                    Text(detail).font(Kid.bodyBold(14)).foregroundStyle(PlansPanel.hint)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
             .padding(16)
-            .background(RoundedRectangle(cornerRadius: 20).fill(.white))
-            .overlay(RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(selected ? Color(red: 0.98, green: 0.45, blue: 0.20) : .clear, lineWidth: 3))
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(selected ? Color(hex: 0xFFF8DE) : .white))
+            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(selected ? Kid.yellow : Color(hex: 0xDCB9F3), lineWidth: selected ? 3.5 : 2))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SquishyStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
-/// "Ask a grown-up": a multiplication a young child cannot answer, before
-/// anything is bought.
+/// "Ask a grown-up": a multiplication a young child cannot answer. Not
+/// used since 2026-11-26 (no gate outside the Kids Category); kept for the
+/// day App Review asks for one, or a Kids Category edition.
 struct ParentalGate: View {
     let passed: () -> Void
     @State private var a = Int.random(in: 6...9)

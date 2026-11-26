@@ -559,7 +559,7 @@ Onboarding → Home → Tạo tranh → Kết quả → (Lưu | In | Thêm vào 
      - Trong app: cho chọn kiểu trình bày khi xuất sách ("Chỉ tranh tô" hoặc "Ảnh và tranh tô").
      - Câu chữ và hình ảnh của quảng cáo đó (mũi tên từ ảnh sang tranh, nhãn "Personalized gift") cũng là gợi ý tốt cho ảnh màn hình trên App Store.
 8. **Paywall:** hiện sau 3 tranh Cartoon miễn phí, hoặc khi bấm xuất sách. Gói năm nổi bật; gói tháng và "Một cuốn sách" bên dưới. Khi user đang dựng sách, đưa "Một cuốn sách" lên trước.
-9. **Cài đặt:** khôi phục giao dịch, chính sách riêng tư, hỗ trợ; cổng phụ huynh trước khi mua và trước khi mở link ngoài.
+9. **Cài đặt:** khôi phục giao dịch, chính sách riêng tư, hỗ trợ. **Không có cổng phụ huynh** (chốt 2026-11-26): app không vào Kids Category nên Guideline 1.3 không bắt buộc, và bảng mua của Apple đã đòi Face ID hoặc mật khẩu (Ask to Buy với tài khoản của bé). Code `ParentalGate` vẫn giữ trong `Store/PaywallView.swift` để bật lại nếu App Review yêu cầu. Tên và mô tả trên App Store viết cho phụ huynh, không dùng cụm "for kids" hay "for children" (kiểm lại nguyên văn Guideline 1.3 trước khi nộp).
 
 ### Sticker (ghi ngày 2026-11-24)
 

@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 enum AppTab: Hashable { case home, create, library }
@@ -214,55 +215,163 @@ struct LibraryView: View {
     }
 }
 
-/// For grown-ups, behind a sum: plans, restoring purchases, the policies.
+/// For grown-ups: the plans right on the screen (user, 2026-11-26: they
+/// were one tap away behind "Plans and purchases"), then restoring
+/// purchases and the policies. No parental gate (see PaywallView).
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var unlocked = false
-    @State private var showPlans = false
+    @Environment(\.openURL) private var openURL
+    @State private var store = StoreModel.shared
+    @State private var manage = false
 
     var body: some View {
         NavigationStack {
-            Group {
-                if unlocked {
-                    List {
-                        Section {
-                            Button("Plans and purchases", systemImage: "star.circle") { showPlans = true }
-                            Button("Restore purchases", systemImage: "arrow.clockwise") {
-                                Task { await StoreModel.shared.restore() }
-                            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if store.hasPro && !Self.debugShowPlans {
+                        proCard
+                    } else {
+                        sectionTitle("Plans")
+                        PlansPanel(showLinks: false)
+                            .padding(16)
+                            .background(card)
+                    }
+                    sectionTitle("Help")
+                    VStack(spacing: 0) {
+                        row("Restore purchases", symbol: "arrow.clockwise") {
+                            Task { await store.restore() }
                         }
-                        Section {
-                            Link(destination: AppLinks.privacy) { Label("Privacy policy", systemImage: "hand.raised") }
-                            Link(destination: AppLinks.terms) { Label("Terms of use", systemImage: "doc.text") }
+                        divider
+                        row("Privacy policy", symbol: "hand.raised") { openURL(AppLinks.privacy) }
+                        divider
+                        row("Terms of use", symbol: "doc.text") { openURL(AppLinks.terms) }
+                    }
+                    .background(card)
+                    #if DEBUG
+                    sectionTitle("Debug")
+                    VStack(spacing: 0) {
+                        NavigationLink {
+                            PhotoPrepDebugView()
+                        } label: {
+                            rowLabel("Photo prep", symbol: "wand.and.rays", chevron: true)
                         }
-                        #if DEBUG
-                        Section("Debug") {
-                            NavigationLink("Photo prep") { PhotoPrepDebugView() }
-                            #if targetEnvironment(simulator)
-                            Button("Test photo on every page", systemImage: "photo.badge.plus") {
-                                PageStore.shared.debugSetTestPhoto(true, for: PageStore.shared.pages.map(\.id))
-                            }
-                            Button("Remove photo from every page", systemImage: "photo.badge.minus", role: .destructive) {
-                                PageStore.shared.debugSetTestPhoto(false, for: PageStore.shared.pages.map(\.id))
-                            }
-                            #endif
+                        #if targetEnvironment(simulator)
+                        divider
+                        row("Test photo on every page", symbol: "photo.badge.plus") {
+                            PageStore.shared.debugSetTestPhoto(true, for: PageStore.shared.pages.map(\.id))
+                        }
+                        divider
+                        row("Remove photo from every page", symbol: "trash", color: Kid.coral) {
+                            PageStore.shared.debugSetTestPhoto(false, for: PageStore.shared.pages.map(\.id))
                         }
                         #endif
                     }
-                    .font(Kid.bodyBold(17))
-                    .tint(Kid.ink)
-                } else {
-                    ParentalGate { withAnimation { unlocked = true } }
-                        .padding(24)
+                    .background(card)
+                    #endif
                 }
+                .padding(16)
             }
+            .background(Kid.background.ignoresSafeArea())
             .navigationTitle("Grown-ups")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .principal) {
+                    Text("Grown-ups").font(Kid.titleBold(24)).foregroundStyle(Kid.ink)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        SoundFX.shared.play(.tap)
+                        dismiss()
+                    } label: {
+                        Text("Done").font(Kid.titleBold(17)).foregroundStyle(Kid.ink)
+                            .padding(.horizontal, 16).frame(height: 37)
+                            .background(Capsule().fill(Color(hex: 0xEFE1FC)))
+                            .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
+                    }
+                    .buttonStyle(SquishyStyle())
+                }
+                .kidPlainBackground()
             }
-            .sheet(isPresented: $showPlans) { PaywallView {} }
+            .manageSubscriptionsSheet(isPresented: $manage)
         }
+    }
+
+    /// `-noPro` (Debug, Simulator): show the plans even with a test
+    /// subscription, to see them.
+    private static var debugShowPlans: Bool {
+        #if DEBUG && targetEnvironment(simulator)
+        ProcessInfo.processInfo.arguments.contains("-noPro")
+        #else
+        false
+        #endif
+    }
+
+    /// Pro already: what it gives, and where to manage it.
+    private var proCard: some View {
+        HStack(spacing: 14) {
+            Image("HomeMascot").resizable().scaledToFit().frame(width: 70, height: 70)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Pro is on").font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
+                Text("60 AI pages a month, unlimited books.")
+                    .font(Kid.bodyBold(14)).foregroundStyle(PlansPanel.hint)
+                Button {
+                    SoundFX.shared.play(.tap)
+                    manage = true
+                } label: {
+                    Text("Manage subscription").font(Kid.bodyBold(15)).foregroundStyle(Kid.ink)
+                        .padding(.horizontal, 14).frame(height: 34)
+                        .background(Capsule().fill(Color(hex: 0xEFE1FC)))
+                }
+                .buttonStyle(SquishyStyle())
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(card)
+    }
+
+    private var card: some View {
+        RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
+            .fill(.white)
+            .shadow(color: Kid.ink.opacity(0.06), radius: 10, y: 3)
+    }
+
+    private var divider: some View {
+        Rectangle().fill(Color(hex: 0xEFE1FC)).frame(height: 1.5).padding(.leading, 62)
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text).font(Kid.titleBold(22)).foregroundStyle(Kid.ink).padding(.leading, 4).padding(.top, 4)
+    }
+
+    private func row(_ title: String, symbol: String, color: Color = Kid.ink,
+                     action: @escaping () -> Void) -> some View {
+        Button {
+            SoundFX.shared.play(.tap)
+            action()
+        } label: {
+            rowLabel(title, symbol: symbol, color: color)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func rowLabel(_ title: String, symbol: String, color: Color = Kid.ink, chevron: Bool = false) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Kid.ink)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color(hex: 0xEFE1FC)))
+            Text(title).font(Kid.bodyBold(17)).foregroundStyle(color)
+            Spacer(minLength: 0)
+            if chevron {
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold)).foregroundStyle(PlansPanel.hint)
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 58)
+        .contentShape(Rectangle())
     }
 }
 
