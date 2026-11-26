@@ -67,6 +67,9 @@ struct KidSelectToolbarItem: ToolbarContent {
 struct KidSegmented<Value: Hashable>: View {
     let options: [(value: Value, title: String, icon: String)]
     @Binding var selection: Value
+    var height: CGFloat = 41
+    /// The square an option's icon is drawn in; 36 pt unless given.
+    var iconSides: [Value: CGFloat] = [:]
     @Namespace private var pill
 
     var body: some View {
@@ -79,13 +82,17 @@ struct KidSegmented<Value: Hashable>: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selection = option.value }
                 } label: {
                     HStack(spacing: 8) {
-                        Image(option.icon).resizable().scaledToFit().frame(width: 36, height: 36)
+                        if !option.icon.isEmpty {
+                            let side = iconSides[option.value] ?? 36
+                            Image(option.icon).resizable().scaledToFit().frame(width: side, height: side)
+                                .frame(height: min(side, height))
+                        }
                         Text(option.title)
                             .font(Kid.titleBold(17))
                             .foregroundStyle(Kid.ink)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 41)
+                    .frame(height: height)
                     .background {
                         if on {
                             ZStack(alignment: .bottom) {
