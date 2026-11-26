@@ -131,7 +131,7 @@ Agent đọc toàn bộ code (bỏ qua phần chỉ có trong Debug) để tìm 
 
 ### Cần ngay
 
-- **AppIcon** đang **trống** (`Assets.xcassets/AppIcon.appiconset` chỉ có Contents.json): **chặn việc đưa lên store.** Cần 1024×1024: bản thường, bản tối (dark), bản một màu (tinted). Gợi ý: linh vật bút sáp ôm một trang tô màu trên nền kem hoặc vàng.
+- ~~**AppIcon** đang trống~~ **Đã xong 2026-11-26:** bút sáp mặt cười và cuốn sách trên nền kem; đủ ba bản thường, tối và một màu (1024×1024, không alpha, sRGB). File gốc ở `rawassets/AppIcon.appiconset`.
 
 ### Ưu tiên cao (màn chính, bé và phụ huynh thấy thường xuyên)
 
@@ -198,7 +198,7 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); IconBackspace (
 
 ### 10 hình nên vẽ trước
 
-1. AppIcon (thường, tối, một màu)
+1. ~~AppIcon (thường, tối, một màu)~~ (đã xong)
 2. TabHome, TabCreate, TabLibrary
 3. BtnNext, BtnPrev
 4. BtnSettings
