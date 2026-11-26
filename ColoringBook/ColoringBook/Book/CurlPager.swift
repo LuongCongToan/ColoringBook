@@ -21,6 +21,12 @@ struct CurlPager: UIViewControllerRepresentable {
         pager.delegate = context.coordinator
         pager.view.backgroundColor = .clear
         pager.setViewControllers([context.coordinator.page(index)], direction: .forward, animated: false)
+        // UIKit's curl crashes ("view controllers provided (0) doesn't match
+        // the number required (1)") when a swipe or edge tap starts toward a
+        // page that does not exist, or during another turn (user crash,
+        // 2026-11-26). The coordinator stops those gestures from starting.
+        context.coordinator.pager = pager
+        for gesture in pager.gestureRecognizers { gesture.delegate = context.coordinator }
         return pager
     }
 
@@ -37,13 +43,20 @@ struct CurlPager: UIViewControllerRepresentable {
         }
         // An arrow or thumbnail moved the index: turn to that page.
         guard shown.index != index, (0..<count).contains(index) else { return }
+        coordinator.turning = true
         pager.setViewControllers([coordinator.page(index)],
-                                 direction: index > shown.index ? .forward : .reverse, animated: true)
+                                 direction: index > shown.index ? .forward : .reverse, animated: true) { _ in
+            coordinator.turning = false
+        }
     }
 
-    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate,
+                             UIGestureRecognizerDelegate {
         var parent: CurlPager
         var token: Int
+        weak var pager: UIPageViewController?
+        /// A turn is under way; no new one may start until it ends.
+        var turning = false
         init(_ parent: CurlPager) {
             self.parent = parent
             self.token = parent.reloadToken
@@ -65,11 +78,32 @@ struct CurlPager: UIViewControllerRepresentable {
             return page(i + 1)
         }
 
+        func pageViewController(_ pvc: UIPageViewController, willTransitionTo pending: [UIViewController]) {
+            turning = true
+        }
+
         func pageViewController(_ pvc: UIPageViewController, didFinishAnimating finished: Bool,
                                 previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
+            turning = false
             guard completed, let i = (pvc.viewControllers?.first as? CurlPageController)?.index else { return }
             parent.index = i
             if parent.sounds { SoundFX.shared.play(.tap) }
+        }
+
+        /// Lets the pager's own swipe and edge tap start only toward a page
+        /// that exists, and never during a turn.
+        func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+            guard !turning, let pager,
+                  let i = (pager.viewControllers?.first as? CurlPageController)?.index else { return false }
+            let forward: Bool
+            if let pan = gesture as? UIPanGestureRecognizer {
+                let v = pan.velocity(in: pager.view)
+                guard v.x != 0 else { return false }
+                forward = v.x < 0
+            } else {
+                forward = gesture.location(in: pager.view).x > pager.view.bounds.midX
+            }
+            return forward ? i + 1 < parent.count : i > 0
         }
     }
 }

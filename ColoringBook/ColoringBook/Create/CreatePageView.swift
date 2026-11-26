@@ -30,6 +30,12 @@ struct CreatePageView: View {
     /// Bumped per recolor; only the latest result is shown (the color
     /// picker sends many colors while the finger moves).
     @State private var recolorTurn = 0
+    /// The color under the finger in the system picker. The lines use a
+    /// darkened copy; handing that copy back to the picker made its cursor
+    /// jump toward black while dragging (user, 2026-11-26).
+    /// Kept with the stored hex it produced, so it is only used while that
+    /// color is still the chosen one.
+    @State private var pickedInk: (color: Color, hex: String)?
 
     /// The stored line color for a style: a preset's name or "#RRGGBB".
     private func storedInk(for style: PageStyle) -> String { style.onDevice ? sketchInk : aiInk }
@@ -516,13 +522,18 @@ struct CreatePageView: View {
         let custom = stored.hasPrefix("#")
         let current = ink(for: style)
         let customColor = Binding<Color>(
-            get: { Color(red: current.r, green: current.g, blue: current.b) },
+            get: {
+                if let picked = pickedInk, picked.hex == stored { return picked.color }
+                return Color(red: current.r, green: current.g, blue: current.b)
+            },
             set: { color in
                 let c = UIColor(color).cgColor.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!,
                                                          intent: .defaultIntent, options: nil)?.components ?? [0, 0, 0]
                 let rgb = SketchMaker.usableInk((Double(c[0]), Double(c.count > 2 ? c[1] : c[0]),
                                                  Double(c.count > 2 ? c[2] : c[0])))
-                choose(SketchMaker.hex(rgb))
+                let hex = SketchMaker.hex(rgb)
+                pickedInk = (color, hex)
+                choose(hex)
             })
         return VStack(alignment: .leading, spacing: 8) {
             Text(style.onDevice ? "Pencil color" : "Line color")

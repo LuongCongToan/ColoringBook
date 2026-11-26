@@ -35,13 +35,21 @@ struct RootTabView: View {
         // tabs, so padding from out here never reaches the screens; instead
         // each screen reads the bar's height and keeps clear of it
         // (`kidTabBarClearance()`).
-        ZStack(alignment: .bottom) {
-            tabView
-                .environment(\.kidTabBarHeight, tabs.barHidden ? 0
-                             : (verticalSizeClass == .compact ? KidTabBar.compactHeight : KidTabBar.height) + 8)
-            if !tabs.barHidden {
-                KidTabBar(selected: $tabs.selected)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+        GeometryReader { geo in
+            // The bar's foot sits 19 pt above the screen's edge, partly over
+            // the home indicator's area; on phones without one, just above
+            // the edge.
+            let bottom = geo.safeAreaInsets.bottom
+            let sink = max(0, bottom - KidTabBar.footGap)
+            let barHeight = verticalSizeClass == .compact ? KidTabBar.compactHeight : KidTabBar.height
+            ZStack(alignment: .bottom) {
+                tabView
+                    .environment(\.kidTabBarHeight, tabs.barHidden ? 0 : barHeight - sink + (bottom > 0 ? 8 : 16))
+                if !tabs.barHidden {
+                    KidTabBar(selected: $tabs.selected)
+                        .padding(.bottom, bottom > 0 ? -sink : 8)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tabs.barHidden)
@@ -63,46 +71,54 @@ struct RootTabView: View {
     }
 }
 
-/// Measured on the concept (2026-11-25): bar 406 pt wide (16.5 pt in from
-/// the sides), the pill 108.6 × 58.9 pt in #FBE18F, icons and labels deep
-/// purple.
+/// Measured on the concept (2026-11-26, Lily's book screen): a cream bar
+/// #FEFAF2, 420 pt wide (10 pt in from the sides) and 102 pt high, its foot
+/// 19 pt above the screen's bottom edge; the current tab on a 135 × 81 pt
+/// pill in #FDE695; icons about 64 pt with Fredoka Bold 16 labels.
 struct KidTabBar: View {
     @Binding var selected: AppTab
-    static let height: CGFloat = 70
+    static let height: CGFloat = 102
     /// Phone on its side: icon beside the word, a lower bar.
-    static let compactHeight: CGFloat = 50
+    static let compactHeight: CGFloat = 54
+    /// Gap between the bar's foot and the screen's bottom edge.
+    static let footGap: CGFloat = 19
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private var compact: Bool { verticalSizeClass == .compact }
 
+    /// Tab, label, icon asset (rawassets/ColoringBook-Navigation, 2026-11-26).
     private let items: [(AppTab, String, String)] = [
-        (.home, "Home", "house.fill"),
-        (.create, "Create", "plus.circle.fill"),
-        (.library, "My library", "books.vertical.fill"),
+        (.home, "Home", "TabHome"),
+        (.create, "Create", "TabCreate"),
+        (.library, "My library", "TabLibrary"),
     ]
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(items, id: \.0) { tab, title, symbol in
+            ForEach(items, id: \.0) { tab, title, icon in
                 let on = selected == tab
                 Button {
                     SoundFX.shared.play(.tap)
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selected = tab }
                 } label: {
-                    let layout = compact ? AnyLayout(HStackLayout(spacing: 6)) : AnyLayout(VStackLayout(spacing: 2))
+                    let layout = compact ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(spacing: -4))
                     layout {
-                        Image(systemName: symbol)
-                            .font(.system(size: compact ? 20 : 24, weight: .bold))
+                        // The art has a small margin of its own.
+                        Image(icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: compact ? 40 : 64, height: compact ? 40 : 64)
                         Text(title)
-                            .font(Kid.title(15, relativeTo: .caption))
+                            .font(Kid.titleBold(16, relativeTo: .caption))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                     }
                     .foregroundStyle(Kid.ink)
-                    .frame(width: compact ? 150 : 108.6, height: compact ? 40 : 58.9)
+                    .frame(maxWidth: compact ? 160 : 135)
+                    .frame(height: compact ? 44 : 81)
                     .background {
                         if on {
-                            RoundedRectangle(cornerRadius: compact ? 18 : 22, style: .continuous)
-                                .fill(Color(hex: 0xFBE18F))
+                            RoundedRectangle(cornerRadius: compact ? 20 : 28, style: .continuous)
+                                .fill(Color(hex: 0xFDE695))
                                 .matchedGeometryEffect(id: "pill", in: pill)
                         }
                     }
@@ -116,13 +132,12 @@ struct KidTabBar: View {
         }
         .padding(.horizontal, 6)
         .frame(height: compact ? Self.compactHeight : Self.height)
-        .frame(maxWidth: compact ? 560 : .infinity)
+        .frame(maxWidth: compact ? 600 : .infinity)
         .background(
-            RoundedRectangle(cornerRadius: compact ? 24 : 30, style: .continuous)
-                .fill(.white)
-                .shadow(color: Kid.ink.opacity(0.10), radius: 10, y: 3))
-        .padding(.horizontal, 16.5)
-        .padding(.bottom, 4)
+            RoundedRectangle(cornerRadius: compact ? 27 : 40, style: .continuous)
+                .fill(Color(hex: 0xFEFAF2))
+                .shadow(color: Kid.ink.opacity(0.08), radius: 12, y: 2))
+        .padding(.horizontal, 10)
     }
 
     @Namespace private var pill

@@ -78,7 +78,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 
 | Asset | Hình cần vẽ | Thay cho | Chỗ dùng |
 |---|---|---|---|
-| TabHome, TabCreate, TabLibrary | Ngôi nhà cười; bút sáp kèm dấu cộng lấp lánh; chồng sách cười | `house.fill`, `plus.circle.fill`, `books.vertical.fill` | Thanh điều hướng (`Design/RootTabView.swift:77-81`) |
+| ~~TabHome, TabCreate, TabLibrary~~ | ~~Ngôi nhà, nút cộng, chồng sách~~ | | Đã xong |
 | BtnNext, BtnPrev | Nút tròn mũi tên, kiểu giống BtnBack (bản trắng cho thẻ, bản vàng to cho sách) | `arrow.right`, `chevron.left/right` | Thẻ lớn màn chính (`PageLibraryView.swift:173`), lật sách (`BookReaderView.swift:267`) |
 | BtnSettings | Nút tròn lavender có bánh răng kawaii (hoặc "chìa khoá người lớn") | `gearshape.fill` | Màn chính (`PageLibraryView.swift:120`) |
 | DecoSparkle | Ngôi sao 4 cánh mũm mĩm, 3 màu (san hô, vàng, bạc hà) | `star.fill`, `sparkles` | Đầu màn chính, màn kết quả |
@@ -128,7 +128,7 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); IconBackspace (
 ### Thứ tự vẽ đề nghị
 
 1. ~~AppIcon~~
-2. TabHome, TabCreate, TabLibrary
+2. ~~TabHome, TabCreate, TabLibrary~~
 3. BtnNext, BtnPrev
 4. BtnSettings
 5. DecoSparkle
