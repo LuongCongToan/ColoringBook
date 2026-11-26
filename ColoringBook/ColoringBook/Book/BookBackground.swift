@@ -33,9 +33,10 @@ nonisolated enum BackgroundLibrary {
         for ext in ["png", "jpg", "jpeg"] {
             urls += Bundle.main.urls(forResourcesWithExtension: ext, subdirectory: nil) ?? []
         }
-        #if DEBUG && targetEnvironment(simulator)
-        urls += devFolderFiles()
-        #endif
+        // The trial backgrounds in `tempdrawing_img/` are no longer
+        // offered: the colored covers (CoverLibrary) replace them (user,
+        // 2026-11-26). With no bg-*.png in the app, the Background card
+        // hides itself and books saved with one show without it.
         var seen = Set<String>()
         let found: [BookBackground] = urls
             .filter { $0.deletingPathExtension().lastPathComponent.hasPrefix("bg-") }
@@ -134,17 +135,6 @@ nonisolated enum BackgroundLibrary {
         return ctx.makeImage()
     }
 
-    #if DEBUG && targetEnvironment(simulator)
-    private static func devFolderFiles() -> [URL] {
-        let folder = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // Book
-            .deletingLastPathComponent()  // ColoringBook (sources)
-            .deletingLastPathComponent()  // ColoringBook (project)
-            .deletingLastPathComponent()  // repo root
-            .appendingPathComponent("tempdrawing_img")
-        return (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-    }
-    #endif
 
     nonisolated(unsafe) private static var loaded: [BookBackground]?
     private static let lock = NSLock()

@@ -12,6 +12,9 @@ struct MyPagesView: View {
     @State private var confirmDelete = false
     /// One page deleted from its long-press menu.
     @State private var single: UUID?
+    @State private var tabs = AppTabs.shared
+    /// Pulses the page just saved.
+    @State private var glow = false
 
     private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
 
@@ -38,6 +41,17 @@ struct MyPagesView: View {
                             .overlay(alignment: .topTrailing) {
                                 if selecting { SelectCheck(on: chosen).padding(8) }
                             }
+                            .overlay {
+                                // The page just saved (Save on the coloring screen).
+                                if tabs.highlightPage == page.id {
+                                    RoundedRectangle(cornerRadius: Kid.radius + 4, style: .continuous)
+                                        .strokeBorder(Kid.yellow, lineWidth: 6)
+                                        .padding(-6)
+                                        .shadow(color: Kid.yellow.opacity(glow ? 0.9 : 0.3), radius: glow ? 14 : 4)
+                                }
+                            }
+                            .scaleEffect(tabs.highlightPage == page.id && glow ? 1.04 : 1)
+                            .id(page.id)
                     }
                     .buttonStyle(SquishyStyle())
                     .accessibilityAddTraits(chosen ? .isSelected : [])
@@ -92,6 +106,16 @@ struct MyPagesView: View {
             ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
         }
         .onAppear { store.refresh() }
+        .task(id: tabs.highlightPage) {
+            guard tabs.highlightPage != nil else { return }
+            withAnimation(.easeInOut(duration: 0.6).repeatCount(5, autoreverses: true)) { glow = true }
+            try? await Task.sleep(for: .seconds(3.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.4)) {
+                glow = false
+                tabs.highlightPage = nil
+            }
+        }
     }
 
     // MARK: - Selecting

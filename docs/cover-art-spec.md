@@ -1,6 +1,6 @@
 # Quy cách vẽ bìa sách (cover) cho ColoringBook
 
-Bìa là một khung trang trí **có màu sẵn** phủ lên toàn bộ trang bìa. App tự viết tên sách ("Lily's Coloring Book", chữ viền để tô) và đặt tranh đầu tiên của sách vào khoảng trống ở giữa. Mẫu đầu tiên: `Covers/cover-crayons.png` (gáy tím bên trái, hoa và bút sáp ở góc).
+Bìa là một khung trang trí **có màu sẵn** phủ lên toàn bộ trang bìa. App tự viết tên sách ("Lily's Coloring Book", chữ viền để tô) và đặt tranh đầu tiên của sách vào khoảng trống ở giữa. Hiện có 6 bìa trong `Covers/`: garden, lavender, ocean, party, rainbow, space (2026-11-26). Sách mới mặc định dùng lavender.
 
 ## File cần giao
 
@@ -10,8 +10,6 @@ Bìa là một khung trang trí **có màu sẵn** phủ lên toàn bộ trang b
 | Kích thước | **1275×1650 px** (đúng tỷ lệ khổ Letter, in 150 dpi) |
 | Nền | **Trong suốt**. App đặt trang giấy trắng bên dưới |
 | Màu | Tô sẵn, theo bảng màu app: vàng `#FFD54A`, lavender `#D8B9FF`, san hô `#FF7078`, bạc hà `#70DCC1`, nét tím đậm `#28145C` |
-
-Bìa mẫu hiện có cỡ 1086×1448 px (tỷ lệ 3:4). App vẫn dùng được, chỉ kéo dọc khoảng 3% cho vừa khổ Letter, nhìn không thấy. Các bìa sau vẽ đúng 1275×1650 cho khỏi kéo và in nét hơn.
 
 ## Vùng vẽ (tính theo phần trăm, áp dụng cho mọi cỡ)
 
@@ -35,6 +33,6 @@ Trên file 1275×1650: chỗ ghi tên là x = 230 → 1084, y = 272 → 602; ch�
 
 ## Đưa vào app
 
-Chép file vào `ColoringBook/ColoringBook/Covers/`. Thư mục này nằm trong synchronized folder nên file tự vào bundle. Bìa mới tự hiện trong màn Make a book, ở hàng chọn bìa, trước các khung nét. Sách mới mặc định dùng bìa màu đầu tiên theo thứ tự tên.
+Chép file vào `ColoringBook/ColoringBook/Covers/`. Thư mục này nằm trong synchronized folder nên file tự vào bundle. Bìa mới tự hiện trong màn Make a book, ở hàng chọn bìa, trước các khung nét. Sách mới mặc định dùng bìa lavender.
 
-Vị trí tên và tranh đang được cố định trong code (`Book/CoverLibrary.swift`, `titleArea` và `artArea`), đo trên bìa mẫu. Nếu một bìa cần bố cục khác, báo lại để thêm số đo riêng cho bìa đó.
+Vị trí tên và tranh được đo riêng cho từng bìa (`Book/CoverLibrary.swift`, bảng `measured`): ô tên lớn nhất không đụng hình ở góc, rồi ô tranh lớn nhất bên dưới. Bìa mới chưa đo dùng hai vùng trong bảng trên. Khi thêm bìa, nhờ đo lại để tên và tranh to nhất có thể.

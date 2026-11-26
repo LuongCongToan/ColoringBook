@@ -14,7 +14,21 @@ nonisolated enum CoverLibrary {
             .sorted()
     }
 
-    static func image(_ name: String) -> UIImage? {
+    /// Covers that were renamed; books saved with the old name still find
+    /// theirs.
+    private static let renamed = ["crayons": "lavender"]
+
+    /// The current name of a saved cover.
+    static func current(_ name: String?) -> String? { name.map { renamed[$0] ?? $0 } }
+
+    /// The cover new books start with.
+    static var standard: String? {
+        let all = names()
+        return all.contains("lavender") ? "lavender" : all.first
+    }
+
+    static func image(_ requested: String) -> UIImage? {
+        let name = renamed[requested] ?? requested
         lock.lock(); defer { lock.unlock() }
         if let cached = cache[name] { return cached }
         guard let url = Bundle.main.url(forResource: "cover-\(name)", withExtension: "png"),
@@ -23,14 +37,34 @@ nonisolated enum CoverLibrary {
         return image
     }
 
-    /// Where the title goes, as shares of the sheet. Measured on
-    /// cover-crayons (2026-11-26): the border's inner edge runs from 9% to
-    /// 94% across (the spine makes it sit right of center) and from 8% to
-    /// 91% down; corner pictures reach in to about 16% from the top and
-    /// 22% from the bottom.
-    static let titleArea = CGRect(x: 0.18, y: 0.165, width: 0.67, height: 0.20)
-    /// Where the first picture goes.
-    static let artArea = CGRect(x: 0.17, y: 0.40, width: 0.69, height: 0.37)
+    /// Where the title and the first picture go, as shares of the sheet,
+    /// for each cover. Measured on the artwork (2026-11-26): the largest
+    /// title box clear of the corner pictures (with a 1% margin), then the
+    /// largest box under it for a 4:3 picture, both centered on the space
+    /// inside the border (right of the page's center, past the spine).
+    static func areas(for requested: String) -> (title: CGRect, art: CGRect) {
+        let name = renamed[requested] ?? requested
+        return measured[name] ?? (defaultTitle, defaultArt)
+    }
+
+    private static let measured: [String: (title: CGRect, art: CGRect)] = [
+        "garden": (CGRect(x: 0.231, y: 0.215, width: 0.596, height: 0.148),
+                   CGRect(x: 0.200, y: 0.376, width: 0.659, height: 0.385)),
+        "lavender": (CGRect(x: 0.157, y: 0.203, width: 0.706, height: 0.155),
+                     CGRect(x: 0.176, y: 0.370, width: 0.667, height: 0.385)),
+        "ocean": (CGRect(x: 0.224, y: 0.194, width: 0.651, height: 0.148),
+                  CGRect(x: 0.216, y: 0.355, width: 0.667, height: 0.312)),
+        "party": (CGRect(x: 0.251, y: 0.224, width: 0.533, height: 0.148),
+                  CGRect(x: 0.180, y: 0.385, width: 0.675, height: 0.394)),
+        "rainbow": (CGRect(x: 0.176, y: 0.248, width: 0.722, height: 0.161),
+                    CGRect(x: 0.216, y: 0.421, width: 0.643, height: 0.367)),
+        "space": (CGRect(x: 0.216, y: 0.227, width: 0.682, height: 0.148),
+                  CGRect(x: 0.235, y: 0.388, width: 0.643, height: 0.348)),
+    ]
+
+    /// For a cover not measured yet: the zones in docs/cover-art-spec.md.
+    private static let defaultTitle = CGRect(x: 0.18, y: 0.165, width: 0.67, height: 0.20)
+    private static let defaultArt = CGRect(x: 0.17, y: 0.40, width: 0.69, height: 0.37)
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cache: [String: UIImage] = [:]

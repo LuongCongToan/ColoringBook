@@ -35,7 +35,7 @@ struct BookBuilderView: View {
         opts.childName = book?.name ?? ""
         opts.coverFrame = book?.coverFrame ?? .stars
         // New books start on the first colored cover.
-        opts.coverArt = book == nil ? CoverLibrary.names().first : book?.coverArt
+        opts.coverArt = book == nil ? CoverLibrary.standard : CoverLibrary.current(book?.coverArt)
         opts.belongsToPage = book?.belongsToPage ?? true
         opts.layout = book?.layout ?? .pagesOnly
         opts.background = BackgroundLibrary.named(book?.background)

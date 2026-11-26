@@ -31,6 +31,9 @@ struct ColoringView: View {
                                 .overlay(alignment: .bottomTrailing) {
                                     ZoomButtons(session: session).padding(14)
                                 }
+                                .overlay(alignment: .bottomLeading) {
+                                    SaveButton(action: saveAndShow).padding(14)
+                                }
                             SidePanel(session: session)
                                 .frame(width: 200)
                         }
@@ -45,6 +48,7 @@ struct ColoringView: View {
                         canvas
                             .frame(height: pageHeight)
                         HStack {
+                            SaveButton(action: saveAndShow)
                             Spacer()
                             ZoomButtons(session: session)
                         }
@@ -106,6 +110,17 @@ struct ColoringView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+
+    /// Save: keep the page, then show it first in My pages (user,
+    /// 2026-11-26). Pages save themselves as a child colors; this is the
+    /// clear "I'm done" a child and a parent look for.
+    private func saveAndShow() {
+        autosave?.cancel()
+        PageStore.shared.save(session, force: true)
+        SoundFX.shared.play(.sticker)
+        AppTabs.shared.showSavedPage(session.pageID)
+        dismiss()
+    }
 
     /// The design's top bar: Back on the left, the title in the middle,
     /// undo, redo and share (a grown-up action, in the corner) on the right.
@@ -677,6 +692,29 @@ private struct UndoButton: View {
 
 /// Big magnifier buttons: small children cannot pinch, so zooming must work
 /// with plain taps. "Fit" appears only while zoomed in.
+/// The yellow "Save" pill, beside the zoom buttons.
+private struct SaveButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            SoundFX.shared.play(.tap)
+            action()
+        } label: {
+            Label("Save", systemImage: "checkmark")
+                .font(Kid.titleBold(20))
+                .foregroundStyle(Kid.ink)
+                .padding(.horizontal, 20)
+                .frame(height: 52)
+                .background(Capsule().fill(Kid.yellow))
+                .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+                .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
+        }
+        .buttonStyle(SquishyStyle())
+        .accessibilityLabel("Save page")
+    }
+}
+
 private struct ZoomButtons: View {
     let session: ColoringSession
 

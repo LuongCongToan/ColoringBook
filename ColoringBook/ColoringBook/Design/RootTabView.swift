@@ -14,6 +14,21 @@ final class AppTabs {
     /// Bumped by "Make a coloring page" on Home: Create starts a new page
     /// rather than showing the last result.
     var freshCreate = 0
+    /// Which shelf My library shows.
+    var libraryShelf: LibraryView.Shelf = .books
+    /// Bumped by Save on the coloring screen: My library goes back to its
+    /// first screen, on Pages.
+    var libraryReset = 0
+    /// The page just saved, shown first and highlighted in My pages.
+    var highlightPage: UUID?
+
+    /// Save on the coloring screen: My library, Pages, that page first.
+    func showSavedPage(_ id: UUID) {
+        highlightPage = id
+        libraryShelf = .pages
+        libraryReset += 1
+        selected = .library
+    }
 
     private init() {
         #if DEBUG && targetEnvironment(simulator)
@@ -65,7 +80,9 @@ struct RootTabView: View {
                 NavigationStack { CreatePageView() }.kidTabBarSpace()
             }
             Tab(value: AppTab.library) {
-                NavigationStack { LibraryView() }.kidTabBarSpace()
+                // A new identity drops whatever was pushed (Save from a
+                // page opened in a book lands on Pages, not in the book).
+                NavigationStack { LibraryView() }.id(tabs.libraryReset).kidTabBarSpace()
             }
         }
     }
@@ -180,17 +197,17 @@ struct LibraryView: View {
         var id: String { rawValue }
     }
 
-    @State private var shelf: Shelf = .books
+    @State private var tabs = AppTabs.shared
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Show", selection: $shelf) {
+            Picker("Show", selection: $tabs.libraryShelf) {
                 ForEach(Shelf.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
-            switch shelf {
+            switch tabs.libraryShelf {
             case .books: BookListView()
             case .pages: MyPagesView()
             }

@@ -401,11 +401,11 @@ nonisolated enum BookRenderer {
             artArea = CGRect(x: box.minX + 16, y: titleArea.maxY + 22,
                              width: box.width - 32, height: box.maxY - 18 - (titleArea.maxY + 22))
         } else if let name = options.coverArt, let art = CoverLibrary.image(name) {
-            // Drawn over the whole sheet (Letter is a little taller than
-            // the 3:4 artwork; the stretch does not show).
+            // Drawn over the whole sheet (1275×1650, Letter-shaped).
             art.draw(in: sheet)
-            titleArea = CoverLibrary.titleArea.scaled(to: sheet)
-            artArea = CoverLibrary.artArea.scaled(to: sheet)
+            let areas = CoverLibrary.areas(for: name)
+            titleArea = areas.title.scaled(to: sheet)
+            artArea = areas.art.scaled(to: sheet)
         } else {
             drawFrame(options.coverFrame, in: ctx)
             titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)
