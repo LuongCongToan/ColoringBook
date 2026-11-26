@@ -69,14 +69,9 @@ struct MyPagesView: View {
         .kidBackButton(hidden: selecting)
         .toolbar {
             if !store.pages.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(selecting ? "Cancel" : "Select") {
-                        withAnimation {
-                            selecting.toggle()
-                            selection = []
-                        }
-                    }
-                    .font(Kid.body(17))
+                KidSelectToolbarItem(selecting: selecting) {
+                    selecting.toggle()
+                    selection = []
                 }
             }
         }

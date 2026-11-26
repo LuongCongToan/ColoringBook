@@ -69,14 +69,9 @@ struct BookListView: View {
         .navigationBarTitleDisplayMode(selecting ? .inline : .large)
         .toolbar {
             if !books.books.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(selecting ? "Cancel" : "Select") {
-                        withAnimation {
-                            selecting.toggle()
-                            selection = []
-                        }
-                    }
-                    .fontWeight(selecting ? .bold : .regular)
+                KidSelectToolbarItem(selecting: selecting) {
+                    selecting.toggle()
+                    selection = []
                 }
             }
         }

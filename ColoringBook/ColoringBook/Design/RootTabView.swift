@@ -201,12 +201,10 @@ struct LibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Show", selection: $tabs.libraryShelf) {
-                ForEach(Shelf.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 8)
+            KidSegmented(options: [(Shelf.books, "Books", "IconBooks"), (Shelf.pages, "Pages", "IconPages")],
+                         selection: $tabs.libraryShelf)
+                .padding(.horizontal, 16.5)
+                .padding(.vertical, 8)
             switch tabs.libraryShelf {
             case .books: BookListView()
             case .pages: MyPagesView()
