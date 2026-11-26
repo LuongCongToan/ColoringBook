@@ -63,7 +63,6 @@ struct BookListView: View {
                     .padding(.horizontal, 32)
             }
         }
-        .kidTabBarClearance()
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(selecting ? selectionTitle : "My books")
         .kidBackButton(hidden: selecting)
@@ -83,6 +82,15 @@ struct BookListView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
+        }
+        .kidTabBarClearance()
+        // Select mode takes the tab bar's place, like Photos; leaving the
+        // screen (or the tab) ends it.
+        .onChange(of: selecting) { _, on in AppTabs.shared.barHidden = on }
+        .onDisappear {
+            selecting = false
+            selection = []
+            AppTabs.shared.barHidden = false
         }
         .confirmationDialog(single.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
                             isPresented: Binding(get: { single != nil }, set: { if !$0 { single = nil } }),

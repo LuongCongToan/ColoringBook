@@ -8,6 +8,12 @@ enum AppTab: Hashable { case home, create, library }
 final class AppTabs {
     static let shared = AppTabs()
     var selected: AppTab = .home
+    /// Hides the tab bar while a screen shows its own bottom bar (Select
+    /// mode in My pages and My books, as in Photos).
+    var barHidden = false
+    /// Bumped by "Make a coloring page" on Home: Create starts a new page
+    /// rather than showing the last result.
+    var freshCreate = 0
 
     private init() {
         #if DEBUG && targetEnvironment(simulator)
@@ -31,10 +37,14 @@ struct RootTabView: View {
         // (`kidTabBarClearance()`).
         ZStack(alignment: .bottom) {
             tabView
-                .environment(\.kidTabBarHeight,
-                             (verticalSizeClass == .compact ? KidTabBar.compactHeight : KidTabBar.height) + 8)
-            KidTabBar(selected: $tabs.selected)
+                .environment(\.kidTabBarHeight, tabs.barHidden ? 0
+                             : (verticalSizeClass == .compact ? KidTabBar.compactHeight : KidTabBar.height) + 8)
+            if !tabs.barHidden {
+                KidTabBar(selected: $tabs.selected)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tabs.barHidden)
         .ignoresSafeArea(.keyboard)
     }
 
@@ -224,4 +234,8 @@ struct SettingsView: View {
             .sheet(isPresented: $showPlans) { PaywallView {} }
         }
     }
+}
+
+#Preview("Home") {
+    RootTabView()
 }

@@ -866,6 +866,8 @@ User chọn **sticker có màu sẵn, không tô**: 20 sticker kawaii trong `raw
 
 ### TODO trước khi phát hành
 
+Danh sách lỗi và việc làm đẹp sau lượt thử toàn bộ ngày 2026-11-26: [polish-plan.md](polish-plan.md).
+
 - [ ] **Popup xin đánh giá** (user nhắc 2026-11-25): dùng `requestReview` của StoreKit (hộp thoại hệ thống, iOS tự giới hạn số lần). Chỉ hỏi sau lúc vui và ở chỗ phụ huynh đang dùng, ví dụ sau khi lưu sách hoặc Save PDF xong, hoặc sau vài trang đã tô; không hỏi bé giữa lúc tô, không tự làm hộp hỏi riêng trước hộp hệ thống. Kiểm lại quy định cho Kids Category (Guideline 1.3) trước khi bật.
 - [ ] Worker thật: deploy `coloring-api`, thay URL tạm trong `WorkerPageGenerator`, đặt key BFL mới bằng `wrangler secret`, endpoint `/credit`.
 - [ ] Đăng Privacy Policy, thay URL tạm trong `AppLinks`, khai App Privacy (Photos).

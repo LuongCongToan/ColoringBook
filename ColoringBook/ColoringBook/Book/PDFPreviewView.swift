@@ -71,10 +71,12 @@ struct PDFPreviewView: View {
     private var notes: [String] {
         var out: [String] = []
         if book.pictures < 5 {
-            out.append("Only \(book.pictures) pictures. 5 to 20 make a nicer book.")
+            out.append(book.pictures == 1 ? "Only 1 picture. 5 to 20 make a nicer book."
+                       : "Only \(book.pictures) pictures. 5 to 20 make a nicer book.")
         }
         if book.options.layout != .pagesOnly && book.withoutPhoto > 0 {
-            out.append("\(book.withoutPhoto) pictures have no photo and print without one.")
+            out.append(book.withoutPhoto == 1 ? "1 picture has no photo and prints without one."
+                       : "\(book.withoutPhoto) pictures have no photo and print without one.")
         }
         if book.options.layout == .photoFacing {
             out.append("Print single-sided if you color with markers: the photos would be on the backs.")

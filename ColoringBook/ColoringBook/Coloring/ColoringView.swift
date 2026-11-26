@@ -73,6 +73,10 @@ struct ColoringView: View {
                 PageStore.shared.save(session)
             }
         }
+        // Coloring needs every bit of the screen: the tab bar steps aside
+        // (it came back over the tools in landscape).
+        .onAppear { AppTabs.shared.barHidden = true }
+        .onDisappear { AppTabs.shared.barHidden = false }
         .onAppear {
             #if DEBUG && targetEnvironment(simulator)
             // `-brushTool`: open with the brush, to see the size row.
@@ -172,26 +176,29 @@ private struct SidePanel: View {
     let session: ColoringSession
 
     var body: some View {
-        VStack(spacing: 14) {
-            if session.tool.usesSize {
-                SizePicker(session: session, axis: .vertical)
+        // One scrolling column: sizes, colors, stickers or frames, all
+        // reachable on a short landscape screen (they were cut off).
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 10) {
+                if session.tool.usesSize {
+                    PanelTitle(text: session.tool.sizeTitle)
+                    SizePicker(session: session, axis: .vertical)
+                        .frame(maxWidth: .infinity)
+                }
+                if session.tool.usesColor {
+                    PanelTitle(text: "Colors")
+                    ColorStrip(session: session, axis: .vertical)
+                }
+                if session.tool == .sticker {
+                    StickerTray(session: session, axis: .vertical)
+                }
+                if session.tool == .frame {
+                    FrameTray(session: session, axis: .vertical)
+                }
             }
-            if session.tool.usesColor {
-                ColorStrip(session: session, axis: .vertical)
-            }
-            if session.tool == .sticker {
-                StickerTray(session: session, axis: .vertical)
-            }
-            if session.tool == .frame {
-                FrameTray(session: session, axis: .vertical)
-            }
-            if session.tool == .rainbow || session.tool == .eraser {
-                Spacer()
-            }
+            .padding(.vertical, 12)
         }
-        .padding(.vertical, 12)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Theme.panel)
         .animation(.spring(duration: 0.3), value: session.tool)
     }
 }
@@ -203,18 +210,25 @@ private struct ToolRail: View {
     let axis: Axis
 
     var body: some View {
-        let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: 5))
-            : AnyLayout(VStackLayout(spacing: 12))
-        layout {
-            ForEach(ColoringSession.Tool.allCases) { tool in
-                ToolButton(tool: tool, session: session)
+        if axis == .horizontal {
+            HStack(spacing: 5) { buttons }
+                .padding(.horizontal, 11)
+        } else {
+            // A short screen (phone on its side) cannot show six tools in a
+            // column: it scrolls.
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 10) { buttons }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 8)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
-        .padding(.horizontal, axis == .horizontal ? 11 : 0)
-        .padding(.vertical, axis == .vertical ? 16 : 0)
-        .frame(maxHeight: axis == .vertical ? .infinity : nil, alignment: .top)
-        .background(axis == .vertical ? Theme.panel : .clear)
+    }
+
+    @ViewBuilder private var buttons: some View {
+        ForEach(ColoringSession.Tool.allCases) { tool in
+            ToolButton(tool: tool, session: session)
+        }
     }
 }
 
@@ -347,7 +361,7 @@ private struct SizePicker: View {
     var body: some View {
         let layout = axis == .horizontal
             ? AnyLayout(HStackLayout(spacing: 14))
-            : AnyLayout(VStackLayout(spacing: 6))
+            : AnyLayout(VStackLayout(spacing: 4))
         let tool = session.tool
         let current = session.sizeIndex[tool] ?? 1
         layout {
@@ -423,13 +437,13 @@ private struct ColorStrip: View {
                 .padding(.vertical, 4)
             }
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: [GridItem(.fixed(84)), GridItem(.fixed(84))], spacing: 4) {
-                    swatches
-                    customColor
-                }
-                .padding(.vertical, 4)
+            // The side panel scrolls; no scroll view of its own here.
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(56), spacing: 4), count: 3), spacing: 4) {
+                swatches
+                customColor
             }
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -504,10 +518,9 @@ private struct StickerTray: View {
                     .padding(.vertical, 4)
             }
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVGrid(columns: [GridItem(.fixed(84)), GridItem(.fixed(84))], spacing: 10) { items }
-                    .padding(.vertical, 4)
-            }
+            LazyVGrid(columns: [GridItem(.fixed(84)), GridItem(.fixed(84))], spacing: 10) { items }
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -545,10 +558,9 @@ private struct FrameTray: View {
                     .padding(.vertical, 6)
             }
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 10) { items }
-                    .padding(.vertical, 6)
-            }
+            VStack(spacing: 10) { items }
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -794,3 +806,11 @@ private struct ShareSheet: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
+
+#if DEBUG && targetEnvironment(simulator)
+#Preview("Coloring, landscape", traits: .landscapeLeft) {
+    if let url = DevSamples.pages().first?.url, let data = try? Data(contentsOf: url), let art = try? LineArt.load(data) {
+        NavigationStack { ColoringView(art: art) }
+    }
+}
+#endif

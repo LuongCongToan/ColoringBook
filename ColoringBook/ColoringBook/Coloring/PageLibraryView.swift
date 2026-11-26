@@ -26,6 +26,7 @@ struct PageLibraryView: View {
                     // Opens the Create tab, so the tab bar shows where you are.
                     Button {
                         SoundFX.shared.play(.tap)
+                        AppTabs.shared.freshCreate += 1
                         AppTabs.shared.selected = .create
                     } label: {
                         // The camera art is taller than the book's: sized so the

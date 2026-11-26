@@ -97,7 +97,15 @@ struct CreatePageView: View {
         // "Draw my page" stays in sight above the tab bar, whatever the
         // screen's height (it was pushed under the bar in landscape).
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !isDone {
+            if case .done(let page, _) = phase {
+                resultButtons(page)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .background(
+                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                                       startPoint: .top, endPoint: .bottom))
+            } else {
                 drawButton
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
@@ -111,6 +119,25 @@ struct CreatePageView: View {
         .kidTabBarClearance()
         .background(KidBackground())
         .navigationTitle("New page")
+        .toolbar {
+            if isDone {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // A finished page stayed on this tab with no way to make
+                    // another (full-flow test, 2026-11-26).
+                    Button {
+                        startOver()
+                    } label: {
+                        Label("New page", systemImage: "plus")
+                            .font(Kid.body(16))
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .tint(Kid.ink)
+                }
+            }
+        }
+        .onChange(of: AppTabs.shared.freshCreate) { _, _ in
+            if isDone { startOver() }
+        }
         .kidBackButton()
         .navigationBarTitleDisplayMode(.inline)
         .overlay {
@@ -266,8 +293,7 @@ struct CreatePageView: View {
     }
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
-        let next: PageStyle = page.style == .cartoon ? .chibi : .cartoon
-        return VStack(spacing: 18) {
+        VStack(spacing: 18) {
             // The crayon cheering: the page worked.
             HStack(spacing: 6) {
                 Image("EditorCelebration")
@@ -305,12 +331,25 @@ struct CreatePageView: View {
                     .foregroundStyle(Kid.ink.opacity(0.65))
             }
 
+            Text(page.style.onDevice
+                 ? "Cartoon and chibi are drawn by AI, with cleaner lines."
+                 : "Trying another style uses one more page.")
+                .font(Kid.bodyBold(14))
+                .foregroundStyle(Kid.ink.opacity(0.65))
+        }
+    }
+
+    /// The result's buttons, pinned above the tab bar so they are never
+    /// half hidden ("Try chibi style" was under the bar).
+    private func resultButtons(_ page: GeneratedPage) -> some View {
+        let next: PageStyle = page.style == .cartoon ? .chibi : .cartoon
+        return VStack(spacing: 10) {
             // Primary: yellow, the brush.
             Button {
                 SoundFX.shared.play(.tap)
                 Task { await openColoring(page) }
             } label: {
-                kidButton("Color it!", art: "EditorBrush", color: Kid.yellow, size: 34, height: 80)
+                kidButton("Color it!", art: "EditorBrush", color: Kid.yellow, size: wide ? 26 : 32, height: wide ? 56 : 72)
             }
             .buttonStyle(SquishyStyle())
 
@@ -322,15 +361,23 @@ struct CreatePageView: View {
             } label: {
                 kidButton(next == .chibi ? "Try chibi style" : "Try cartoon style",
                           art: next == .chibi ? "EditorChibi" : "StyleCartoon",
-                          color: Kid.lavender, size: 26, height: 64)
+                          color: Kid.lavender, size: wide ? 20 : 24, height: wide ? 46 : 56)
                     .padding(.horizontal, 16)
             }
             .buttonStyle(SquishyStyle())
-            Text(page.style.onDevice
-                 ? "Cartoon and chibi are drawn by AI, with cleaner lines."
-                 : "Trying another style uses one more page.")
-                .font(Kid.bodyBold(14))
-                .foregroundStyle(Kid.ink.opacity(0.65))
+        }
+    }
+
+    /// Back to choosing a photo, for the next page.
+    private func startOver() {
+        SoundFX.shared.play(.tap)
+        withAnimation {
+            phase = .choosing
+            prepared = nil
+            preview = nil
+            colorPhoto = nil
+            pick = nil
+            baseLines = nil
         }
     }
 

@@ -53,9 +53,10 @@ struct BookBuilderView: View {
             }
             .padding(16)
         }
-        .kidTabBarClearance()
         .background(Color(.systemGroupedBackground))
         .safeAreaInset(edge: .bottom) { mainButton }
+        // After the pinned button, so the button sits above the tab bar.
+        .kidTabBarClearance()
         .navigationTitle(editing == nil ? "Make a book" : "Edit book")
         .kidBackButton()
         .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +73,11 @@ struct BookBuilderView: View {
         }
         .sheet(isPresented: $arranging) { ArrangeSheet(selected: $selected, store: store) }
         .navigationDestination(item: $openBook) { book in BookReaderView(bookID: book.id) }
+        // Back from the book just saved goes past this form (it still held
+        // the choices, and saving again made a second book).
+        .onChange(of: openBook) { old, new in
+            if old != nil && new == nil { dismiss() }
+        }
     }
 
     // MARK: - Cover

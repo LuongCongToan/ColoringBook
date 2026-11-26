@@ -50,7 +50,6 @@ struct MyPagesView: View {
             }
             .padding(18)
         }
-        .kidTabBarClearance()
         .background(KidBackground())
         .navigationTitle(selecting ? selectionTitle : "My pages")
         .kidBackButton(hidden: selecting)
@@ -69,6 +68,15 @@ struct MyPagesView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if selecting { selectionBar }
+        }
+        .kidTabBarClearance()
+        // Select mode takes the tab bar's place, like Photos; leaving the
+        // screen (or the tab) ends it.
+        .onChange(of: selecting) { _, on in AppTabs.shared.barHidden = on }
+        .onDisappear {
+            selecting = false
+            selection = []
+            AppTabs.shared.barHidden = false
         }
         .confirmationDialog("Delete this page?",
                             isPresented: Binding(get: { single != nil }, set: { if !$0 { single = nil } }),
