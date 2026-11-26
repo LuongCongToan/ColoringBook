@@ -22,6 +22,10 @@ struct BookReaderView: View {
     @State private var exportError: String?
     @State private var arranging: ArrangeTarget?
     @State private var opening = false
+    /// The book as a video, to post (BookVideoMaker).
+    @State private var makingVideo = false
+    @State private var videoProgress = 0.0
+    @State private var video: SharedVideo?
 
     private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
 
@@ -107,6 +111,15 @@ struct BookReaderView: View {
         .toolbar {
             if let book {
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await saveVideo() }
+                    } label: {
+                        Image(systemName: "play.rectangle.fill")
+                    }
+                    .accessibilityLabel("Save video")
+                    .disabled(makingVideo || exporting || pageIDs.isEmpty)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         BookBuilderView(book: book)
                     } label: {
@@ -129,6 +142,8 @@ struct BookReaderView: View {
             }
         }
         .loading(exporting, "Making the PDF…", progress: exportProgress)
+        .loading(makingVideo, "Making the video…", progress: videoProgress)
+        .sheet(item: $video) { video in VideoShareSheet(url: video.url) }
         .loading(opening, "Opening the page…")
         .alert("Save PDF", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -164,6 +179,10 @@ struct BookReaderView: View {
             }
             if DebugBook.takeAutoSavePDF() {
                 Task { try? await Task.sleep(for: .seconds(1)); await savePDF() }
+            }
+            // `-saveVideo`: make the video as soon as a book opens.
+            if ProcessInfo.processInfo.arguments.contains("-saveVideo"), !makingVideo, video == nil {
+                Task { try? await Task.sleep(for: .seconds(1)); await saveVideo() }
             }
             #endif
         }
@@ -342,6 +361,37 @@ struct BookReaderView: View {
         coloring = PageToColor(art: art, pageID: id, saved: saved)
     }
 
+    // MARK: - Video
+
+    /// Every sheet as the reader shows it, then the video made from them
+    /// off the main thread, then the share sheet (TikTok, Instagram,
+    /// Facebook, Save Video).
+    private func saveVideo() async {
+        guard let book, !makingVideo else { return }
+        makingVideo = true
+        videoProgress = 0
+        defer { makingVideo = false }
+        var images: [CGImage] = []
+        let count = sheets.count
+        for i in 0..<count {
+            if let image = await image(at: i), let cg = image.cgImage { images.append(cg) }
+            videoProgress = 0.15 * Double(i + 1) / Double(max(count, 1))
+        }
+        let title = book.title
+        let sheetsDone = images
+        do {
+            let url = try await Task.detached(priority: .userInitiated) {
+                try await BookVideoMaker.make(sheets: sheetsDone, title: title) { p in
+                    Task { @MainActor in videoProgress = 0.15 + 0.85 * p }
+                }
+            }.value
+            SoundFX.shared.play(.sticker)
+            video = SharedVideo(url: url)
+        } catch {
+            exportError = "The video could not be made. Please try again."
+        }
+    }
+
     // MARK: - PDF
 
     /// The book as it is in the app, sheet for sheet: the cover, the name
@@ -414,4 +464,22 @@ private struct PageToColor: Identifiable, Hashable {
 
 extension Array {
     subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
+}
+
+/// A finished book video, for the share sheet.
+private struct SharedVideo: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// The system share sheet with the video file: TikTok, Instagram, Facebook,
+/// Messages, Save Video.
+private struct VideoShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

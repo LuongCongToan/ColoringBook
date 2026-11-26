@@ -11,5 +11,9 @@
 	     (docs/app-store-products.md). iOS 18+, which is why the app needs 18. -->
 	<key>SKIncludeConsumableInAppPurchaseHistory</key>
 	<true/>
+	<!-- "Save Video" in the share sheet, for the book video (BookVideoMaker):
+	     add-only, the app never reads the library this way. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Saves your coloring book videos to your photos.</string>
 </dict>
 </plist>
