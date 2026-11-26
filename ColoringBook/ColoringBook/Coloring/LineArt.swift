@@ -24,6 +24,9 @@ nonisolated struct LineArt: @unchecked Sendable {
     /// everything at working size, never painted. Nil for the built-in
     /// line frames, which children color like the rest.
     var colorFrame: CGImage? = nil
+    /// Where the drawing sits on the page, in page pixels. It is fitted to
+    /// each frame's opening, so it moves and resizes with the frame.
+    var drawing: CGRect = .zero
     /// The model's page as received, kept so the frame can be changed.
     let source: CGImage
     /// The same page as the bytes that arrived, for saving.
@@ -125,9 +128,13 @@ nonisolated struct LineArt: @unchecked Sendable {
         mask = morph(mask, width: width, height: height, radius: closeRadius, grow: false)
         mask = morph(mask, width: width, height: height, radius: 1, grow: true)
         if colorFrame != nil {
-            // A colored frame is not for painting: only the picture area
-            // inside it takes paint.
-            let inner = pictureArea(for: frame, size: size).insetBy(dx: -3, dy: -3).integral
+            // A colored frame is not for painting: only the drawing takes
+            // paint. Its own edge is the wall (a pixel inside, so no gap
+            // runs along it), so a shape left open at the drawing's edge is
+            // closed the same way whatever frame is chosen (user,
+            // 2026-11-26: a shirt open at the bottom spilled into the
+            // background with a frame whose opening left room around it).
+            let inner = art.insetBy(dx: 1, dy: 1).integral
             for y in 0..<height {
                 let inside = y >= Int(inner.minY) && y < Int(inner.maxY)
                 for x in 0..<width where !(inside && x >= Int(inner.minX) && x < Int(inner.maxX)) {
@@ -136,7 +143,7 @@ nonisolated struct LineArt: @unchecked Sendable {
             }
         }
         return LineArt(width: width, height: height, lines: lines, barrier: mask, frame: frame,
-                       colorFrame: colorFrame, source: image, sourceData: data)
+                       colorFrame: colorFrame, drawing: art, source: image, sourceData: data)
     }
 
     static let closeRadius = 3

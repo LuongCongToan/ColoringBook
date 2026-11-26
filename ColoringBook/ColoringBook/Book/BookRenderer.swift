@@ -55,6 +55,9 @@ nonisolated struct BookOptions: Sendable {
     var includeColors = false
     /// The frame around the cover and the name page (when no background).
     var coverFrame: PageFrame = .stars
+    /// Colored cover artwork (`CoverLibrary`); replaces the frame on the
+    /// cover when there is no background.
+    var coverArt: String?
     /// A picture the sheets sit on; the cover and name page always use it.
     var background: BookBackground?
     /// The pictures sit on the background too, not only the cover.
@@ -160,12 +163,13 @@ nonisolated enum BookRenderer {
     }
 
     /// The cover as a picture, for the in-app book (same design as the PDF).
-    static func coverImage(name: String, first: BookPageSource?, frame: PageFrame = .stars,
+    static func coverImage(name: String, first: BookPageSource?, frame: PageFrame = .stars, art: String? = nil,
                            background: BookBackground? = nil, scale: CGFloat = 2) -> UIImage {
         sheetImage(scale: scale) { ctx in
             var options = BookOptions()
             options.childName = name
             options.coverFrame = frame
+            options.coverArt = art
             options.background = background
             drawCover(in: ctx, name: name, first: first, options: options)
         }
@@ -396,6 +400,12 @@ nonisolated enum BookRenderer {
             titleArea = CGRect(x: box.minX + 8, y: box.minY + 18, width: box.width - 16, height: min(170, box.height * 0.28))
             artArea = CGRect(x: box.minX + 16, y: titleArea.maxY + 22,
                              width: box.width - 32, height: box.maxY - 18 - (titleArea.maxY + 22))
+        } else if let name = options.coverArt, let art = CoverLibrary.image(name) {
+            // Drawn over the whole sheet (Letter is a little taller than
+            // the 3:4 artwork; the stretch does not show).
+            art.draw(in: sheet)
+            titleArea = CoverLibrary.titleArea.scaled(to: sheet)
+            artArea = CoverLibrary.artArea.scaled(to: sheet)
         } else {
             drawFrame(options.coverFrame, in: ctx)
             titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)

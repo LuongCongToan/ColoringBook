@@ -125,14 +125,53 @@ final class ColoringSession {
     func setFrame(_ frame: FrameChoice) {
         guard frame != art.frame, let framed = art.with(frame: frame) else { return }
         record()
-        apply(framed)
+        // The drawing is fitted to each frame's opening, so it moves and
+        // resizes: paint and stickers move with it (user, 2026-11-26: fills
+        // replayed at their old spots landed in the background).
+        let from = art.drawing, to = framed.drawing
+        stickers = stickers.map { Self.move($0, from: from, to: to) }
+        apply(framed, actions: Self.move(paint.actions, from: from, to: to))
     }
 
-    private func apply(_ framed: LineArt) {
+    private func apply(_ framed: LineArt, actions: [PaintAction]) {
         art = framed
-        paint.rebuild(barrier: framed.barrier)
+        paint.rebuild(barrier: framed.barrier, actions: actions)
         pageImage = paint.layer.makeImage()
         revision += 1
+    }
+
+    /// Page pixels where the drawing sat at `from`, moved to where it sits
+    /// at `to`.
+    private static func mover(from: CGRect, to: CGRect) -> (scale: CGFloat, point: (CGPoint) -> CGPoint) {
+        guard from.width > 0, to.width > 0, from != to else { return (1, { $0 }) }
+        let s = to.width / from.width
+        return (s, { p in CGPoint(x: to.minX + (p.x - from.minX) * s, y: to.minY + (p.y - from.minY) * s) })
+    }
+
+    private static func move(_ actions: [PaintAction], from: CGRect, to: CGRect) -> [PaintAction] {
+        let (s, at) = mover(from: from, to: to)
+        guard s != 1 || from != to else { return actions }
+        return actions.map { action in
+            switch action {
+            case .fill(var op):
+                let p = at(CGPoint(x: op.x, y: op.y))
+                op.x = Int(p.x.rounded())
+                op.y = Int(p.y.rounded())
+                return .fill(op)
+            case .stroke(var stroke):
+                stroke.points = stroke.points.map(at)
+                stroke.width *= s
+                return .stroke(stroke)
+            }
+        }
+    }
+
+    private static func move(_ sticker: PlacedSticker, from: CGRect, to: CGRect) -> PlacedSticker {
+        let (s, at) = mover(from: from, to: to)
+        var moved = sticker
+        moved.center = at(sticker.center)
+        moved.size *= s
+        return moved
     }
 
     // MARK: - Fill
@@ -247,11 +286,12 @@ final class ColoringSession {
     private func restore(_ s: Snapshot) {
         var repaint = false
         if s.frame != art.frame, let framed = art.with(frame: s.frame) {
+            // The snapshot's actions already sit where its frame puts the
+            // drawing.
             art = framed
-            paint.rebuild(barrier: framed.barrier)
+            paint.rebuild(barrier: framed.barrier, actions: s.actions)
             repaint = true
-        }
-        if s.actions != paint.actions {
+        } else if s.actions != paint.actions {
             paint.set(s.actions)
             repaint = true
         }

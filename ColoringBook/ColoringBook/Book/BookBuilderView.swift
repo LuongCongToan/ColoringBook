@@ -34,6 +34,8 @@ struct BookBuilderView: View {
         var opts = BookOptions()
         opts.childName = book?.name ?? ""
         opts.coverFrame = book?.coverFrame ?? .stars
+        // New books start on the first colored cover.
+        opts.coverArt = book == nil ? CoverLibrary.names().first : book?.coverArt
         opts.belongsToPage = book?.belongsToPage ?? true
         opts.layout = book?.layout ?? .pagesOnly
         opts.background = BackgroundLibrary.named(book?.background)
@@ -106,17 +108,40 @@ struct BookBuilderView: View {
                 if options.background == nil {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(PageFrame.allCases) { frame in
+                        // Colored covers first, then the line frames.
+                        ForEach(CoverLibrary.names(), id: \.self) { name in
+                            let on = options.coverArt == name
                             Button {
                                 SoundFX.shared.play(.tap)
+                                options.coverArt = name
+                            } label: {
+                                Group {
+                                    if let image = CoverLibrary.image(name) {
+                                        Image(uiImage: image).resizable().scaledToFit()
+                                    }
+                                }
+                                .frame(width: 33, height: 42)
+                                .background(.white)
+                                .padding(3)
+                                .overlay(RoundedRectangle(cornerRadius: 8)
+                                    .strokeBorder(on ? Self.accent : Color.black.opacity(0.12), lineWidth: on ? 3 : 1))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(name.replacingOccurrences(of: "-", with: " ").capitalized) cover")
+                        }
+                        ForEach(PageFrame.allCases) { frame in
+                            let on = options.coverArt == nil && options.coverFrame == frame
+                            Button {
+                                SoundFX.shared.play(.tap)
+                                options.coverArt = nil
                                 options.coverFrame = frame
                             } label: {
                                 FramePreview(frame: .builtIn(frame))
                                     .frame(width: 48, height: 36)
                                     .padding(3)
                                     .overlay(RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(options.coverFrame == frame ? Self.accent : Color.black.opacity(0.12),
-                                                      lineWidth: options.coverFrame == frame ? 3 : 1))
+                                        .strokeBorder(on ? Self.accent : Color.black.opacity(0.12),
+                                                      lineWidth: on ? 3 : 1))
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(frame.title) frame")
@@ -135,7 +160,7 @@ struct BookBuilderView: View {
 
     /// Changes whenever the cover would look different.
     private var coverKey: String {
-        "\(options.childName)|\(options.coverFrame.rawValue)|\(options.background?.name ?? "")|\(selected.first?.uuidString ?? "")"
+        "\(options.childName)|\(options.coverFrame.rawValue)|\(options.coverArt ?? "-")|\(options.background?.name ?? "")|\(selected.first?.uuidString ?? "")"
     }
 
     private func renderCover() async {
@@ -150,7 +175,8 @@ struct BookBuilderView: View {
         }
         guard !Task.isCancelled else { return }
         coverPreview = BookRenderer.coverImage(name: options.childName, first: first,
-                                               frame: options.coverFrame, background: options.background, scale: 0.6)
+                                               frame: options.coverFrame, art: options.coverArt,
+                                               background: options.background, scale: 0.6)
     }
 
     // MARK: - Background
@@ -408,6 +434,7 @@ struct BookBuilderView: View {
         book.name = options.childName
         book.pageIDs = pageIDs
         book.coverFrame = options.coverFrame
+        book.coverArt = options.coverArt
         book.background = options.background?.name
         book.backgroundOnPages = options.backgroundOnPages
         book.belongsToPage = options.belongsToPage

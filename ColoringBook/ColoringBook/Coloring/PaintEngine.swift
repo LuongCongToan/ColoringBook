@@ -174,8 +174,11 @@ nonisolated struct PagePaint: Sendable {
 
     /// The same actions over a new barrier (a different frame): the drawing
     /// has not moved, so fills inside it land where they did before.
-    mutating func rebuild(barrier: [UInt8]) {
-        let all = actions
+    ///
+    /// - Parameter moved: the actions to replay instead, when the drawing
+    ///   moved with the frame.
+    mutating func rebuild(barrier: [UInt8], actions moved: [PaintAction]? = nil) {
+        let all = moved ?? actions
         layer = FillLayer(width: layer.width, height: layer.height, barrier: barrier)
         checkpoints = [:]
         actions = []

@@ -286,7 +286,7 @@ struct BookReaderView: View {
         default: key = "\(sheet)"
         }
         // Sheets look different on another background.
-        let look = "\(book?.background ?? "-")-\(book?.backgroundOnPages ?? true)"
+        let look = "\(book?.background ?? "-")-\(book?.backgroundOnPages ?? true)-\(book?.coverArt ?? "-")"
         if let cached = cache[key + look] { return cached }
         let result: UIImage?
         let frame = book?.coverFrame ?? .stars
@@ -295,7 +295,8 @@ struct BookReaderView: View {
         switch sheet {
         case .cover:
             let first = await source(for: pageIDs.first, photo: false)
-            result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame, background: background)
+            result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame,
+                                             art: book?.coverArt, background: background)
         case .belongsTo:
             result = BookRenderer.belongsToImage(name: book?.name ?? "", frame: frame, background: background)
         case .photo(let id):
@@ -373,6 +374,7 @@ struct BookReaderView: View {
         options.childName = book.name
         options.belongsToPage = book.belongsToPage
         options.coverFrame = book.coverFrame
+        options.coverArt = book.coverArt
         options.layout = book.layout
         options.background = BackgroundLibrary.named(book.background)
         options.backgroundOnPages = book.backgroundOnPages

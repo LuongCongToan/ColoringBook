@@ -11,6 +11,8 @@ struct StoredBook: Codable, Identifiable, Hashable {
     var created = Date()
     var updated = Date()
     var coverFrame: PageFrame = .stars
+    /// Colored cover artwork (`CoverLibrary`); nil uses `coverFrame`.
+    var coverArt: String?
     var belongsToPage = true
     /// Play a sound when a page turns.
     var pageSounds = true
@@ -44,6 +46,7 @@ struct StoredBook: Codable, Identifiable, Hashable {
         created = try c.decodeIfPresent(Date.self, forKey: .created) ?? Date()
         updated = try c.decodeIfPresent(Date.self, forKey: .updated) ?? Date()
         coverFrame = try c.decodeIfPresent(PageFrame.self, forKey: .coverFrame) ?? .stars
+        coverArt = try c.decodeIfPresent(String.self, forKey: .coverArt)
         belongsToPage = try c.decodeIfPresent(Bool.self, forKey: .belongsToPage) ?? true
         pageSounds = try c.decodeIfPresent(Bool.self, forKey: .pageSounds) ?? true
         layout = try c.decodeIfPresent(BookLayout.self, forKey: .layout) ?? .pagesOnly
