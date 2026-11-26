@@ -180,8 +180,9 @@ struct BookReaderView: View {
             if DebugBook.takeAutoSavePDF() {
                 Task { try? await Task.sleep(for: .seconds(1)); await savePDF() }
             }
-            // `-saveVideo`: make the video as soon as a book opens.
-            if ProcessInfo.processInfo.arguments.contains("-saveVideo"), !makingVideo, video == nil {
+            // `-saveVideo`: make the video as soon as the first book opens,
+            // once only (it ran for every book opened afterwards).
+            if DebugBook.takeAutoSaveVideo(), !makingVideo, video == nil {
                 Task { try? await Task.sleep(for: .seconds(1)); await saveVideo() }
             }
             #endif

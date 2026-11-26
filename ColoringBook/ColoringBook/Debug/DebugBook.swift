@@ -28,6 +28,13 @@ enum DebugBook {
         return autoSavePDFLeft
     }
 
+    /// `-saveVideo`: the same, for the book video.
+    private static var autoSaveVideoLeft = ProcessInfo.processInfo.arguments.contains("-saveVideo")
+    static func takeAutoSaveVideo() -> Bool {
+        defer { autoSaveVideoLeft = false }
+        return autoSaveVideoLeft
+    }
+
     static var wantsBookList: Bool { ProcessInfo.processInfo.arguments.contains("-bookList") }
 
     static func makeTestLibraryBook(name: String = "Mia") async -> UUID? {

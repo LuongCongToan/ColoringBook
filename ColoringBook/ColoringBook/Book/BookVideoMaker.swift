@@ -8,9 +8,9 @@ import UIKit
 /// nothing is uploaded.
 ///
 /// 1080×1920 at 30 fps (the size Reels, TikTok and Stories use). Each sheet
-/// rests a moment, then curls over to the next (Core Image's page curl);
-/// a soft paper sound plays at every turn. No music: the apps people post
-/// to let them add their own, and it keeps clear of music licences.
+/// rests a moment, then curls over to the next (Core Image's page curl).
+/// Silent: the apps people post to let them add music, and a paper sound
+/// made in code sounded odd (user, 2026-11-26).
 nonisolated enum BookVideoMaker {
     static let size = CGSize(width: 1080, height: 1920)
     static let fps: Int32 = 30
@@ -53,14 +53,10 @@ nonisolated enum BookVideoMaker {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("BookVideo", isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let silent = folder.appendingPathComponent("pages.mp4")
-        let sound = folder.appendingPathComponent("turns.m4a")
         let name = title.replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespaces)
         let output = folder.appendingPathComponent((name.isEmpty ? "Coloring Book" : name) + ".mp4")
 
-        let turns = try await writeVideo(sheets: sheets, title: title, to: silent) { progress($0 * 0.9) }
-        try writeTurnSounds(at: turns, duration: totalDuration(sheetCount: sheets.count), to: sound)
-        try await combine(video: silent, audio: sound, into: output)
+        _ = try await writeVideo(sheets: sheets, title: title, to: output, progress: progress)
         progress(1)
         return output
     }
@@ -226,63 +222,5 @@ nonisolated enum BookVideoMaker {
                 attributes: [.font: footFont, .foregroundColor: ink.withAlphaComponent(0.6), .paragraphStyle: centered],
                 context: nil)
         }.cgImage!
-    }
-
-    // MARK: - Sound
-
-    /// A soft paper swish at each turn: filtered noise under a quick swell,
-    /// made in code like the app's other sounds (no files, no licences).
-    private static func writeTurnSounds(at turns: [Double], duration: Double, to url: URL) throws {
-        let rate = 44_100.0
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1),
-              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(duration * rate) + 1),
-              let samples = buffer.floatChannelData?[0] else { throw Failure.writer }
-        buffer.frameLength = buffer.frameCapacity
-        let count = Int(buffer.frameLength)
-        for i in 0..<count { samples[i] = 0 }
-        var generator = SystemRandomNumberGenerator()
-        for start in turns {
-            let length = Int(0.55 * rate)
-            let first = Int((start + 0.05) * rate)
-            var low: Float = 0, lower: Float = 0
-            for k in 0..<length where first + k < count {
-                let t = Double(k) / Double(length)
-                // Rises fast, fades slowly: a page brushing past.
-                let envelope = Float(sin(.pi * pow(t, 0.45)) * (1 - t))
-                let noise = Float.random(in: -1...1, using: &generator)
-                low += (noise - low) * 0.25
-                lower += (low - lower) * 0.25
-                samples[first + k] += (low - lower * 0.6) * envelope * 0.55
-            }
-        }
-        let file = try AVAudioFile(forWriting: url, settings: [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: rate,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 96_000,
-        ], commonFormat: .pcmFormatFloat32, interleaved: false)
-        try file.write(from: buffer)
-    }
-
-    private static func combine(video: URL, audio: URL, into output: URL) async throws {
-        let composition = AVMutableComposition()
-        let videoAsset = AVURLAsset(url: video)
-        let audioAsset = AVURLAsset(url: audio)
-        guard let videoSource = try await videoAsset.loadTracks(withMediaType: .video).first,
-              let videoTrack = composition.addMutableTrack(withMediaType: .video,
-                                                           preferredTrackID: kCMPersistentTrackID_Invalid)
-        else { throw Failure.writer }
-        let length = try await videoAsset.load(.duration)
-        try videoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: length), of: videoSource, at: .zero)
-        if let audioSource = try await audioAsset.loadTracks(withMediaType: .audio).first,
-           let audioTrack = composition.addMutableTrack(withMediaType: .audio,
-                                                        preferredTrackID: kCMPersistentTrackID_Invalid) {
-            let audioLength = try await audioAsset.load(.duration)
-            try audioTrack.insertTimeRange(CMTimeRange(start: .zero, duration: CMTimeMinimum(length, audioLength)),
-                                           of: audioSource, at: .zero)
-        }
-        guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough)
-        else { throw Failure.writer }
-        try await export.export(to: output, as: .mp4)
     }
 }
