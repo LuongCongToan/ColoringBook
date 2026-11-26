@@ -262,10 +262,8 @@ struct CreatePageView: View {
                     }
                 }
             }
-            if style.onDevice {
-                inkPicker(for: style) { sketchInk = $0 }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            // Line color is chosen on the result screen only, for every style
+            // (user, 2026-11-26): the pre-draw picker for Sketch was a duplicate.
         }
     }
 
