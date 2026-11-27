@@ -22,6 +22,10 @@ final class ColoringSession {
     private(set) var art: LineArt
     var tool: Tool = .fill { didSet { if tool != .sticker { selectedSticker = nil } } }
     var color: RGBA = Palette.colors[0]
+    /// What the brush draws with: plain paint, crayon or glitter.
+    var brushKind: BrushKind = .pen
+    /// What the bucket pours: plain paint (nil) or a pattern.
+    var pattern: FillPattern?
     /// Index into `sizes(for:)`, remembered per tool.
     var sizeIndex: [Tool: Int] = [.brush: 1, .rainbow: 2, .eraser: 2]
     private(set) var stickers: [PlacedSticker] = []
@@ -116,7 +120,7 @@ final class ColoringSession {
     /// The ink a stroke made now would use, or nil for tools that do not draw.
     var currentInk: Stroke.Ink? {
         switch tool {
-        case .brush: .solid(color)
+        case .brush: brushKind.ink(color)
         case .rainbow: .rainbow
         case .eraser: .eraser
         case .fill, .sticker, .frame: nil
@@ -188,7 +192,7 @@ final class ColoringSession {
         guard !stickers.contains(where: { $0.contains(pagePoint: point) }),
               let (x, y) = paint.layer.seed(nearX: Int(point.x), y: Int(point.y)) else { return }
         record()
-        paint.apply(.fill(FillOp(x: x, y: y, color: color)))
+        paint.apply(.fill(FillOp(x: x, y: y, color: color, pattern: pattern)))
         pageImage = paint.layer.makeImage()
         lastFill = ((lastFill?.serial ?? 0) + 1, CGPoint(x: x, y: y))
         revision += 1

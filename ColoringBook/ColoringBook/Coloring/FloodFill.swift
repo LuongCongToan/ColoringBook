@@ -26,6 +26,9 @@ nonisolated struct FillOp: Hashable, Codable, Sendable {
     var x: Int
     var y: Int
     var color: RGBA
+    /// Poured as a pattern of `color` instead of plain paint. Nil in pages
+    /// saved before patterns, which decode as plain.
+    var pattern: FillPattern? = nil
 }
 
 /// A fillable bitmap: the barrier that stops paint, the paint itself, and a
@@ -106,12 +109,19 @@ nonisolated struct FillLayer: Sendable {
     /// still count as "the same paint" when refilling.
     static let tolerance = 48
 
+    /// The alpha a patterned fill leaves on its pixels (plain paint has 255,
+    /// paper and the soft edges of strokes less). A pattern has two colors,
+    /// so color alone could not tell its pixels apart from others; this way
+    /// a tap on a pattern takes the whole pattern, both colors.
+    static let patternAlpha: UInt8 = 254
+
     /// Paints the region around the op's pixel, the way a paint bucket does:
     ///
     /// - Tapping unpainted paper fills every unpainted pixel in the region
     ///   and slides the color *under* brush strokes already there, so they
     ///   stay, with their soft edges, and act as borders.
     /// - Tapping paint (an earlier fill or a stroke) recolors only that paint.
+    /// - Tapping a pattern recolors the whole pattern.
     ///
     /// Lines from the page always stop the paint. Returns false when the
     /// pixel is a line, so nothing was painted.
@@ -123,19 +133,25 @@ nonisolated struct FillLayer: Sendable {
         let color = op.color
         let bleed = Self.bleed
         let tolerance = Self.tolerance
+        let tag = Self.patternAlpha
+        let pattern = op.pattern
+        let (base, accent) = FillPattern.colors(for: color)
 
         return barrier.withUnsafeBufferPointer { wall -> Bool in
             guard wall[start] == 0 else { return false }
             return scratch.withUnsafeMutableBufferPointer { mark -> Bool in
                 rgba.withUnsafeMutableBufferPointer { paint -> Bool in
                     let s = start * 4
-                    // Paper (or the soft edge of a stroke) versus solid paint.
-                    let onPaper = paint[s + 3] < 255
+                    // Paper (or the soft edge of a stroke), a pattern, or
+                    // solid paint.
+                    let onPaper = paint[s + 3] < tag
+                    let onPattern = paint[s + 3] == tag
                     let seed = (Int(paint[s]), Int(paint[s + 1]), Int(paint[s + 2]))
 
                     func matches(_ i: Int) -> Bool {
                         let p = i * 4
-                        if onPaper { return paint[p + 3] < 255 }
+                        if onPaper { return paint[p + 3] < tag }
+                        if onPattern { return paint[p + 3] == tag }
                         return paint[p + 3] == 255
                             && abs(Int(paint[p]) - seed.0) <= tolerance
                             && abs(Int(paint[p + 1]) - seed.1) <= tolerance
@@ -145,17 +161,28 @@ nonisolated struct FillLayer: Sendable {
 
                     func put(_ i: Int) {
                         let p = i * 4
+                        // This pixel's color: the paint, or its spot in the pattern.
+                        var c = (Int(color.r), Int(color.g), Int(color.b))
+                        if let pattern {
+                            let m = pattern.coverage(x: i % w, y: i / w)
+                            func mix(_ a: UInt8, _ b: UInt8) -> Int { Int(Float(a) + (Float(b) - Float(a)) * m + 0.5) }
+                            c = (mix(base.r, accent.r), mix(base.g, accent.g), mix(base.b, accent.b))
+                        }
                         if onPaper {
                             // Premultiplied "under": existing paint stays on top.
                             let a = Int(paint[p + 3])
                             let k = 255 - a
-                            paint[p] = UInt8(Int(paint[p]) + Int(color.r) * k / 255)
-                            paint[p + 1] = UInt8(Int(paint[p + 1]) + Int(color.g) * k / 255)
-                            paint[p + 2] = UInt8(Int(paint[p + 2]) + Int(color.b) * k / 255)
-                            paint[p + 3] = 255
+                            c = (Int(paint[p]) + c.0 * k / 255, Int(paint[p + 1]) + c.1 * k / 255,
+                                 Int(paint[p + 2]) + c.2 * k / 255)
+                        }
+                        if pattern == nil {
+                            paint[p] = UInt8(c.0); paint[p + 1] = UInt8(c.1)
+                            paint[p + 2] = UInt8(c.2); paint[p + 3] = 255
                         } else {
-                            paint[p] = color.r; paint[p + 1] = color.g
-                            paint[p + 2] = color.b; paint[p + 3] = color.a
+                            // Premultiplied at the pattern's alpha.
+                            let t = Int(tag)
+                            paint[p] = UInt8(c.0 * t / 255); paint[p + 1] = UInt8(c.1 * t / 255)
+                            paint[p + 2] = UInt8(c.2 * t / 255); paint[p + 3] = tag
                         }
                     }
 

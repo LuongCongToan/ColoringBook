@@ -9,6 +9,10 @@ nonisolated struct Stroke: Hashable, Codable, Sendable {
         case rainbow
         /// Clears paint and bucket fills alike, back to white paper.
         case eraser
+        /// Wax on paper: the color with the paper's grain showing through.
+        case crayon(RGBA)
+        /// The color sprinkled with flecks and twinkles.
+        case glitter(RGBA)
     }
 
     var ink: Ink
@@ -52,41 +56,63 @@ nonisolated enum StrokeRenderer {
     ///     eraser shows white paper. In the page bitmap it clears instead.
     static func draw(_ stroke: Stroke, in ctx: CGContext, scale: CGFloat = 1, live: Bool = false) {
         guard let first = stroke.points.first else { return }
-        let width = stroke.width * scale
+        let width = stroke.width
         ctx.saveGState()
         defer { ctx.restoreGState() }
+        // Everything below is in page pixels.
+        ctx.scaleBy(x: scale, y: scale)
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
         ctx.setLineWidth(width)
-        let p = { (pt: CGPoint) in CGPoint(x: pt.x * scale, y: pt.y * scale) }
+        let dot = CGRect(x: first.x - width / 2, y: first.y - width / 2, width: width, height: width)
 
-        switch stroke.ink {
-        case .solid, .eraser:
-            let color: CGColor
-            if case .solid(let ink) = stroke.ink {
-                color = CGColor(srgbRed: CGFloat(ink.r) / 255, green: CGFloat(ink.g) / 255,
-                                blue: CGFloat(ink.b) / 255, alpha: 1)
-            } else {
-                // Live, the eraser shows white paper; in the page it clears.
-                color = CGColor(gray: 1, alpha: 1)
-                if !live { ctx.setBlendMode(.clear) }
-            }
-            ctx.setStrokeColor(color)
-            ctx.setFillColor(color)
+        /// The stroke's shape filled or stroked in the current color.
+        func paintShape() {
             if stroke.points.count == 1 {
                 // A tap leaves a dot.
-                let c = p(first)
-                ctx.fillEllipse(in: CGRect(x: c.x - width / 2, y: c.y - width / 2, width: width, height: width))
-                return
+                ctx.fillEllipse(in: dot)
+            } else {
+                ctx.addPath(smoothPath(stroke.points))
+                ctx.strokePath()
             }
-            ctx.addPath(smoothPath(stroke.points.map(p)))
-            ctx.strokePath()
+        }
+
+        switch stroke.ink {
+        case .solid(let ink):
+            ctx.setStrokeColor(ink.cgColor)
+            ctx.setFillColor(ink.cgColor)
+            paintShape()
+
+        case .eraser:
+            // Live, the eraser shows white paper; in the page it clears.
+            ctx.setStrokeColor(CGColor(gray: 1, alpha: 1))
+            ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+            if !live { ctx.setBlendMode(.clear) }
+            paintShape()
+
+        case .glitter(let ink):
+            ctx.setStrokeColor(ink.cgColor)
+            ctx.setFillColor(ink.cgColor)
+            paintShape()
+            Glitter.drawFlecks(of: stroke, color: ink, in: ctx)
+
+        case .crayon(let ink):
+            // The shape in a layer of its own, then only the grain's share
+            // of it kept, so the paper shows through in specks.
+            ctx.clip(to: bounds(of: stroke))
+            ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+            ctx.setStrokeColor(ink.cgColor)
+            ctx.setFillColor(ink.cgColor)
+            paintShape()
+            ctx.setBlendMode(.destinationIn)
+            let tile = CGFloat(Crayon.tile)
+            ctx.draw(Crayon.grain, in: CGRect(x: 0, y: 0, width: tile, height: tile), byTiling: true)
+            ctx.endTransparencyLayer()
 
         case .rainbow:
             if stroke.points.count == 1 {
-                let c = p(first)
                 ctx.setFillColor(Rainbow.color(at: 0, width: stroke.width))
-                ctx.fillEllipse(in: CGRect(x: c.x - width / 2, y: c.y - width / 2, width: width, height: width))
+                ctx.fillEllipse(in: dot)
                 return
             }
             // Short segments, each in the color for its place along the
@@ -96,8 +122,8 @@ nonisolated enum StrokeRenderer {
                 let a = stroke.points[i - 1], b = stroke.points[i]
                 let step = hypot(b.x - a.x, b.y - a.y)
                 ctx.setStrokeColor(Rainbow.color(at: distance + step / 2, width: stroke.width))
-                ctx.move(to: p(a))
-                ctx.addLine(to: p(b))
+                ctx.move(to: a)
+                ctx.addLine(to: b)
                 ctx.strokePath()
                 distance += step
             }
@@ -130,7 +156,9 @@ nonisolated enum StrokeRenderer {
             minX = min(minX, p.x); maxX = max(maxX, p.x)
             minY = min(minY, p.y); maxY = max(maxY, p.y)
         }
-        let pad = stroke.width / 2 + 2
+        // Glitter's twinkles may poke out past the line.
+        let reach: CGFloat = if case .glitter = stroke.ink { Glitter.pad } else { 0.5 }
+        let pad = stroke.width * reach + 2
         return CGRect(x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad)
     }
 }

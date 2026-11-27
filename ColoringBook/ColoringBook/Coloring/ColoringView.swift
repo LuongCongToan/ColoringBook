@@ -91,6 +91,19 @@ struct ColoringView: View {
             if args.contains("-stickers"), session.stickers.isEmpty {
                 for kind in [StickerKind.unicorn, .rainbow, .cupcake] { session.addSticker(kind) }
             }
+            // `-demoStrokes`: a crayon and a glitter wave across the page
+            // (the agent's taps cannot draw).
+            if args.contains("-demoStrokes") {
+                let w = CGFloat(session.art.width), h = CGFloat(session.art.height)
+                for (i, ink) in [Stroke.Ink.crayon(Palette.colors[6]), .glitter(Palette.colors[8])].enumerated() {
+                    let y = h * (0.4 + 0.25 * CGFloat(i))
+                    let points = stride(from: w * 0.1, through: w * 0.9, by: 6).map {
+                        CGPoint(x: $0, y: y + sin($0 / 70) * 50)
+                    }
+                    session.commit(Stroke(ink: ink, width: 70, points: points))
+                }
+                session.tool = .brush
+            }
             #endif
             // A page just made from a photo goes into "My pages" right away.
             PageStore.shared.save(session)
@@ -164,6 +177,9 @@ private struct BottomPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ToolRail(session: session, axis: .horizontal)
+            if session.tool.hasKinds {
+                KindPicker(session: session, axis: .horizontal)
+            }
             if session.tool.usesSize {
                 PanelTitle(text: session.tool.sizeTitle)
                 SizePicker(session: session, axis: .horizontal)
@@ -194,6 +210,10 @@ private struct SidePanel: View {
         // reachable on a short landscape screen (they were cut off).
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 10) {
+                if session.tool.hasKinds {
+                    PanelTitle(text: session.tool.kindsTitle)
+                    KindPicker(session: session, axis: .vertical)
+                }
                 if session.tool.usesSize {
                     PanelTitle(text: session.tool.sizeTitle)
                     SizePicker(session: session, axis: .vertical)
@@ -360,6 +380,11 @@ private extension ColoringSession.Tool {
         }
     }
 
+    /// Brush and bucket each come in kinds (crayon, glitter; patterns).
+    var hasKinds: Bool { self == .brush || self == .fill }
+
+    var kindsTitle: String { self == .fill ? "Patterns" : "Brushes" }
+
     var sizeTitle: String {
         switch self {
         case .eraser: "Eraser size"
@@ -446,6 +471,179 @@ private struct SizePicker: View {
                 .fill(Color(uiColor: session.color.uiColor))
                 .overlay(Circle().strokeBorder(Color.black.opacity(0.1), lineWidth: 1))
                 .frame(width: diameter, height: diameter)
+        }
+    }
+}
+
+// MARK: - Kinds
+
+/// The brush's kinds (plain, crayon, glitter) or the bucket's patterns, each
+/// drawn in the chosen color by the same code that paints the page, so the
+/// button shows exactly what a stroke or a tap will make.
+private struct KindPicker: View {
+    let session: ColoringSession
+    let axis: Axis
+
+    private struct Option: Identifiable {
+        let id: String
+        let label: String
+        let selected: Bool
+        let image: UIImage
+        let pick: () -> Void
+    }
+
+    private var options: [Option] {
+        let color = session.color
+        if session.tool == .fill {
+            return ([nil] + FillPattern.allCases.map(Optional.some)).map { pattern in
+                Option(id: pattern?.rawValue ?? "plain", label: pattern?.accessibilityName ?? "Plain paint",
+                       selected: session.pattern == pattern,
+                       image: KindPreview.pattern(pattern, color: color)) { session.pattern = pattern }
+            }
+        }
+        return BrushKind.allCases.map { kind in
+            Option(id: kind.rawValue, label: kind.accessibilityName, selected: session.brushKind == kind,
+                   image: KindPreview.brush(kind, color: color)) { session.brushKind = kind }
+        }
+    }
+
+    var body: some View {
+        let options = options
+        Group {
+            if axis == .horizontal {
+                // Centered like the sizes; scrolls on a narrow phone.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { buttons(options) }
+                        .frame(maxWidth: .infinity)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) { buttons(options) }
+                            .padding(.horizontal, 13)
+                    }
+                }
+            } else {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(56), spacing: 4), count: 3), spacing: 4) {
+                    buttons(options)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .sensoryFeedback(.selection, trigger: session.brushKind)
+        .sensoryFeedback(.selection, trigger: session.pattern)
+    }
+
+    @ViewBuilder private func buttons(_ options: [Option]) -> some View {
+        ForEach(options) { option in
+            Button {
+                SoundFX.shared.play(.tap)
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { option.pick() }
+            } label: {
+                Image(uiImage: option.image)
+                    .resizable()
+                    .frame(width: 42, height: 42)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                    .shadow(color: .black.opacity(0.14), radius: 2, y: 1.5)
+                    .frame(width: 52, height: 52)
+                    .background(Circle().strokeBorder(option.selected ? Kid.ink : .clear, lineWidth: 3))
+                    .scaleEffect(option.selected ? 1.06 : 1)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(option.label)
+            .accessibilityAddTraits(option.selected ? .isSelected : [])
+        }
+    }
+}
+
+/// The pictures on the kind buttons, made once per kind and color.
+private enum KindPreview {
+    /// 42 pt at 3×.
+    private static let side = 126
+    private static var cache: [String: UIImage] = [:]
+
+    private static func key(_ name: String, _ c: RGBA) -> String { "\(name)-\(c.r)-\(c.g)-\(c.b)" }
+
+    /// A circle of the bucket's paint, plain or patterned, with one heart,
+    /// star or dot right in the middle.
+    static func pattern(_ pattern: FillPattern?, color: RGBA) -> UIImage {
+        let id = key(pattern?.rawValue ?? "plain", color)
+        if let image = cache[id] { return image }
+        let (base, mark) = FillPattern.colors(for: color)
+        let shift = Int(pattern.map(FillPattern.cellSize) ?? 0) / 2 - side / 2
+        var pixels = [UInt8](repeating: 255, count: side * side * 4)
+        for y in 0..<side {
+            for x in 0..<side {
+                let m = pattern?.coverage(x: x + shift, y: y + shift) ?? 0
+                let i = (y * side + x) * 4
+                pixels[i] = UInt8(Float(base.r) + (Float(mark.r) - Float(base.r)) * m)
+                pixels[i + 1] = UInt8(Float(base.g) + (Float(mark.g) - Float(base.g)) * m)
+                pixels[i + 2] = UInt8(Float(base.b) + (Float(mark.b) - Float(base.b)) * m)
+            }
+        }
+        let paint = CGDataProvider(data: Data(pixels) as CFData).flatMap {
+            CGImage(width: side, height: side, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: side * 4,
+                    space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                    bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                    provider: $0, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        }
+        let image = render { _ in
+            paint.map { UIImage(cgImage: $0).draw(in: CGRect(x: 0, y: 0, width: side, height: side)) }
+        }
+        cache[id] = image
+        return image
+    }
+
+    /// A short wavy stroke of the brush on paper.
+    static func brush(_ kind: BrushKind, color: RGBA) -> UIImage {
+        let id = key(kind.rawValue, color)
+        if let image = cache[id] { return image }
+        // Drawn a little larger and shrunk, so the crayon's grain and the
+        // glitter's flecks come out as they look on a page.
+        let zoom: CGFloat = 0.7
+        let s = CGFloat(side) / zoom
+        let points = stride(from: s * 0.1, through: s * 0.9, by: 3).map { x in
+            CGPoint(x: x, y: s / 2 + sin((x - s * 0.1) / (s * 0.8) * 2 * .pi) * s * 0.14)
+        }
+        let image = render { cg in
+            // Grey paper so a white stroke still shows.
+            UIColor(white: color == .white ? 0.82 : 1, alpha: 1).setFill()
+            UIRectFill(CGRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(side)))
+            StrokeRenderer.draw(Stroke(ink: kind.ink(color), width: s * 0.24, points: points), in: cg, scale: zoom)
+        }
+        cache[id] = image
+        return image
+    }
+
+    private static func render(_ body: (CGContext) -> Void) -> UIImage {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 3
+        let size = CGSize(width: CGFloat(side) / 3, height: CGFloat(side) / 3)
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            // Drawn in pixels.
+            context.cgContext.scaleBy(x: 1.0 / 3, y: 1.0 / 3)
+            body(context.cgContext)
+        }
+    }
+}
+
+private extension FillPattern {
+    var accessibilityName: String {
+        switch self {
+        case .stripes: "Stripes"
+        case .dots: "Polka dots"
+        case .hearts: "Hearts"
+        case .stars: "Stars"
+        case .checks: "Checks"
+        }
+    }
+}
+
+private extension BrushKind {
+    var accessibilityName: String {
+        switch self {
+        case .pen: "Plain brush"
+        case .crayon: "Crayon"
+        case .glitter: "Glitter"
         }
     }
 }
