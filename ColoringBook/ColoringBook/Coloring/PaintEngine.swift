@@ -97,13 +97,24 @@ nonisolated enum StrokeRenderer {
             Glitter.drawFlecks(of: stroke, color: ink, in: ctx)
 
         case .crayon(let ink):
-            // The shape in a layer of its own, then only the grain's share
-            // of it kept, so the paper shows through in specks.
+            // The shape in a layer of its own: a faint outer band and a
+            // full core, for a fuzzy edge. Then only the grain's share of it
+            // is kept.
             ctx.clip(to: bounds(of: stroke))
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+            ctx.setStrokeColor(ink.cgColor.copy(alpha: 0.6) ?? ink.cgColor)
+            ctx.setFillColor(ink.cgColor.copy(alpha: 0.6) ?? ink.cgColor)
+            paintShape()
+            let core = width * 0.84
+            ctx.setLineWidth(core)
             ctx.setStrokeColor(ink.cgColor)
             ctx.setFillColor(ink.cgColor)
-            paintShape()
+            if stroke.points.count == 1 {
+                ctx.fillEllipse(in: CGRect(x: first.x - core / 2, y: first.y - core / 2, width: core, height: core))
+            } else {
+                ctx.addPath(smoothPath(stroke.points))
+                ctx.strokePath()
+            }
             ctx.setBlendMode(.destinationIn)
             let tile = CGFloat(Crayon.tile)
             ctx.draw(Crayon.grain, in: CGRect(x: 0, y: 0, width: tile, height: tile), byTiling: true)

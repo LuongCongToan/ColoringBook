@@ -129,9 +129,10 @@ extension RGBA {
     }
 }
 
-/// Crayon: the stroke shows the paper's tooth, little gaps where the wax
-/// skipped. The grain sits fixed on the page, so going over a spot again
-/// darkens it but keeps the texture, as a real crayon does.
+/// Crayon: soft, a little see-through wax with a streaky grain and a
+/// fuzzy edge, never white specks (with specks it looked like glitter,
+/// user 2026-11-27). The grain sits fixed on the page, so going over a spot
+/// again darkens it but keeps the texture, as a real crayon does.
 nonisolated enum Crayon {
     /// Page pixels per tile of grain.
     static let tile = 256
@@ -148,26 +149,28 @@ nonisolated enum Crayon {
             h ^= h >> 31
             return Float(h >> 40) / Float(1 << 24)
         }
-        /// Smooth noise on a grid of `cell` pixels, wrapping at the tile.
-        func noise(_ x: Int, _ y: Int, cell: Int, seed: UInt64) -> Float {
-            let gx = x / cell, gy = y / cell
-            let fx = Float(x % cell) / Float(cell), fy = Float(y % cell) / Float(cell)
+        /// Smooth noise on a grid of `cw` × `ch` pixels, wrapping at the tile.
+        func noise(_ x: Int, _ y: Int, cw: Int, ch: Int, seed: UInt64) -> Float {
+            let gx = x / cw, gy = y / ch
+            let fx = Float(x % cw) / Float(cw), fy = Float(y % ch) / Float(ch)
             let sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy)
-            let w = n / cell
-            func at(_ i: Int, _ j: Int) -> Float { hash((i % w) * cell, (j % w) * cell, seed) }
+            let wx = n / cw, wy = n / ch
+            func at(_ i: Int, _ j: Int) -> Float { hash((i % wx) * cw, (j % wy) * ch, seed) }
             let top = at(gx, gy) * (1 - sx) + at(gx + 1, gy) * sx
             let bottom = at(gx, gy + 1) * (1 - sx) + at(gx + 1, gy + 1) * sx
             return top * (1 - sy) + bottom * sy
         }
         for y in 0..<n {
             for x in 0..<n {
-                let fine = hash(x, y, 1)
-                let medium = noise(x, y, cell: 4, seed: 2)
-                let coarse = noise(x, y, cell: 32, seed: 3)
-                let tooth = 0.45 * medium + 0.3 * fine + 0.25 * coarse
-                // Mostly wax, with specks of paper.
-                let t = min(max((tooth - 0.2) / 0.28, 0), 1)
-                let wax = 0.2 + 0.76 * t * t * (3 - 2 * t)
+                // Long thin streaks over a little paper tooth and soft
+                // clumps.
+                let streak = noise((x + y) % n, y, cw: 32, ch: 2, seed: 2)
+                let tooth = noise(x, y, cw: 4, ch: 4, seed: 4)
+                let clumps = noise(x, y, cw: 64, ch: 64, seed: 3)
+                let v = 0.5 * streak + 0.25 * tooth + 0.25 * clumps
+                // Never bare paper: lighter and darker wax.
+                let t = min(max((v - 0.25) / 0.45, 0), 1)
+                let wax = 0.42 + 0.53 * t * t * (3 - 2 * t)
                 // Black at that alpha: only the alpha is used.
                 pixels[(y * n + x) * 4 + 3] = UInt8(wax * 255)
             }
@@ -194,7 +197,7 @@ nonisolated enum Glitter {
     /// How far flecks reach from the middle of the line, as a share of its
     /// width, and how far a twinkle may poke out past that.
     static let reach: CGFloat = 0.42
-    static let pad: CGFloat = 0.65
+    static let pad: CGFloat = 0.75
 
     static func flecks(for stroke: Stroke) -> [Fleck] {
         guard let first = stroke.points.first else { return [] }
@@ -217,10 +220,10 @@ nonisolated enum Glitter {
                 let radius = next().squareRoot() * w * reach
                 let center = CGPoint(x: p.x + cos(angle) * radius, y: p.y + sin(angle) * radius)
                 let pick = next(), grow = next()
-                if pick < 0.08 {
-                    flecks.append(Fleck(kind: .twinkle, center: center, size: max(5, w * (0.2 + 0.14 * grow))))
+                if pick < 0.16 {
+                    flecks.append(Fleck(kind: .twinkle, center: center, size: max(7, w * (0.26 + 0.16 * grow))))
                 } else {
-                    flecks.append(Fleck(kind: pick < 0.8 ? .light : .dark, center: center,
+                    flecks.append(Fleck(kind: pick < 0.86 ? .light : .dark, center: center,
                                         size: max(1.2, w * (0.025 + 0.03 * grow))))
                 }
             }
@@ -248,8 +251,20 @@ nonisolated enum Glitter {
         return flecks
     }
 
-    /// Draws the flecks over the stroke, in page coordinates.
+    /// Draws the shine and the flecks over the stroke, in page coordinates.
     static func drawFlecks(of stroke: Stroke, color: RGBA, in ctx: CGContext) {
+        // A lighter core, so the line looks glossy, like glitter glue.
+        let shine = color.mixed(with: .white, 0.22).cgColor
+        ctx.setStrokeColor(shine)
+        ctx.setFillColor(shine)
+        let core = stroke.width * 0.5
+        if stroke.points.count == 1, let p = stroke.points.first {
+            ctx.fillEllipse(in: CGRect(x: p.x - core / 2, y: p.y - core / 2, width: core, height: core))
+        } else {
+            ctx.setLineWidth(core)
+            ctx.addPath(StrokeRenderer.smoothPath(stroke.points))
+            ctx.strokePath()
+        }
         let flecks = flecks(for: stroke)
         let light = color.mixed(with: .white, 0.8).cgColor
         let dark = color.mixed(with: RGBA(0, 0, 0), 0.18).cgColor
