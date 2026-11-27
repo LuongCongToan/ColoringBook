@@ -2,11 +2,11 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
-/// A frame around the page: one drawn in code, or artwork from PNG files made
-/// to docs/frame-art-spec.md.
+/// A frame around the page: one drawn in code, or artwork from image files
+/// made to docs/frame-art-spec.md.
 nonisolated enum FrameChoice: Hashable, Codable, Sendable, Identifiable {
     case builtIn(PageFrame)
-    /// The name in `frame-<name>-landscape.png` / `-portrait.png`.
+    /// The name in `frame-<name>-landscape.heic` / `-portrait.heic`.
     case image(String)
 
     static let `default` = FrameChoice.builtIn(.plain)
@@ -26,8 +26,10 @@ nonisolated enum FrameChoice: Hashable, Codable, Sendable, Identifiable {
     }
 }
 
-/// Frame artwork from PNG files: colored, transparent in the middle,
-/// 1600×1200 and 1200×1600 (docs/frame-art-spec.md). The picture goes in the
+/// Frame artwork: colored, transparent in the middle, 1600×1200 and
+/// 1200×1600 (docs/frame-art-spec.md). Shipped as HEIC with alpha, a fifth
+/// the size of the artist's PNG (Tools/pack-frames.sh); PNG still works, for
+/// frames being tried out. The picture goes in the
 /// transparent opening, measured from each file (`FrameLibrary.opening`).
 nonisolated struct ImageFrame: Sendable, Hashable {
     let name: String
@@ -99,12 +101,14 @@ nonisolated enum FrameLibrary {
         imageFrames().first { $0.name == name }
     }
 
-    /// Pairs of `frame-<name>-landscape.png` and `frame-<name>-portrait.png`.
-    /// A frame missing either orientation is left out.
+    static let fileTypes = ["heic", "png"]
+
+    /// Pairs of `frame-<name>-landscape` and `frame-<name>-portrait` files
+    /// (HEIC or PNG). A frame missing either orientation is left out.
     static func imageFrames() -> [ImageFrame] {
-        var urls = Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: nil) ?? []
+        var urls = fileTypes.flatMap { Bundle.main.urls(forResourcesWithExtension: $0, subdirectory: nil) ?? [] }
         #if DEBUG && targetEnvironment(simulator)
-        urls += devFolderPNGs()
+        urls += devFolderFiles()
         #endif
         var landscape: [String: URL] = [:], portrait: [String: URL] = [:]
         for url in urls {
@@ -126,7 +130,7 @@ nonisolated enum FrameLibrary {
     #if DEBUG && targetEnvironment(simulator)
     /// Frames dropped into `tempdrawing_img/` at the repo root, to try new
     /// artwork without adding it to the app.
-    private static func devFolderPNGs() -> [URL] {
+    private static func devFolderFiles() -> [URL] {
         let folder = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()  // Coloring
             .deletingLastPathComponent()  // ColoringBook (sources)
@@ -134,7 +138,7 @@ nonisolated enum FrameLibrary {
             .deletingLastPathComponent()  // repo root
             .appendingPathComponent("tempdrawing_img")
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-        return files.filter { $0.pathExtension.lowercased() == "png" }
+        return files.filter { fileTypes.contains($0.pathExtension.lowercased()) }
     }
     #endif
 

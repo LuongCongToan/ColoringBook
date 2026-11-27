@@ -24,6 +24,7 @@ Mỗi khung gồm **2 file PNG**:
 - Không nhỏ hơn cỡ trên: khi in, khung được phóng gần gấp đôi.
 - `<tên>` viết thường, không dấu, nối bằng gạch ngang, ví dụ `frame-dinosaurs-landscape.png`.
 - Bản dọc **không** phải là bản ngang xoay 90°. Phải sắp xếp lại họa tiết cho cạnh dài và cạnh ngắn.
+- Giao PNG vào `rawassets/coloring_frames/`. App không dùng PNG trực tiếp: chạy `Tools/pack-frames.sh` để chuyển sang HEIC (giữ trong suốt, nhỏ khoảng 5 lần) vào `ColoringBook/ColoringBook/Frames/`.
 
 ## 3. Vùng vẽ (đo trên file 1600×1200; bản dọc đổi chỗ chiều ngang và chiều dọc)
 

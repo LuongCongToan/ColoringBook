@@ -8,7 +8,7 @@ import SwiftUI
     let page = DevSamples.pages().first.flatMap { try? Data(contentsOf: $0.url) }
     ScrollView {
         VStack(spacing: 16) {
-            if frames.isEmpty { Text("No frame-*-landscape/portrait.png pairs found") }
+            if frames.isEmpty { Text("No frame-*-landscape/portrait pairs found") }
             ForEach(frames, id: \.name) { frame in
                 Text(frame.name).font(.headline)
                 if let page, let art = try? LineArt.load(page, frame: .image(frame.name)) {

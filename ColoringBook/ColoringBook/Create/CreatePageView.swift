@@ -16,6 +16,8 @@ struct CreatePageView: View {
     @State private var phase: Phase = .choosing
     @State private var askConsent = false
     @State private var coloring: ArtToColor?
+    /// Turning the page into lines to color after "Color it!" (1–2 s).
+    @State private var opening = false
     @State private var showPlans = false
     /// Guideline 5.1.2(i): ask before the first photo leaves the device
     /// (docs/privacy.md). Kept per install.
@@ -124,6 +126,7 @@ struct CreatePageView: View {
                 Task { await draw() }
             }
         }
+        .loading(opening, "Opening the page…")
         .navigationDestination(item: $coloring) { item in
             ColoringView(art: item.art, photo: item.photo)
         }
@@ -490,6 +493,9 @@ struct CreatePageView: View {
     }
 
     private func openColoring(_ page: GeneratedPage) async {
+        guard !opening else { return }
+        opening = true
+        defer { opening = false }
         guard let art = try? await lineArt(page.imageData) else {
             phase = .failed("This page could not be opened. Try drawing it again.")
             return

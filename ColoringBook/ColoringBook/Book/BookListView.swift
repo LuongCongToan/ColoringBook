@@ -172,37 +172,26 @@ struct BookListView: View {
 }
 
 /// A book on a shelf, as in the design (measured 148 × 152 pt): a thick
-/// colored cover, the title at the top of the white page, the first page as
-/// the picture, a wavy strip along the bottom, a darker spine on the left.
+/// colored cover with a darker spine on the left, and on it the book's real
+/// cover, as the reader and the PDF show it (`ShelfCovers`).
 struct BookShelfCover: View {
     let book: StoredBook
     let pages: PageStore
     var tint: Color = Kid.lavender
 
+    @State private var cover: UIImage?
+
     var body: some View {
         let first = book.pageIDs.lazy.compactMap { id in pages.pages.first { $0.id == id } }.first
-        VStack(spacing: 2) {
-            // Design sheet: Fredoka SemiBold 16 pt, #28145C.
-            Text(book.title)
-                .font(Kid.title(16, relativeTo: .caption))
-                .foregroundStyle(Kid.ink)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .lineSpacing(-3)
-                .minimumScaleFactor(0.8)
-                .frame(height: 38)
-            AsyncImage(url: first?.thumbnail) { image in
-                image.resizable().scaledToFit()
-            } placeholder: {
-                Image(systemName: "book.closed").font(.largeTitle).foregroundStyle(Kid.ink.opacity(0.3))
+        Group {
+            if let cover {
+                Image(uiImage: cover).resizable().scaledToFit()
+            } else {
+                Image("HomeBook").resizable().scaledToFit().opacity(0.25).padding(20)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 6)
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.white))
-        .overlay(alignment: .bottom) { Waves(color: tint.opacity(0.45)).frame(height: 10) }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .padding(.leading, 13)
         .padding([.top, .trailing], 8)
@@ -215,29 +204,66 @@ struct BookShelfCover: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous)))
         .shadow(color: tint.opacity(0.4), radius: 5, y: 4)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(book.title)
-    }
-}
-
-/// A row of soft scallops, like the bottom edge of the design's covers.
-private struct Waves: View {
-    let color: Color
-
-    var body: some View {
-        GeometryReader { g in
-            let r = g.size.height
-            Path { p in
-                p.move(to: CGPoint(x: 0, y: g.size.height))
-                var x: CGFloat = 0
-                while x < g.size.width {
-                    p.addArc(center: CGPoint(x: x + r, y: g.size.height), radius: r,
-                             startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false)
-                    x += r * 2
-                }
-                p.addLine(to: CGPoint(x: g.size.width, y: g.size.height))
-                p.closeSubpath()
-            }
-            .fill(color)
+        .task(id: ShelfCovers.key(book, first: first)) {
+            cover = await ShelfCovers.image(for: book, first: first)
         }
     }
 }
+
+/// Small pictures of book covers for the shelves, drawn by the same code as
+/// the reader's cover and kept on disk (Caches) until the book or its first
+/// page changes. Drawing one takes a moment, so it is done once.
+@MainActor
+enum ShelfCovers {
+    private static var memory: [String: UIImage] = [:]
+
+    private static var folder: URL {
+        URL.cachesDirectory.appendingPathComponent("ShelfCovers", isDirectory: true)
+    }
+
+    /// Changes whenever the cover would look different: the book was saved
+    /// (name, cover, background, pages) or its first page was.
+    static func key(_ book: StoredBook, first: SavedPageInfo?) -> String {
+        let firstPart = first.map { "\($0.id.uuidString)-\(Int($0.updated.timeIntervalSince1970 * 1000))" } ?? "none"
+        return "\(book.id.uuidString)-\(Int(book.updated.timeIntervalSince1970 * 1000))-\(firstPart)"
+    }
+
+    static func image(for book: StoredBook, first: SavedPageInfo?) async -> UIImage? {
+        let key = key(book, first: first)
+        if let image = memory[key] { return image }
+        let file = folder.appendingPathComponent(key + ".jpg")
+        if let image = UIImage(contentsOfFile: file.path) {
+            memory[key] = image
+            return image
+        }
+        var source: BookPageSource?
+        if let first, let (art, saved) = try? await PageStore.shared.load(first.id) {
+            let session = ColoringSession(art: art, pageID: first.id, restoring: saved)
+            // The cover shows the lines only, as in the book.
+            if let lines = session.renderLineArt().cgImage {
+                source = BookPageSource(lineArt: lines, colored: lines, photo: nil)
+            }
+        }
+        let image = await draw(name: book.name, first: source, frame: book.coverFrame, art: book.coverArt,
+                               background: BackgroundLibrary.named(book.background))
+        memory[key] = image
+        // Keep only this cover for the book.
+        let fm = FileManager.default
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let old = (try? fm.contentsOfDirectory(atPath: folder.path)) ?? []
+        for name in old where name.hasPrefix(book.id.uuidString) { try? fm.removeItem(at: folder.appendingPathComponent(name)) }
+        try? image.jpegData(compressionQuality: 0.85)?.write(to: file)
+        return image
+    }
+
+    /// Half a point per point of the sheet: about 300 × 400 px, sharp at the
+    /// shelf's size on a 3× screen.
+    @concurrent
+    private nonisolated static func draw(name: String, first: BookPageSource?, frame: PageFrame, art: String?,
+                                         background: BookBackground?) async -> UIImage {
+        BookRenderer.coverImage(name: name, first: first, frame: frame, art: art, background: background, scale: 0.5)
+    }
+}
+

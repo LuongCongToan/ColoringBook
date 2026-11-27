@@ -36,6 +36,8 @@ Tools/rnd/out/
 *.jpg
 *.heic
 *.HEIC
+# ...except the picture frames the app ships (Tools/pack-frames.sh).
+!ColoringBook/ColoringBook/Frames/frame-*.heic
 
 # Marketing material, kept out of git as in Haru
 Marketings/

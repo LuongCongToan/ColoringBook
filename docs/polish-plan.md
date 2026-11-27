@@ -33,7 +33,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 13. **"59 pages left this month"** không giảm sau lần vẽ thứ hai. Kiểm lại với Worker thật.
 14. **Sketch:** đổ màu vào mặt tràn sang áo (nét hở). Thử lại trên iPhone thật, nơi tách nền chạy được.
 15. ~~Mục Debug trong Grown-ups~~ — Đã kiểm: nằm trong `#if DEBUG`. (2026-11-27)
-16. **Cần quyết:** trang vừa tạo chỉ được lưu vào My pages khi bấm "Color it!". Có nên lưu ngay khi có kết quả?
+16. ~~Cần quyết: lưu trang vừa tạo khi nào~~ — User chốt: chỉ vào My pages khi bấm "Color it!" (giữ như hiện tại). (2026-11-27)
 44. ~~Màn tô màu xoay ngang (iPhone)~~ — Dụng cụ 2 cột (đủ 6 thẻ), cỡ cọ 2 hàng. (2026-11-27)
 45. ~~Chấm cỡ cọ quá nhỏ để chạm~~ — Cả ô 52 pt nhận chạm. (2026-11-27)
 46. ~~Thanh tab hiện trên màn tô màu khi mở từ My library~~ — Thanh tab ẩn theo danh sách "ai đang ẩn", không còn bị màn trước bật lại. (2026-11-27)
@@ -50,7 +50,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 
 17. ~~PDF preview: sai số ít/số nhiều~~
 18. **Màn kết quả (dọc):** dòng "59 pages left this month" và ghi chú bị nút ghim che. Đưa lên gần ảnh, hoặc vào khối nút ghim.
-19. **Bấm "Color it!"** phải chờ 1–2 giây không có phản hồi. Thêm lớp loading.
+19. ~~Bấm "Color it!" chờ 1–2 giây không phản hồi~~ — Hiện popup "Opening the page…", chặn bấm hai lần. (2026-11-27)
 20. **Khay khung ở màn tô màu:** ô "Simple" có vùng chạm quá to (khoảng 289×213 pt), đè ô bên cạnh, hình là một góc bị cắt. Nút −/+ đè lên góc tranh; khi xoay ngang nút − mờ lẫn vào hình khung. Dùng asset FrameNone, giới hạn khung ô, dời nút zoom. *Thử lại: vẫn còn.*
 21. **Bìa sách khi đang chọn:** vòng chọn che cuối tên sách. Dời ra mép ngoài bìa.
 22. **Trợ năng:** ảnh trang ở My pages chưa có nhãn; ô màu đều đọc là "Color" (chỉ White và Any color có tên). Đặt tên màu ("Red", "Orange"…). Ngôi sao trang trí ở Home bị VoiceOver đọc là "Favorite": ẩn khỏi trợ năng. *Thử lại: vẫn còn.*
@@ -60,11 +60,11 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 26. **Màn tô màu (dọc):** khoảng trống giữa hàng Save/zoom và hàng dụng cụ: khoảng 184 pt khi dùng Fill, 90 pt khi dùng Brush trên iPhone; 210–290 pt trên iPad. Cho tranh to hơn, hoặc đặt nút zoom chồng lên góc tranh.
 27. **Màn đọc sách:** icon layout (50×40 pt) và dòng "Tap the page to color it" (khoảng 12 pt, font SF xám) quá nhỏ cho bé. Khi xoay ngang, trang chỉ khoảng 115×151 pt trên iPhone: xếp trang bên trái, nút bên phải. Mũi tên trước/sau nhảy chỗ giữa trang bìa và trang tô. *Thử lại: vẫn còn.*
 28. **Arrange page:** chấm kéo đổi cỡ (16 pt) khó thấy; vẽ to hơn.
-29. **Chữ chờ:** thống nhất dùng "…" thay cho "..." ("Opening the page...", "Making the PDF...", "Making room for colors..."). *Thử lại: vẫn còn.*
+29. ~~Chữ chờ: thống nhất dùng "…"~~ — Đã kiểm: không còn "..." trong app. (2026-11-27)
 30. **Màn chính khi xoay ngang:** linh vật chạm mép trên. *Thử lại: vẫn còn.*
 55. **Fill đổ được vào lề trắng ngoài viền trang** (khung nét "Simple"), tràn cả lề. Giới hạn trong viền tranh.
 56. **Hàng dụng cụ (dọc):** các thẻ chạm sát mép màn (Fill bắt đầu ở x = 3) và sát nhau; "Brush size" chỉ cách thẻ khoảng 6 pt. Lề 16 pt, cách nhau 6–8 pt.
-57. **Ảnh sách trong My library khác bìa thật:** ô sách hiện một trang có màu và khung, còn bìa thật trong sách là viền sao đen trắng với tranh khác. Vẽ ô sách từ bìa thật.
+57. ~~Ảnh sách trong My library khác bìa thật~~ — Ô sách vẽ từ bìa thật (cùng code với trình đọc sách), lưu đệm trong Caches tới khi sách hoặc trang đầu đổi. (2026-11-27)
 58. ~~Xem trước PDF có hai nút Print~~ — Bỏ nút góc trên. (2026-11-27)
 59. **New page: thẻ kiểu vẽ đang chọn to ra** (132 so với 126 pt), làm khoảng cách hai bên lệch (4 và 10 pt). Dùng `scaleEffect` không đổi bố cục. Nhãn "FREE" chỉ khoảng 11 pt.
 60. **Thanh tab hiện lại chậm** khoảng 1 giây sau khi rời màn tô màu hoặc chế độ chọn. Cho hiện cùng hiệu ứng quay lại.
@@ -93,7 +93,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 
 ## Đổi giao diện bằng code (không cần hình mới)
 
-34. **Các màn chưa đổi giao diện:** ~~Make a book~~, ~~paywall~~, ~~màn Grown-ups~~ (xong 2026-11-26). Còn lại: đọc sách (mũi tên cam, layout đang chọn viền cam; ~~nút Save PDF~~), ~~xem trước PDF~~ (xong 2026-11-27), Arrange (danh sách hệ thống, dấu trừ đỏ, tay kéo), lớp loading (font SF), hộp hỏi đồng ý. Đổi sang bảng màu Kid, Fredoka/Nunito, thẻ trắng, nút viên thuốc.
+34. **Các màn chưa đổi giao diện:** ~~Make a book~~, ~~paywall~~, ~~màn Grown-ups~~ (xong 2026-11-26). Còn lại: đọc sách (mũi tên cam, layout đang chọn viền cam; ~~nút Save PDF~~), ~~xem trước PDF~~ (xong 2026-11-27), Arrange (danh sách hệ thống, dấu trừ đỏ, tay kéo), ~~lớp loading~~ (xong 2026-11-27: thẻ kem viền tím, linh vật bút sáp, 3 chấm, dùng cho cả màn chờ AI vẽ), hộp hỏi đồng ý. Đổi sang bảng màu Kid, Fredoka/Nunito, thẻ trắng, nút viên thuốc.
 35. **Font:** thay `.font(.headline/.caption/.footnote…)` bằng `Kid.title/body/bodyBold`.
 36. **Điều khiển hệ thống:** ~~bộ chọn Books/Pages và As colored/Fresh, công tắc và ô tên ở Make a book, danh sách Grown-ups~~ (xong). Còn lại: danh sách Arrange. ~~Thanh công cụ của chế độ chọn~~ (xong).
 37. **Đường chọn sticker:** đổi từ xanh hệ thống sang tím (hiện vẫn là nét đứt xanh, nút X đỏ, nút đổi cỡ xanh). *Thử lại: vẫn còn.*
@@ -103,7 +103,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 
 ## Thứ tự đề nghị (sau lượt thử 2026-11-26 tối)
 
-1. ~~P1~~ và P2 đã sửa 2026-11-27. P2 còn: 13 (cần Worker thật), 14 (cần iPhone thật), 16 (cần quyết).
+1. ~~P1~~ và P2 đã sửa 2026-11-27. P2 còn: 13 (cần Worker thật), 14 (cần iPhone thật).
 2. **Màn tô màu:** 26, 20.
 3. **Đọc sách:** 27, 34 (đổi giao diện đọc sách, Arrange).
 4. **iPad:** 31, 32, 33, 68–71.
@@ -129,9 +129,9 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 | BtnStickerDelete, BtnStickerResize | Nút tròn san hô có dấu X; nút tròn lavender có mũi tên đôi cong | `xmark` đỏ, mũi tên xanh hệ thống | Tay cầm sticker (`ColoringCanvasView.swift:562-576`) |
 | SwatchAnyColor | Giọt sơn hoặc bánh xe cầu vồng có mặt cười | Ô ColorPicker hệ thống | Ô cuối bảng màu |
 | CheckOn, CheckOff | Vòng tròn vàng viền trắng có tick tím; vòng trống | `checkmark`, vòng xanh hệ thống | Thẻ kiểu vẽ, ô màu, chế độ chọn, gói paywall |
-| DrawingWait | Linh vật bút sáp đang vẽ (tốt nhất 2–3 khung cho chuyển động lặp) | `pencil.and.scribble` | Màn chờ vẽ (`CreatePageView.swift:722`) |
+| ~~DrawingWait~~ | ~~Linh vật bút sáp đang vẽ~~ | | Đã xong: `LoadingMascot` (2026-11-27) |
 | IconMagicWand | Đũa phép ngôi sao kèm lấp lánh | `wand.and.stars` | Nút "Draw my page", paywall |
-| LoadingSpinner | Giọt sơn xoay hoặc bút sáp nhún | ProgressView hệ thống | Mở trang, làm PDF, xử lý ảnh |
+| ~~LoadingSpinner~~ | ~~Giọt sơn xoay hoặc bút sáp nhún~~ | | Đã xong: linh vật nhún và 3 chấm vẽ bằng code (2026-11-27) |
 | TileNewBook | Cuốn sách kawaii kèm dấu cộng lấp lánh | `plus` trong ô nét đứt | Ô "New book" (`BookListView.swift:193`) |
 | EmptyBooks, EmptyPages | Linh vật cạnh kệ sách trống; linh vật cầm bút sáp và trang trắng | Chỉ có chữ | Màn trống My books, My pages |
 | FrameNone | Trang trắng có mặt cười, nghĩa là "không khung" | Góc khung cũ kèm `face.smiling` | Ô đầu khay khung (`ColoringView.swift:610`) |
@@ -180,4 +180,4 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); HandleTurn (nú
 9. ~~Arrange page: ảnh gốc bị khung nền che~~ — Không còn áp dụng: đã bỏ Background. (2026-11-27)
 10. CheckOn, CheckOff
 
-Tiếp theo: IconMagicWand, LoadingSpinner, TileNewBook, EmptyBooks/EmptyPages, FrameNone, 3 hình Layout.
+Tiếp theo: IconMagicWand, TileNewBook, EmptyBooks/EmptyPages, FrameNone, 3 hình Layout.
