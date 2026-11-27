@@ -13,7 +13,6 @@ struct StoredBook: Codable, Identifiable, Hashable {
     var coverFrame: PageFrame = .stars
     /// Colored cover artwork (`CoverLibrary`); nil uses `coverFrame`.
     var coverArt: String?
-    var belongsToPage = true
     /// Play a sound when a page turns.
     var pageSounds = true
     /// How pages are laid out, in the app and in the PDF.
@@ -47,7 +46,6 @@ struct StoredBook: Codable, Identifiable, Hashable {
         updated = try c.decodeIfPresent(Date.self, forKey: .updated) ?? Date()
         coverFrame = try c.decodeIfPresent(PageFrame.self, forKey: .coverFrame) ?? .stars
         coverArt = try c.decodeIfPresent(String.self, forKey: .coverArt)
-        belongsToPage = try c.decodeIfPresent(Bool.self, forKey: .belongsToPage) ?? true
         pageSounds = try c.decodeIfPresent(Bool.self, forKey: .pageSounds) ?? true
         layout = try c.decodeIfPresent(BookLayout.self, forKey: .layout) ?? .pagesOnly
         pageLayouts = try c.decodeIfPresent([UUID: BookLayout].self, forKey: .pageLayouts) ?? [:]

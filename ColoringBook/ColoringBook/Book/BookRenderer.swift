@@ -45,7 +45,6 @@ nonisolated enum LineWeight: String, CaseIterable, Identifiable, Sendable {
 
 nonisolated struct BookOptions: Sendable {
     var childName = ""
-    var belongsToPage = true
     var layout: BookLayout = .pagesOnly
     var lines: LineWeight = .medium
     /// A blank back after every printed sheet, so markers do not bleed into
@@ -106,7 +105,7 @@ nonisolated enum BookRenderer {
 
     /// What each PDF page is, in order, for the review screen.
     enum PageKind: Hashable, Sendable {
-        case cover, belongsTo, photo(Int), picture(Int), blank
+        case cover, photo(Int), picture(Int), blank
     }
 
     static func makePDF(pages: [BookPageSource], options: BookOptions,
@@ -134,13 +133,6 @@ nonisolated enum BookRenderer {
             kinds.append(.cover)
             drawCover(in: pdf.cgContext, name: options.childName, first: pages.first, options: options)
             sheetDone()
-
-            if options.belongsToPage {
-                pdf.beginPage()
-                kinds.append(.belongsTo)
-                drawBelongsTo(in: pdf.cgContext, name: options.childName, options: options)
-                sheetDone()
-            }
 
             for (index, page) in pages.enumerated() {
                 let layout = page.layout ?? options.layout
@@ -172,16 +164,6 @@ nonisolated enum BookRenderer {
             options.coverArt = art
             options.background = background
             drawCover(in: ctx, name: name, first: first, options: options)
-        }
-    }
-
-    /// The "This book belongs to" page as a picture, for the in-app book.
-    static func belongsToImage(name: String, frame: PageFrame = .stars, background: BookBackground? = nil) -> UIImage {
-        sheetImage(scale: 2) { ctx in
-            var options = BookOptions()
-            options.coverFrame = frame
-            options.background = background
-            drawBelongsTo(in: ctx, name: name, options: options)
         }
     }
 
@@ -424,32 +406,6 @@ nonisolated enum BookRenderer {
             if let lines = printReady(art, size: CGSize(width: drawn.width / 72 * dpi, height: drawn.height / 72 * dpi), weight: options.lines) {
                 UIImage(cgImage: lines).draw(in: rect)
             }
-        }
-    }
-
-    private static func drawBelongsTo(in ctx: CGContext, name: String, options: BookOptions) {
-        defer { if let background = options.background { drawOverlay(background, in: ctx) } }
-        // Where the words go: the usual places, or the background's middle.
-        var box = CGRect(x: 100, y: 0, width: sheet.width - 200, height: sheet.height)
-        var dy: CGFloat = 0
-        if let background = options.background {
-            let inner = contentArea(background).insetBy(dx: 10, dy: 10)
-            box = CGRect(x: inner.minX + 20, y: inner.minY, width: inner.width - 40, height: inner.height)
-            dy = inner.midY - sheet.midY  // the usual layout, centered in the middle
-        } else {
-            drawFrame(options.coverFrame, in: ctx)
-        }
-        drawOutlineText(["This book", "belongs to"], in: CGRect(x: box.minX, y: 200 + dy, width: box.width, height: 170), ctx: ctx)
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            // A line to write the name on.
-            ctx.setStrokeColor(UIColor.black.cgColor)
-            ctx.setLineWidth(2)
-            ctx.move(to: CGPoint(x: box.minX + 40, y: 520 + dy))
-            ctx.addLine(to: CGPoint(x: box.maxX - 40, y: 520 + dy))
-            ctx.strokePath()
-        } else {
-            drawOutlineText([trimmed], in: CGRect(x: box.minX, y: 420 + dy, width: box.width, height: 110), ctx: ctx)
         }
     }
 

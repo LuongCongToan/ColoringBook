@@ -809,7 +809,7 @@ User nhận xét UI và icon "nghiêm túc quá, không giống chibi, không gi
 Code ở `ColoringBook/ColoringBook/Book/`. Màn chính có thẻ "Make a coloring book".
 
 - **Chọn trang:** chọn từ "My pages" theo thứ tự chạm (gợi ý 5–20 trang), kéo để đổi thứ tự.
-- **Bìa:** "<Tên>'s Coloring Book" bằng chữ rỗng để tô (Arial Rounded), khung sao, và tranh đầu tiên. Có thể thêm trang "This book belongs to <Tên>" (khung tim; không có tên thì để một dòng kẻ để viết tay).
+- **Bìa:** "<Tên>'s Coloring Book" bằng chữ rỗng để tô (Arial Rounded), khung sao, và tranh đầu tiên. Trang "This book belongs to <Tên>" đã bỏ khỏi sách và PDF (user, 2026-11-27).
 - **Kiểu trình bày** (chọn chung cho cả sách ở Make a book, đổi riêng từng trang trong sách, xem "Luồng sách" bên dưới): "Coloring pages" (một tranh mỗi trang); "Photo + page" (ảnh màu bên trái, tranh tô bên phải, kèm dòng "Color me like the photo!"); "Small photo" (từ 2026-11-24: ảnh như một tấm ảnh chụp viền trắng, nghiêng 6°, có bóng, đặt đè lên góc dưới bên phải của tranh; tranh được dùng cả trang). Trang không có ảnh thì in tranh một mình.
 - **Tuỳ chọn** (không còn trên giao diện; PDF dùng nét Medium, không trang trắng, giữ màu): nét Thin / Medium / Thick (làm dày 0 / 1,5 / 4 px ở 300 dpi); trang trắng sau mỗi tờ; in kèm màu đã tô trong app.
 - **Khổ và chất lượng in:** Letter, lề 0,5 inch. Tranh ngang được xoay để lấp đầy trang dọc. Tranh được xử lý cho in như `print_page.py`: phóng Lanczos lên 300 dpi, làm mờ nhẹ, lọc ngưỡng 0,6, làm dày nét bằng morphology.

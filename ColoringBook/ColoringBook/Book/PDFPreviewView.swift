@@ -140,7 +140,6 @@ struct PDFPreviewView: View {
         guard book.kinds.indices.contains(i) else { return "" }
         switch book.kinds[i] {
         case .cover: return "Cover"
-        case .belongsTo: return "Name page"
         case .photo(let n): return "Photo \(n)"
         case .picture(let n): return "Picture \(n)"
         case .blank: return "Blank back"

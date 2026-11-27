@@ -35,7 +35,6 @@ struct BookBuilderView: View {
         opts.coverFrame = book?.coverFrame ?? .stars
         // New books start on the first colored cover.
         opts.coverArt = book == nil ? CoverLibrary.standard : CoverLibrary.current(book?.coverArt)
-        opts.belongsToPage = book?.belongsToPage ?? true
         opts.layout = book?.layout ?? .pagesOnly
         opts.background = BackgroundLibrary.named(book?.background)
         opts.backgroundOnPages = book?.backgroundOnPages ?? true
@@ -147,12 +146,6 @@ struct BookBuilderView: View {
                 .frame(height: 46)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Self.fieldFill))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Self.lilacLine, lineWidth: 2))
-                Toggle(isOn: $options.belongsToPage) {
-                    Text("\u{201C}This book belongs to\u{201D} page")
-                        .font(Kid.bodyBold(16))
-                        .foregroundStyle(Kid.ink)
-                }
-                .tint(Self.toggleTint)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -509,7 +502,6 @@ struct BookBuilderView: View {
         book.coverArt = options.coverArt
         book.background = options.background?.name
         book.backgroundOnPages = options.backgroundOnPages
-        book.belongsToPage = options.belongsToPage
         book.layout = options.layout
         book.pageSounds = pageSounds
         BookStore.shared.save(book)

@@ -86,7 +86,7 @@ struct ColoringView: View {
             if ProcessInfo.processInfo.arguments.contains("-brushTool") { session.tool = .brush }
             // `-frame <name>`: start with that picture frame (FrameLibrary).
             let args = ProcessInfo.processInfo.arguments
-            if let i = args.firstIndex(of: "-frame"), i + 1 < args.count { session.setFrame(.image(args[i + 1])) }
+            if let i = args.firstIndex(of: "-frame"), i + 1 < args.count { Task { await session.setFrame(.image(args[i + 1])) } }
             // `-stickers`: drop a few stickers and open the sticker tray.
             if args.contains("-stickers"), session.stickers.isEmpty {
                 for kind in [StickerKind.unicorn, .rainbow, .cupcake] { session.addSticker(kind) }
@@ -119,6 +119,20 @@ struct ColoringView: View {
     private var canvas: some View {
         ColoringCanvas(session: session, revision: session.revision, tool: session.tool, zoom: session.zoom)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A frame change takes a moment: a small spinner on the page is
+            // enough (user, 2026-11-27), the tools stay in view.
+            .overlay {
+                if session.showsReframing {
+                    ProgressView()
+                        .controlSize(.large)
+                        .tint(Kid.ink)
+                        .frame(width: 64, height: 64)
+                        .background(Circle().fill(.white).shadow(color: Kid.ink.opacity(0.18), radius: 8, y: 3))
+                        .transition(.opacity)
+                        .accessibilityLabel("Changing the frame")
+                }
+            }
+            .animation(.easeInOut(duration: 0.15), value: session.showsReframing)
     }
 
     @Environment(\.dismiss) private var dismiss
@@ -818,7 +832,7 @@ private struct FrameTray: View {
             let selected = session.art.frame == frame
             Button {
                 SoundFX.shared.play(.sticker)
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.setFrame(frame) }
+                Task { await session.setFrame(frame) }
             } label: {
                 FramePreview(frame: frame)
                     .frame(width: small ? 76 : 96, height: small ? 56 : 72)

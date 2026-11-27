@@ -165,7 +165,7 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); HandleTurn (nú
 - BtnPlus: nút "New page".
 - HomeBook (mờ): bìa sách chưa có hình.
 - HomeMascot trên nền kem: màn khởi động.
-- Bộ khung màu `Frames/`: thay khung nét cũ ở bìa sách và trang "This book belongs to".
+- Bộ khung màu `Frames/`: thay khung nét cũ ở bìa sách.
 
 ### Thứ tự vẽ đề nghị
 

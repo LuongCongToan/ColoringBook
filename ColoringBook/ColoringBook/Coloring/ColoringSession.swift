@@ -129,36 +129,80 @@ final class ColoringSession {
 
     // MARK: - Frame
 
-    /// Swaps the frame around the picture. The drawing stays where it is,
-    /// so paint inside it is kept; paint in the old frame's band is
-    /// replayed over the new frame's shapes.
-    func setFrame(_ frame: FrameChoice) {
-        guard frame != art.frame, let framed = art.with(frame: frame) else { return }
+    /// True while a frame change is worked out (off the main thread: the
+    /// lines are made again and every action replayed, 1–2 s on a busy
+    /// page). Painting, undo and other frame changes wait for it.
+    private(set) var reframing = false
+    /// Shows the loading card, once a frame change takes long enough to
+    /// notice, so a quick one does not flash it.
+    private(set) var showsReframing = false
+
+    /// Swaps the frame around the picture. The drawing is fitted to each
+    /// frame's opening, so it moves and resizes: paint and stickers move with
+    /// it (user, 2026-11-26: fills replayed at their old spots landed in the
+    /// background); paint in the old frame's band is replayed over the new
+    /// frame's shapes.
+    func setFrame(_ frame: FrameChoice) async {
+        guard frame != art.frame, !reframing else { return }
+        let from = art.drawing
+        guard let result = await reframe(to: frame, actions: { to in Self.move(paint.actions, from: from, to: to) })
+        else { return }
         record()
-        // The drawing is fitted to each frame's opening, so it moves and
-        // resizes: paint and stickers move with it (user, 2026-11-26: fills
-        // replayed at their old spots landed in the background).
-        let from = art.drawing, to = framed.drawing
-        stickers = stickers.map { Self.move($0, from: from, to: to) }
-        apply(framed, actions: Self.move(paint.actions, from: from, to: to))
+        stickers = stickers.map { Self.move($0, from: from, to: result.art.drawing) }
+        apply(result)
     }
 
-    private func apply(_ framed: LineArt, actions: [PaintAction]) {
-        art = framed
-        paint.rebuild(barrier: framed.barrier, actions: actions)
-        pageImage = paint.layer.makeImage()
+    private struct Reframed: @unchecked Sendable {
+        let art: LineArt
+        let paint: PagePaint
+        let image: CGImage?
+    }
+
+    /// The page in another frame, made off the main thread. `actions` gives
+    /// the paint to replay, from where the new frame puts the drawing.
+    private func reframe(to frame: FrameChoice, actions: (CGRect) -> [PaintAction]) async -> Reframed? {
+        reframing = true
+        let reveal = Task {
+            try? await Task.sleep(for: .milliseconds(200))
+            if !Task.isCancelled { showsReframing = true }
+        }
+        defer {
+            reveal.cancel()
+            reframing = false
+            showsReframing = false
+        }
+        guard let framed = await Self.framed(art, frame) else { return nil }
+        return await Self.repainted(framed, paint: paint, actions: actions(framed.drawing))
+    }
+
+    @concurrent
+    private nonisolated static func framed(_ art: LineArt, _ frame: FrameChoice) async -> LineArt? {
+        art.with(frame: frame)
+    }
+
+    @concurrent
+    private nonisolated static func repainted(_ art: LineArt, paint: PagePaint, actions: [PaintAction]) async -> Reframed {
+        var paint = paint
+        paint.rebuild(barrier: art.barrier, actions: actions)
+        return Reframed(art: art, paint: paint, image: paint.layer.makeImage())
+    }
+
+    private func apply(_ result: Reframed) {
+        art = result.art
+        paint = result.paint
+        pageImage = result.image
         revision += 1
     }
 
     /// Page pixels where the drawing sat at `from`, moved to where it sits
     /// at `to`.
-    private static func mover(from: CGRect, to: CGRect) -> (scale: CGFloat, point: (CGPoint) -> CGPoint) {
+    private nonisolated static func mover(from: CGRect, to: CGRect) -> (scale: CGFloat, point: (CGPoint) -> CGPoint) {
         guard from.width > 0, to.width > 0, from != to else { return (1, { $0 }) }
         let s = to.width / from.width
         return (s, { p in CGPoint(x: to.minX + (p.x - from.minX) * s, y: to.minY + (p.y - from.minY) * s) })
     }
 
-    private static func move(_ actions: [PaintAction], from: CGRect, to: CGRect) -> [PaintAction] {
+    private nonisolated static func move(_ actions: [PaintAction], from: CGRect, to: CGRect) -> [PaintAction] {
         let (s, at) = mover(from: from, to: to)
         guard s != 1 || from != to else { return actions }
         return actions.map { action in
@@ -189,7 +233,7 @@ final class ColoringSession {
     /// A bucket tap at a page pixel. Stickers come colored, so a tap on one
     /// does nothing.
     func fill(atPage point: CGPoint) {
-        guard !stickers.contains(where: { $0.contains(pagePoint: point) }),
+        guard !reframing, !stickers.contains(where: { $0.contains(pagePoint: point) }),
               let (x, y) = paint.layer.seed(nearX: Int(point.x), y: Int(point.y)) else { return }
         record()
         paint.apply(.fill(FillOp(x: x, y: y, color: color, pattern: pattern)))
@@ -202,7 +246,7 @@ final class ColoringSession {
 
     /// A finished stroke from the canvas.
     func commit(_ stroke: Stroke) {
-        guard !stroke.points.isEmpty else { return }
+        guard !reframing, !stroke.points.isEmpty else { return }
         record()
         paint.apply(.stroke(stroke))
         pageImage = paint.layer.makeImage()
@@ -212,6 +256,7 @@ final class ColoringSession {
     // MARK: - Stickers
 
     func addSticker(_ kind: StickerKind) {
+        guard !reframing else { return }
         record()
         let size = CGFloat(min(art.width, art.height)) * 0.3
         // Fan new stickers out a little so they do not land exactly on top
@@ -282,25 +327,25 @@ final class ColoringSession {
     }
 
     func undo() {
-        guard let previous = undoStack.popLast() else { return }
+        guard !reframing, let previous = undoStack.popLast() else { return }
         redoStack.append(snapshot())
         restore(previous)
     }
 
     func redo() {
-        guard let next = redoStack.popLast() else { return }
+        guard !reframing, let next = redoStack.popLast() else { return }
         undoStack.append(snapshot())
         restore(next)
     }
 
     private func restore(_ s: Snapshot) {
         var repaint = false
-        if s.frame != art.frame, let framed = art.with(frame: s.frame) {
+        if s.frame != art.frame {
             // The snapshot's actions already sit where its frame puts the
-            // drawing.
-            art = framed
-            paint.rebuild(barrier: framed.barrier, actions: s.actions)
-            repaint = true
+            // drawing. Made off the main thread, like `setFrame`.
+            Task {
+                if let result = await reframe(to: s.frame, actions: { _ in s.actions }) { apply(result) }
+            }
         } else if s.actions != paint.actions {
             paint.set(s.actions)
             repaint = true

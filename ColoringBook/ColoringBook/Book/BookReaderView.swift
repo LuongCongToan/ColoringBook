@@ -48,7 +48,7 @@ struct BookReaderView: View {
 
     /// One sheet in the book, in order, as in the PDF.
     private enum Sheet: Hashable {
-        case cover, belongsTo
+        case cover
         /// The photo facing its picture ("Photo + page").
         case photo(UUID)
         case picture(UUID)
@@ -63,7 +63,6 @@ struct BookReaderView: View {
 
     private var sheets: [Sheet] {
         var out: [Sheet] = [.cover]
-        if book?.belongsToPage == true { out.append(.belongsTo) }
         for id in pageIDs {
             if layout(for: id) == .photoFacing { out.append(.photo(id)) }
             out.append(.picture(id))
@@ -225,7 +224,6 @@ struct BookReaderView: View {
     private var pageLabel: String {
         switch current {
         case .cover?: return "Cover"
-        case .belongsTo?: return "Name page"
         case .photo(let id)?: return "Photo for page \(number(of: id))"
         case .picture(let id)?: return "Page \(number(of: id)) of \(pageIDs.count)"
         case nil: return ""
@@ -392,8 +390,6 @@ struct BookReaderView: View {
             let first = await source(for: pageIDs.first, photo: false)
             result = BookRenderer.coverImage(name: book?.name ?? "", first: first, frame: frame,
                                              art: book?.coverArt, background: background)
-        case .belongsTo:
-            result = BookRenderer.belongsToImage(name: book?.name ?? "", frame: frame, background: background)
         case .photo(let id):
             result = loadPhoto(id).map { BookRenderer.photoPageImage($0, background: pageBackground) }
         case .picture(let id):
@@ -497,7 +493,6 @@ struct BookReaderView: View {
 
         var options = BookOptions()
         options.childName = book.name
-        options.belongsToPage = book.belongsToPage
         options.coverFrame = book.coverFrame
         options.coverArt = book.coverArt
         options.layout = book.layout
