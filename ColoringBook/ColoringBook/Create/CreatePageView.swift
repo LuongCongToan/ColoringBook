@@ -735,8 +735,9 @@ private struct StyleCard: View {
     }
 }
 
-/// Shown while the AI draws: a pencil at work and a few cheerful lines, so
-/// the wait feels like part of the fun (brief 7, "Hiệu ứng").
+/// Shown while the AI draws: the loading card with the crayon mascot and a
+/// few cheerful lines taking turns, so the wait feels like part of the fun
+/// (brief 7, "Hiệu ứng").
 private struct DrawingWaitView: View {
     private static let lines = [
         "Sharpening the pencils…",
@@ -746,27 +747,8 @@ private struct DrawingWaitView: View {
     ]
 
     var body: some View {
-        ZStack {
-            Theme.background.opacity(0.96).ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "pencil.and.scribble")
-                    .font(.system(size: 90, weight: .semibold))
-                    .foregroundStyle(Theme.accent)
-                    .symbolEffect(.bounce, options: .repeating)
-                TimelineView(.periodic(from: .now, by: 1.6)) { context in
-                    let index = Int(context.date.timeIntervalSinceReferenceDate / 1.6) % Self.lines.count
-                    Text(Self.lines[index])
-                        .font(.title3.weight(.bold))
-                        .contentTransition(.opacity)
-                        .animation(.easeInOut, value: index)
-                }
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Theme.accent)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Drawing your coloring page")
+        LoadingOverlay(lines: Self.lines)
+            .accessibilityLabel("Drawing your coloring page")
     }
 }
 
