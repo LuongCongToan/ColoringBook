@@ -601,8 +601,8 @@ private struct YellowTick: View {
     }
 }
 
-private extension BookLayout {
-    /// The drawn tile for the Page layout card
+extension BookLayout {
+    /// The drawn tile for the Page layout card and the reader's layout row
     /// (rawassets/ColoringBook-Page-Layout-Icons, 2026-11-26).
     var icon: String {
         switch self {
@@ -611,7 +611,9 @@ private extension BookLayout {
         case .photoCorner: "LayoutSmallPhoto"
         }
     }
+}
 
+private extension BookLayout {
     /// The square each tile's art is drawn in, so the art itself comes out
     /// as on the concept: 86 pt high, 105 pt wide, 91 pt wide.
     var iconSide: CGFloat {

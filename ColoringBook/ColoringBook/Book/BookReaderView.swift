@@ -30,7 +30,12 @@ struct BookReaderView: View {
     @State private var videoProgress = 0.0
     @State private var video: SharedVideo?
 
-    private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
+    // Reader design (rawassets/ColoringBook-Reader-Assets, 2026-11-27).
+    private static let hint = Color(hex: 0x796790)
+    private static let lilac = Color(hex: 0xD9BCF6)
+    private static let lilacLine = Color(hex: 0xDCC4F5)
+    private static let lemon = Color(hex: 0xFFF2A8)
+    private static let lemonLine = Color(hex: 0xF7CB2D)
 
     private var book: StoredBook? { books.books.first { $0.id == bookID } }
 
@@ -90,21 +95,25 @@ struct BookReaderView: View {
                 .padding(.top, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            HStack(spacing: 24) {
+            HStack(spacing: 12) {
                 arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
-                VStack(spacing: 4) {
+                VStack(spacing: 6) {
                     Text(pageLabel)
-                        .font(.headline)
+                        .font(Kid.titleBold(22))
+                        .foregroundStyle(Kid.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     if case .picture? = current {
                         Text("Tap the page to color it")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(Kid.body(15))
+                            .foregroundStyle(Self.hint)
                     }
                     layoutMenu
                 }
-                .frame(minWidth: 150)
+                .frame(maxWidth: .infinity)
                 arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
             }
+            .padding(.horizontal, 16)
             .padding(.bottom, 12)
         }
         .kidTabBarClearance()
@@ -185,13 +194,13 @@ struct BookReaderView: View {
             NavigationLink {
                 BookBuilderView(book: book)
             } label: {
-                actionPill("Edit", symbol: "pencil", fill: Color(hex: 0xEAD7F8))
+                actionPill("Edit", art: "ReaderEdit", fill: Self.lilac)
             }
             .buttonStyle(SquishyStyle())
             Button {
                 Task { await saveVideo() }
             } label: {
-                actionPill("Video", symbol: "play.rectangle.fill", fill: Color(hex: 0xEAD7F8))
+                actionPill("Video", art: "ReaderVideo", fill: Self.lilac)
             }
             .buttonStyle(SquishyStyle())
             .accessibilityLabel("Save video")
@@ -199,7 +208,7 @@ struct BookReaderView: View {
             Button {
                 Task { await savePDF() }
             } label: {
-                actionPill("Save PDF", symbol: "printer.fill", fill: Kid.yellow)
+                actionPill("Save PDF", art: "ReaderPDF", fill: Kid.yellow)
             }
             .buttonStyle(SquishyStyle())
             .disabled(pageIDs.isEmpty)
@@ -209,16 +218,29 @@ struct BookReaderView: View {
         .padding(.top, 6)
     }
 
-    private func actionPill(_ title: String, symbol: String, fill: Color) -> some View {
+    /// A puffy pill as in the design: the icon art, the word, a light top
+    /// and a darker lip along the bottom inside an ink outline.
+    private func actionPill(_ title: String, art: String, fill: Color) -> some View {
         HStack(spacing: 6) {
-            Image(systemName: symbol).font(.system(size: 15, weight: .bold))
-            Text(title).font(Kid.titleBold(17)).lineLimit(1).minimumScaleFactor(0.8)
+            Image(art).resizable().scaledToFit().frame(width: 30, height: 30)
+            Text(title).font(Kid.titleBold(18)).lineLimit(1).minimumScaleFactor(0.7)
         }
         .foregroundStyle(Kid.ink)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .background(Capsule().fill(fill))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(
+            ZStack(alignment: .top) {
+                Capsule().fill(fill.darker(0.12))
+                Capsule()
+                    .fill(fill)
+                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.5), .clear],
+                                                           startPoint: .top, endPoint: .bottom)))
+                    .padding(.bottom, 4)
+            }
+            .clipShape(Capsule()))
         .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2))
+        .shadow(color: Kid.ink.opacity(0.12), radius: 3, y: 2)
     }
 
     private var pageLabel: String {
@@ -267,12 +289,7 @@ struct BookReaderView: View {
                         // The book's own layout needs no exception.
                         setLayout(option == book.layout ? nil : option, for: id)
                     } label: {
-                        LayoutSketch(layout: option)
-                            .frame(width: 40, height: 30)
-                            .padding(5)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(.white))
-                            .overlay(RoundedRectangle(cornerRadius: 9)
-                                .strokeBorder(on ? Self.accent : Color.black.opacity(0.12), lineWidth: on ? 2.5 : 1))
+                        layoutTile(option.icon, on: on)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.title)
@@ -284,21 +301,27 @@ struct BookReaderView: View {
                         SoundFX.shared.play(.tap)
                         arranging = ArrangeTarget(pageID: id)
                     } label: {
-                        Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
-                            .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(Self.accent)
-                            .frame(width: 40, height: 30)
-                            .padding(5)
-                            .background(RoundedRectangle(cornerRadius: 9).fill(.white))
-                            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(
-                                book.pagePlacements[id] != nil ? Self.accent : Color.black.opacity(0.12),
-                                lineWidth: book.pagePlacements[id] != nil ? 2.5 : 1))
+                        layoutTile("ReaderMove", on: book.pagePlacements[id] != nil, artSize: CGSize(width: 38, height: 34))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Arrange this page")
                 }
             }
         }
+    }
+
+    /// A small rounded tile with the layout's picture: lemon when it is this
+    /// page's, white with a lilac edge otherwise.
+    private func layoutTile(_ art: String, on: Bool, artSize: CGSize = CGSize(width: 54, height: 42)) -> some View {
+        Image(art)
+            .resizable()
+            .scaledToFit()
+            .frame(width: artSize.width, height: artSize.height)
+            .frame(width: 60, height: 52)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(on ? Self.lemon : .white))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(on ? Self.lemonLine : Self.lilacLine, lineWidth: 2.5))
+            .shadow(color: Kid.ink.opacity(0.08), radius: 2, y: 1)
     }
 
     private func setLayout(_ layout: BookLayout?, for id: UUID) {
@@ -310,17 +333,15 @@ struct BookReaderView: View {
         reload += 1
     }
 
-    /// The lavender arrow button, as on the Home cards; turned around for
-    /// the previous page.
+    /// The lavender arrow buttons from the reader design.
     private func arrow(back: Bool, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if book?.pageSounds ?? true { SoundFX.shared.play(.tap) }
             withAnimation { action() }
         } label: {
-            Image("BtnArrowLavender")
+            Image(back ? "ReaderPrev" : "ReaderNext")
                 .resizable()
                 .scaledToFit()
-                .scaleEffect(x: back ? -1 : 1)
                 .frame(width: 68, height: 68)
                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
         }
