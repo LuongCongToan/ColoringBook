@@ -22,32 +22,36 @@ struct LoadingOverlay: View {
 
     var body: some View {
         ZStack {
-            // The screen behind, softened and tinted lilac.
-            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
-            Color(hex: 0x6935A4).opacity(0.22).ignoresSafeArea()
+            // No backdrop: the screen stays in view around the card (user,
+            // 2026-11-27: the tinted blur covered everything). This clear
+            // layer still takes the touches.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {}
+                .ignoresSafeArea()
 
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
                 Mascot(animated: !reduceMotion)
                 Words(text: text, lines: lines)
                 if let progress {
                     ProgressBar(value: progress)
-                        .frame(width: 210, height: 16)
-                        .padding(.top, 6)
+                        .frame(width: 170, height: 13)
+                        .padding(.top, 4)
                 } else {
                     BouncingDots(animated: !reduceMotion)
-                        .padding(.top, 6)
+                        .padding(.top, 4)
                 }
             }
-            .padding(.horizontal, 36)
-            .padding(.top, 24)
-            .padding(.bottom, 30)
-            .frame(minWidth: 330)
+            .padding(.horizontal, 28)
+            .padding(.top, 18)
+            .padding(.bottom, 24)
+            .frame(minWidth: 260)
             .background(
-                RoundedRectangle(cornerRadius: 44, style: .continuous)
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .fill(Self.cream)
-                    .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous)
-                        .strokeBorder(Self.border, lineWidth: 6))
-                    .shadow(color: Kid.ink.opacity(0.18), radius: 18, y: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        .strokeBorder(Self.border, lineWidth: 5))
+                    .shadow(color: Kid.ink.opacity(0.25), radius: 22, y: 10))
             .padding(24)
         }
         .transition(.opacity)
@@ -68,9 +72,9 @@ private struct Mascot: View {
             Image("LoadingMascot")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 160, height: 160)
+                .frame(width: 120, height: 120)
                 .rotationEffect(.degrees(4 * swing), anchor: .bottom)
-                .offset(y: -4 * abs(swing))
+                .offset(y: -3 * abs(swing))
         }
         .accessibilityHidden(true)
     }
@@ -102,7 +106,7 @@ private struct Words: View {
 
     private func label(_ s: String) -> some View {
         Text(s)
-            .font(Kid.titleBold(28))
+            .font(Kid.titleBold(22))
             .foregroundStyle(Kid.ink)
             .multilineTextAlignment(.center)
             .lineLimit(2)
@@ -117,19 +121,19 @@ private struct BouncingDots: View {
     var body: some View {
         TimelineView(.animation(paused: !animated)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
-            HStack(spacing: 14) {
+            HStack(spacing: 11) {
                 ForEach(LoadingOverlay.dots.indices, id: \.self) { i in
                     // A soft pulse that walks from left to right.
                     let phase = (t * 2.2 - Double(i) * 0.45).truncatingRemainder(dividingBy: 2 * .pi)
                     let lift = animated ? max(0, sin(phase)) : 0
                     Circle()
                         .fill(LoadingOverlay.dots[i])
-                        .frame(width: 20, height: 20)
+                        .frame(width: 16, height: 16)
                         .scaleEffect(1 + 0.3 * lift)
-                        .offset(y: -5 * lift)
+                        .offset(y: -4 * lift)
                 }
             }
-            .frame(height: 30)
+            .frame(height: 24)
         }
     }
 }

@@ -122,7 +122,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 | Asset | Hình cần vẽ | Thay cho | Chỗ dùng |
 |---|---|---|---|
 | ~~TabHome, TabCreate, TabLibrary~~ | ~~Ngôi nhà, nút cộng, chồng sách~~ | | Đã xong |
-| BtnNext, BtnPrev | Nút tròn mũi tên, kiểu giống BtnBack (bản trắng cho thẻ, bản vàng to cho sách) | `arrow.right`, `chevron.left/right` | Thẻ lớn màn chính (`PageLibraryView.swift:173`), lật sách (`BookReaderView.swift:267`) |
+| ~~BtnNext, BtnPrev~~ | | | Đã xong: `BtnArrowLavender` cho thẻ lớn màn chính và nút lật sách (bản lật ngược cho trang trước) (2026-11-27) |
 | BtnSettings | Nút tròn lavender có bánh răng kawaii (hoặc "chìa khoá người lớn") | `gearshape.fill` | Màn chính (`PageLibraryView.swift:120`) |
 | DecoSparkle | Ngôi sao 4 cánh mũm mĩm, 3 màu (san hô, vàng, bạc hà) | `star.fill`, `sparkles` | Đầu màn chính, màn kết quả |
 | BadgeBooks, BadgePages, BadgeIdeas | Huy hiệu tròn: sách (tím), bảng màu (san hô), ngôi sao (bạc hà) | SF trong vòng tròn màu | Tiêu đề mục (`PageLibraryView.swift:308`) |
@@ -171,7 +171,7 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); HandleTurn (nú
 
 1. ~~AppIcon~~
 2. ~~TabHome, TabCreate, TabLibrary~~
-3. BtnNext, BtnPrev
+3. ~~BtnNext, BtnPrev~~
 4. BtnSettings
 5. DecoSparkle
 6. BadgeBooks, BadgePages, BadgeIdeas

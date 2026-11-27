@@ -91,7 +91,7 @@ struct BookReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack(spacing: 24) {
-                arrow("chevron.left", label: "Previous page", enabled: index > 0) { index -= 1 }
+                arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
                 VStack(spacing: 4) {
                     Text(pageLabel)
                         .font(.headline)
@@ -103,7 +103,7 @@ struct BookReaderView: View {
                     layoutMenu
                 }
                 .frame(minWidth: 150)
-                arrow("chevron.right", label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
             }
             .padding(.bottom, 12)
         }
@@ -310,16 +310,18 @@ struct BookReaderView: View {
         reload += 1
     }
 
-    private func arrow(_ symbol: String, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+    /// The lavender arrow button, as on the Home cards; turned around for
+    /// the previous page.
+    private func arrow(back: Bool, label: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button {
             if book?.pageSounds ?? true { SoundFX.shared.play(.tap) }
             withAnimation { action() }
         } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(.white)
+            Image("BtnArrowLavender")
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(x: back ? -1 : 1)
                 .frame(width: 68, height: 68)
-                .background(Circle().fill(Self.accent))
                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
         }
         .opacity(enabled ? 1 : 0.3)

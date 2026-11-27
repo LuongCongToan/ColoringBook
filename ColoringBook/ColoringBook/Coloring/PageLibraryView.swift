@@ -149,7 +149,7 @@ struct PageLibraryView: View {
     // MARK: - Cards
 
     /// A big rounded card: the illustration on the left, the words on the
-    /// right, a white arrow button.
+    /// right, the lavender arrow button.
     private func homeCard(title: String, subtitle: String, color: Color, art: String,
                           artSize: CGSize = CGSize(width: 212, height: 112), artSlot: CGFloat? = nil,
                           artOffset: CGSize = .zero) -> some View {
@@ -170,12 +170,12 @@ struct PageLibraryView: View {
             }
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: "arrow.right")
-                .font(.system(size: 18, weight: .heavy))
-                .foregroundStyle(Kid.ink)
-                .frame(width: 40, height: 40)
-                .background(Circle().fill(.white))
+            Image("BtnArrowLavender")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 46, height: 46)
                 .shadow(color: Kid.ink.opacity(0.12), radius: 3, y: 2)
+                .accessibilityHidden(true)
         }
         .padding(.leading, 6)
         .padding(.trailing, 12)
