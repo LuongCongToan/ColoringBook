@@ -29,7 +29,8 @@ struct PageArrangeView: View {
 
     private enum Item { case picture, photo }
 
-    private static let accent = Color(red: 0.98, green: 0.45, blue: 0.20)
+    // Arrange design (2026-11-27); the buttons are the reader's PuffyPill.
+    static let hint = Color(hex: 0x6E4E99)
     private let sheet = BookRenderer.sheet
 
     private var book: StoredBook? { books.books.first { $0.id == bookID } }
@@ -50,25 +51,38 @@ struct PageArrangeView: View {
                 .padding(.horizontal, 16)
                 .frame(maxHeight: .infinity)
 
-                Text(showsPhoto ? "Tap to select · drag to move · drag a handle to resize · the round handle turns the photo"
-                                : "Tap to select · drag to move · drag a handle to resize")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
+                VStack(spacing: 4) {
+                    Text("Tap to select · Drag to move")
+                    if showsPhoto {
+                        Text("Drag a handle to resize · Use \(Image(systemName: "arrow.clockwise")) to rotate")
+                    } else {
+                        Text("Drag a handle to resize")
+                    }
+                }
+                .font(Kid.body(16))
+                .foregroundStyle(Self.hint)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .padding(.horizontal, 20)
 
                 HStack(spacing: 12) {
                     if hasPhoto && !showsPhoto {
-                        Button("Add the photo", systemImage: "photo") { addPhoto() }
-                            .buttonStyle(.bordered)
+                        Button { addPhoto() } label: {
+                            PuffyPill(title: "Add the photo", icon: .symbol("photo"))
+                        }
+                        .buttonStyle(SquishyStyle())
                     }
-                    Button("Reset", systemImage: "arrow.counterclockwise") {
+                    Button {
+                        SoundFX.shared.play(.tap)
                         withAnimation { placement = PagePlacement() }
+                    } label: {
+                        PuffyPill(title: "Reset", icon: .symbol("arrow.counterclockwise"), fill: Color(hex: 0xFCD5C0))
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SquishyStyle())
                     .disabled(placement == PagePlacement())
+                    .opacity(placement == PagePlacement() ? 0.5 : 1)
                 }
-                .tint(Self.accent)
                 .padding(.bottom, 8)
             }
             .padding(.top, 8)
@@ -76,10 +90,25 @@ struct PageArrangeView: View {
             .navigationTitle("Arrange page")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { save() }.fontWeight(.bold)
+                ToolbarItem(placement: .principal) {
+                    Text("Arrange page")
+                        .font(Kid.titleBold(22))
+                        .foregroundStyle(Kid.ink)
                 }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button { dismiss() } label: {
+                        PuffyPill(title: "Cancel")
+                    }
+                    .buttonStyle(SquishyStyle())
+                }
+                .kidPlainBackground()
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { save() } label: {
+                        PuffyPill(title: "Done", icon: .symbol("checkmark"), fill: Kid.yellow)
+                    }
+                    .buttonStyle(SquishyStyle())
+                }
+                .kidPlainBackground()
             }
             .task { await load() }
         }
@@ -300,19 +329,21 @@ struct PageArrangeView: View {
 }
 
 /// A dashed box with eight handles around the selected item, as in photo
-/// editors; with a round turn handle above it when the item can turn.
+/// editors; with a round turn handle above it when the item can turn. Lilac
+/// and grape, as in the Arrange design.
 private struct SelectionBox: View {
     let size: CGSize
     let turns: Bool
     let resize: AnyGesture<Void>
     let turn: AnyGesture<Void>?
 
-    private static var accent: Color { Color(red: 0.98, green: 0.45, blue: 0.20) }
+    private static var dash: Color { Color(hex: 0xA65FE0) }
+    private static var grape: Color { Color(hex: 0x5E2391) }
 
     var body: some View {
         ZStack {
             Rectangle()
-                .strokeBorder(Self.accent, style: StrokeStyle(lineWidth: 2, dash: [7, 5]))
+                .strokeBorder(Self.dash, style: StrokeStyle(lineWidth: 2.5, dash: [8, 5]))
                 .frame(width: size.width, height: size.height)
                 .allowsHitTesting(false)
             ForEach(Array(Self.spots.enumerated()), id: \.offset) { _, spot in
@@ -322,19 +353,21 @@ private struct SelectionBox: View {
             }
             if turns, let turn {
                 Rectangle()
-                    .fill(Self.accent)
-                    .frame(width: 2, height: 24)
-                    .position(x: size.width / 2, y: -12)
+                    .fill(Self.grape)
+                    .frame(width: 2.5, height: 26)
+                    .position(x: size.width / 2, y: -13)
                     .allowsHitTesting(false)
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: 26, height: 26)
-                    .background(Circle().fill(Self.accent))
-                    .shadow(color: .black.opacity(0.25), radius: 2)
-                    .frame(width: 40, height: 40)
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundStyle(Kid.ink)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(LinearGradient(colors: [Color(hex: 0xEBDCFC), Color(hex: 0xC9A3F2)],
+                                                             startPoint: .top, endPoint: .bottom)))
+                    .overlay(Circle().strokeBorder(Color(hex: 0xB283E6), lineWidth: 1.5))
+                    .shadow(color: Kid.ink.opacity(0.25), radius: 2, y: 1)
+                    .frame(width: 44, height: 44)
                     .contentShape(Circle())
-                    .position(x: size.width / 2, y: -34)
+                    .position(x: size.width / 2, y: -40)
                     .gesture(turn)
                     .accessibilityLabel("Turn")
             }
@@ -352,8 +385,8 @@ private struct SelectionBox: View {
     private var handle: some View {
         Circle()
             .fill(.white)
-            .overlay(Circle().strokeBorder(Self.accent, lineWidth: 2.5))
-            .frame(width: 16, height: 16)
+            .overlay(Circle().strokeBorder(Self.grape, lineWidth: 2.5))
+            .frame(width: 18, height: 18)
             .shadow(color: .black.opacity(0.2), radius: 1.5)
             .frame(width: 36, height: 36)  // easier to catch than it looks
             .contentShape(Rectangle())

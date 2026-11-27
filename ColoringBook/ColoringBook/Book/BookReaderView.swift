@@ -32,7 +32,6 @@ struct BookReaderView: View {
 
     // Reader design (rawassets/ColoringBook-Reader-Assets, 2026-11-27).
     private static let hint = Color(hex: 0x796790)
-    private static let lilac = Color(hex: 0xD9BCF6)
     private static let lilacLine = Color(hex: 0xDCC4F5)
     private static let lemon = Color(hex: 0xFFF2A8)
     private static let lemonLine = Color(hex: 0xF7CB2D)
@@ -194,13 +193,13 @@ struct BookReaderView: View {
             NavigationLink {
                 BookBuilderView(book: book)
             } label: {
-                actionPill("Edit", art: "ReaderEdit", fill: Self.lilac)
+                PuffyPill(title: "Edit", icon: .art("ReaderEdit"), stretches: true)
             }
             .buttonStyle(SquishyStyle())
             Button {
                 Task { await saveVideo() }
             } label: {
-                actionPill("Video", art: "ReaderVideo", fill: Self.lilac)
+                PuffyPill(title: "Video", icon: .art("ReaderVideo"), stretches: true)
             }
             .buttonStyle(SquishyStyle())
             .accessibilityLabel("Save video")
@@ -208,7 +207,7 @@ struct BookReaderView: View {
             Button {
                 Task { await savePDF() }
             } label: {
-                actionPill("Save PDF", art: "ReaderPDF", fill: Kid.yellow)
+                PuffyPill(title: "Save PDF", icon: .art("ReaderPDF"), fill: Kid.yellow, stretches: true)
             }
             .buttonStyle(SquishyStyle())
             .disabled(pageIDs.isEmpty)
@@ -216,31 +215,6 @@ struct BookReaderView: View {
         .disabled(busy)
         .padding(.horizontal, 16)
         .padding(.top, 6)
-    }
-
-    /// A puffy pill as in the design: the icon art, the word, a light top
-    /// and a darker lip along the bottom inside an ink outline.
-    private func actionPill(_ title: String, art: String, fill: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(art).resizable().scaledToFit().frame(width: 30, height: 30)
-            Text(title).font(Kid.titleBold(18)).lineLimit(1).minimumScaleFactor(0.7)
-        }
-        .foregroundStyle(Kid.ink)
-        .padding(.horizontal, 10)
-        .padding(.bottom, 2)
-        .frame(maxWidth: .infinity, minHeight: 48)
-        .background(
-            ZStack(alignment: .top) {
-                Capsule().fill(fill.darker(0.12))
-                Capsule()
-                    .fill(fill)
-                    .overlay(Capsule().fill(LinearGradient(colors: [.white.opacity(0.5), .clear],
-                                                           startPoint: .top, endPoint: .bottom)))
-                    .padding(.bottom, 4)
-            }
-            .clipShape(Capsule()))
-        .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2))
-        .shadow(color: Kid.ink.opacity(0.12), radius: 3, y: 2)
     }
 
     private var pageLabel: String {
