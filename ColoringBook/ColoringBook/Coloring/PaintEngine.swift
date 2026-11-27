@@ -13,6 +13,15 @@ nonisolated struct Stroke: Hashable, Codable, Sendable {
         case crayon(RGBA)
         /// The color sprinkled with flecks and twinkles.
         case glitter(RGBA)
+        /// See-through felt tip: going over paint mixes with it.
+        case marker(RGBA)
+        /// A bright core with a soft glow around it.
+        case neon(RGBA)
+        /// Fine dots, thick in the middle and thinning out, like a spray can.
+        case spray(RGBA)
+
+        /// The marker mixes (multiplies) with what is under it, on screen too.
+        var multiplies: Bool { if case .marker = self { true } else { false } }
     }
 
     var ink: Ink
@@ -89,6 +98,28 @@ nonisolated enum StrokeRenderer {
             ctx.setFillColor(CGColor(gray: 1, alpha: 1))
             if !live { ctx.setBlendMode(.clear) }
             paintShape()
+
+        case .marker(let ink):
+            // The whole stroke at once, then laid down see-through and
+            // multiplied: one stroke is even, a second one over it is
+            // darker, and yellow over blue makes green.
+            if !live { ctx.setBlendMode(.multiply) }
+            ctx.setAlpha(Marker.opacity)
+            ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+            ctx.setStrokeColor(ink.cgColor)
+            ctx.setFillColor(ink.cgColor)
+            paintShape()
+            ctx.endTransparencyLayer()
+
+        case .neon(let ink):
+            Neon.draw(stroke, color: ink, in: ctx)
+
+        case .spray(let ink):
+            ctx.setFillColor(ink.cgColor)
+            for dot in Spray.dots(for: stroke) {
+                ctx.addEllipse(in: CGRect(x: dot.x - dot.r, y: dot.y - dot.r, width: dot.r * 2, height: dot.r * 2))
+            }
+            ctx.fillPath()
 
         case .glitter(let ink):
             ctx.setStrokeColor(ink.cgColor)
@@ -167,8 +198,12 @@ nonisolated enum StrokeRenderer {
             minX = min(minX, p.x); maxX = max(maxX, p.x)
             minY = min(minY, p.y); maxY = max(maxY, p.y)
         }
-        // Glitter's twinkles may poke out past the line.
-        let reach: CGFloat = if case .glitter = stroke.ink { Glitter.pad } else { 0.5 }
+        // Glitter's twinkles and neon's glow reach past the line.
+        let reach: CGFloat = switch stroke.ink {
+        case .glitter: Glitter.pad
+        case .neon: Neon.pad
+        default: 0.5
+        }
         let pad = stroke.width * reach + 2
         return CGRect(x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad)
     }

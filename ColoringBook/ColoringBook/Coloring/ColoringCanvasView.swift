@@ -507,6 +507,12 @@ private final class LiveStrokeView: UIView {
     var scale: CGFloat = 1
     var stroke: Stroke? {
         didSet {
+            // The marker mixes with the paint under it; so does the page
+            // when the finger lifts.
+            let multiply = stroke?.ink.multiplies == true
+            if multiply != (layer.compositingFilter != nil) {
+                layer.compositingFilter = multiply ? "multiplyBlendMode" : nil
+            }
             // Redraw only around the stroke; the page is large.
             let rect = [oldValue, stroke].compactMap { $0 }.map(StrokeRenderer.bounds(of:))
                 .reduce(CGRect.null) { $0.union($1) }

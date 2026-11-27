@@ -598,8 +598,9 @@ private enum KindPreview {
         let id = key(kind.rawValue, color)
         if let image = cache[id] { return image }
         // Drawn a little larger and shrunk, so the crayon's grain and the
-        // glitter's flecks come out as they look on a page.
-        let zoom: CGFloat = 0.7
+        // glitter's flecks come out as they look on a page. Spray's dots
+        // would vanish shrunk: it is drawn enlarged instead.
+        let zoom: CGFloat = kind == .spray ? 1.8 : 0.7
         let s = CGFloat(side) / zoom
         let points = stride(from: s * 0.1, through: s * 0.9, by: 3).map { x in
             CGPoint(x: x, y: s / 2 + sin((x - s * 0.1) / (s * 0.8) * 2 * .pi) * s * 0.14)
@@ -643,7 +644,10 @@ private extension BrushKind {
         switch self {
         case .pen: "Plain brush"
         case .crayon: "Crayon"
+        case .marker: "Marker"
         case .glitter: "Glitter"
+        case .neon: "Neon"
+        case .spray: "Spray paint"
         }
     }
 }

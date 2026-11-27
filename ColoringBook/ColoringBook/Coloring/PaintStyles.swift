@@ -103,15 +103,112 @@ nonisolated enum FillPattern: String, Hashable, Codable, Sendable, CaseIterable,
 
 /// What the brush draws with.
 nonisolated enum BrushKind: String, CaseIterable, Identifiable, Sendable {
-    case pen, crayon, glitter
+    case pen, crayon, marker, glitter, neon, spray
     var id: String { rawValue }
 
     func ink(_ color: RGBA) -> Stroke.Ink {
         switch self {
         case .pen: .solid(color)
         case .crayon: .crayon(color)
+        case .marker: .marker(color)
         case .glitter: .glitter(color)
+        case .neon: .neon(color)
+        case .spray: .spray(color)
         }
+    }
+}
+
+nonisolated enum Marker {
+    /// How much of one stroke shows; two strokes over each other, about 80%.
+    static let opacity: CGFloat = 0.55
+}
+
+/// Neon: a soft glow in the color, a solid line, and a light core. The glow
+/// is a few wide, faint strokes rather than a shadow, since a shadow's blur
+/// ignores the zoom and would look different on screen and on the page.
+nonisolated enum Neon {
+    /// How far the glow reaches from the middle, as a share of the width.
+    static let pad: CGFloat = 0.8
+
+    static func draw(_ stroke: Stroke, color: RGBA, in ctx: CGContext) {
+        guard let first = stroke.points.first else { return }
+        let w = stroke.width
+        let path = stroke.points.count > 1 ? StrokeRenderer.smoothPath(stroke.points) : nil
+        func line(width: CGFloat, _ c: CGColor) {
+            if let path {
+                ctx.setLineWidth(width)
+                ctx.setStrokeColor(c)
+                ctx.addPath(path)
+                ctx.strokePath()
+            } else {
+                ctx.setFillColor(c)
+                ctx.fillEllipse(in: CGRect(x: first.x - width / 2, y: first.y - width / 2, width: width, height: width))
+            }
+        }
+        // Many faint strokes, each a little narrower, add up to a glow that
+        // fades smoothly outwards.
+        let glow = color.cgColor
+        for i in 0..<8 {
+            line(width: w * (1.6 - 0.1 * CGFloat(i)), glow.copy(alpha: 0.07) ?? glow)
+        }
+        line(width: w * 0.72, glow)
+        // White-hot in the middle, blending into the color in small steps.
+        for i in 1...6 {
+            let t = CGFloat(i) / 6
+            line(width: w * (0.68 - 0.5 * t), color.mixed(with: .white, Double(0.12 + 0.6 * t)).cgColor)
+        }
+    }
+}
+
+/// Spray paint: fine dots scattered around the line, thickest in the middle.
+/// Where each dot goes follows from the stroke's points alone.
+nonisolated enum Spray {
+    struct Dot { var x: CGFloat; var y: CGFloat; var r: CGFloat }
+
+    static func dots(for stroke: Stroke) -> [Dot] {
+        guard let first = stroke.points.first else { return [] }
+        let w = stroke.width
+        let step = max(3, w * 0.1)
+        let perStep = min(60, max(8, Int(w * 0.4)))
+        var dots: [Dot] = []
+        var k: UInt64 = 0
+
+        func burst(at p: CGPoint) {
+            for _ in 0..<perStep {
+                var h = k &* 0x9E3779B97F4A7C15 &+ 0x2545F4914F6CDD1D
+                k += 1
+                func next() -> CGFloat {
+                    h = (h ^ (h >> 30)) &* 0xBF58476D1CE4E5B9
+                    h = (h ^ (h >> 27)) &* 0x94D049BB133111EB
+                    h ^= h >> 31
+                    return CGFloat(h >> 40) / CGFloat(1 << 24)
+                }
+                let angle = next() * 2 * .pi
+                // More dots near the middle, fewer at the edge.
+                let radius = pow(next(), 1.3) * w / 2
+                let size = max(0.8, w * (0.006 + 0.01 * next()))
+                dots.append(Dot(x: p.x + cos(angle) * radius, y: p.y + sin(angle) * radius, r: size))
+            }
+        }
+
+        if stroke.points.count == 1 {
+            // A tap: one puff.
+            for _ in 0..<max(3, Int(w / step * 1.5)) { burst(at: first) }
+            return dots
+        }
+        var until: CGFloat = 0
+        for i in 1..<stroke.points.count {
+            let a = stroke.points[i - 1], b = stroke.points[i]
+            let length = hypot(b.x - a.x, b.y - a.y)
+            guard length > 0 else { continue }
+            while until <= length {
+                let t = until / length
+                burst(at: CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t))
+                until += step
+            }
+            until -= length
+        }
+        return dots
     }
 }
 
