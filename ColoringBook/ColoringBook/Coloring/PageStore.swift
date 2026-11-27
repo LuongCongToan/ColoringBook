@@ -60,7 +60,8 @@ final class PageStore {
     /// Writes the session's state. The page image is written once; the
     /// state and thumbnail every time.
     func save(_ session: ColoringSession, force: Bool = false) {
-        guard force || session.hasContent else { return }
+        guard force || session.hasContent || session.isStored else { return }
+        session.isStored = true
         let dir = folder(session.pageID)
         let saved = session.savedPage()
         let source = session.art.sourceData

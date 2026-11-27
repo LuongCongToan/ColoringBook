@@ -114,3 +114,79 @@ struct KidSegmented<Value: Hashable>: View {
         .background(Capsule().fill(Color(hex: 0xEAD7F8)))
     }
 }
+
+/// The bar Select mode puts in the tab bar's place (My pages, My books):
+/// Select all as a lilac pill, how many are chosen, and a coral trash
+/// button, instead of the system toolbar (polish-plan 51).
+struct KidSelectionBar: View {
+    let title: String
+    let allSelected: Bool
+    let canDelete: Bool
+    let deleteLabel: String
+    let onSelectAll: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button {
+                SoundFX.shared.play(.tap)
+                onSelectAll()
+            } label: {
+                Text(allSelected ? "Deselect all" : "Select all")
+                    .font(Kid.titleBold(17))
+                    .foregroundStyle(Kid.ink)
+                    .padding(.horizontal, 16)
+                    .frame(height: 46)
+                    .background(Capsule().fill(Color(hex: 0xEAD7F8)))
+                    .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2))
+            }
+            .buttonStyle(SquishyStyle())
+            Text(title)
+                .font(Kid.bodyBold(15))
+                .foregroundStyle(Kid.ink.opacity(0.75))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+            Button {
+                SoundFX.shared.play(.tap)
+                onDelete()
+            } label: {
+                Image(systemName: "trash.fill")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(Circle().fill(Kid.coral))
+                    .overlay(Circle().strokeBorder(.white, lineWidth: 2.5))
+                    .shadow(color: Kid.coral.opacity(0.35), radius: 4, y: 2)
+            }
+            .buttonStyle(SquishyStyle())
+            .disabled(!canDelete)
+            .opacity(canDelete ? 1 : 0.4)
+            .accessibilityLabel(deleteLabel)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(Color(hex: 0xFEFAF2))
+                .shadow(color: Kid.ink.opacity(0.1), radius: 12, y: 2))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+    }
+}
+
+/// A chosen tile in Select mode: a yellow ring around it.
+struct SelectedRing: ViewModifier {
+    let on: Bool
+    var radius: CGFloat = Kid.radius
+
+    func body(content: Content) -> some View {
+        content.overlay {
+            if on {
+                RoundedRectangle(cornerRadius: radius + 4, style: .continuous)
+                    .strokeBorder(Kid.yellow, lineWidth: 5)
+                    .padding(-5)
+            }
+        }
+    }
+}

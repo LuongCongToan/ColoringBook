@@ -33,7 +33,10 @@ struct BookListView: View {
                                 toggle(book.id)
                             } label: {
                                 BookShelfCover(book: book, pages: pages, tint: Kid.coverTint(books.books.firstIndex(of: book) ?? 0))
-                                    .overlay(alignment: .topTrailing) { checkmark(selection.contains(book.id)) }
+                                    .overlay(alignment: .topTrailing) {
+                                        SelectCheck(on: selection.contains(book.id)).padding(8)
+                                    }
+                                    .modifier(SelectedRing(on: selection.contains(book.id), radius: 10))
                             }
                             .buttonStyle(.plain)
                             .accessibilityAddTraits(selection.contains(book.id) ? .isSelected : [])
@@ -81,11 +84,11 @@ struct BookListView: View {
         .kidTabBarClearance()
         // Select mode takes the tab bar's place, like Photos; leaving the
         // screen (or the tab) ends it.
-        .onChange(of: selecting) { _, on in AppTabs.shared.barHidden = on }
+        .onChange(of: selecting) { _, on in AppTabs.shared.hideBar("booksSelect", on) }
         .onDisappear {
             selecting = false
             selection = []
-            AppTabs.shared.barHidden = false
+            AppTabs.shared.hideBar("booksSelect", false)
         }
         .confirmationDialog(single.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
                             isPresented: Binding(get: { single != nil }, set: { if !$0 { single = nil } }),
@@ -128,29 +131,12 @@ struct BookListView: View {
         if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
     }
 
-    /// Photos-style bar: Select All on the left, the trash on the right.
+    /// Select all on the left, the trash on the right, in the app's style.
     private var selectionBar: some View {
-        HStack {
-            Button(allSelected ? "Deselect All" : "Select All") {
-                selection = allSelected ? [] : Set(books.books.map(\.id))
-            }
-            .font(.headline)
-            Spacer()
-            Text(selectionTitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button(role: .destructive) {
-                confirmDelete = true
-            } label: {
-                Image(systemName: "trash")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-            }
-            .tint(.red)
-            .disabled(selection.isEmpty)
-            .accessibilityLabel("Delete selected books")
-            // On the trash button, so the question pops up next to it.
+        KidSelectionBar(title: selectionTitle, allSelected: allSelected, canDelete: !selection.isEmpty,
+                        deleteLabel: "Delete selected books",
+                        onSelectAll: { selection = allSelected ? [] : Set(books.books.map(\.id)) },
+                        onDelete: { confirmDelete = true })
             .confirmationDialog(deleteTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button(selection.count == 1 ? "Delete book" : "Delete \(selection.count) books", role: .destructive) {
                     withAnimation {
@@ -162,25 +148,6 @@ struct BookListView: View {
             } message: {
                 Text("The pages stay in My pages.")
             }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(.bar)
-    }
-
-    private func checkmark(_ on: Bool) -> some View {
-        ZStack {
-            Circle().fill(on ? Color.blue : Color.black.opacity(0.25))
-            Circle().strokeBorder(.white, lineWidth: 2)
-            if on {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(.white)
-            }
-        }
-        .frame(width: 28, height: 28)
-        .shadow(color: .black.opacity(0.25), radius: 2)
-        .padding(8)
     }
 
     private var newBookTile: some View {

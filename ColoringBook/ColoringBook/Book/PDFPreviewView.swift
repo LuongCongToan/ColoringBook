@@ -13,34 +13,77 @@ struct PDFPreviewView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                summary
-                if let document {
-                    PDFDocumentView(document: document, index: $index)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    Text(label(for: index) + "  ·  \(index + 1) of \(document.pageCount)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    thumbnails(document)
+            GeometryReader { geo in
+                // Landscape: the page on the left, the rest on the right
+                // (polish-plan 43); portrait: one column, the page as big as
+                // the room left.
+                if geo.size.width > geo.size.height {
+                    HStack(spacing: 16) {
+                        pageArea
+                        ScrollView {
+                            VStack(spacing: 14) {
+                                summary
+                                if let document { thumbnails(document) }
+                                buttons
+                            }
+                            .padding(.vertical, 12)
+                        }
+                        .frame(width: min(420, geo.size.width * 0.46))
+                    }
+                    .padding(.horizontal, 16)
                 } else {
-                    ProgressView().frame(maxHeight: .infinity)
+                    VStack(spacing: 12) {
+                        summary
+                        pageArea
+                        if let document { thumbnails(document) }
+                        buttons
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
                 }
-                printButton
             }
-            .padding(.vertical, 12)
-            .background(Color(.systemGray6).ignoresSafeArea())
+            .background(Kid.background.ignoresSafeArea())
             .navigationTitle("PDF preview")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Back") { dismiss() }
+                    KidCircleButton(image: "BtnBack", label: "Back") { dismiss() }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Print", systemImage: "printer") { print() }
+                .kidPlainBackground()
+                ToolbarItem(placement: .principal) {
+                    Text("PDF preview").font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
                 }
             }
             .task { document = PDFDocument(url: book.url) }
         }
+        // Full height on iPad: the form sheet cut the page in half.
+        .presentationSizing(.page)
+    }
+
+    /// The current page, whole (aspect-fit), with where it is in the book.
+    private var pageArea: some View {
+        VStack(spacing: 8) {
+            if let document {
+                TabView(selection: $index) {
+                    ForEach(0..<document.pageCount, id: \.self) { i in
+                        PageImage(page: document.page(at: i), longSide: 1400)
+                            .shadow(color: Kid.ink.opacity(0.18), radius: 8, y: 4)
+                            .padding(10)
+                            .tag(i)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                Text(label(for: index) + "  ·  \(index + 1) of \(document.pageCount)")
+                    .font(Kid.bodyBold(15))
+                    .foregroundStyle(PlansPanel.hint)
+            } else {
+                ProgressView().controlSize(.large).tint(Kid.ink)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Summary
@@ -48,23 +91,29 @@ struct PDFPreviewView: View {
     private var pageCount: Int { book.kinds.count }
 
     private var summary: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(book.title).font(.headline)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(book.title)
+                .font(Kid.titleBold(20))
+                .foregroundStyle(Kid.ink)
+                .lineLimit(2)
             Text("\(book.pictures) pictures · \(pageCount) pages · US Letter · \(book.options.lines.title) lines")
-                .font(.subheadline)
+                .font(Kid.bodyBold(14))
+                .foregroundStyle(Kid.ink.opacity(0.8))
             Text("Paper: \(pageCount) sheets single-sided, or \((pageCount + 1) / 2) double-sided.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(Kid.body(14))
+                .foregroundStyle(PlansPanel.hint)
             ForEach(notes, id: \.self) { note in
-                Label(note, systemImage: "exclamationmark.circle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Kid.orange)
+                    Text(note).foregroundStyle(Kid.ink.opacity(0.85))
+                }
+                .font(Kid.bodyBold(13))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.systemBackground)))
-        .padding(.horizontal, 16)
+        .background(RoundedRectangle(cornerRadius: 20).fill(.white))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color(hex: 0xEAD7F8), lineWidth: 2))
     }
 
     /// Things worth knowing before paper and ink are spent.
@@ -109,15 +158,15 @@ struct PDFPreviewView: View {
                             withAnimation { index = i }
                         } label: {
                             VStack(spacing: 4) {
-                                PageThumbnail(page: document.page(at: i))
+                                PageImage(page: document.page(at: i), longSide: 160)
                                     .frame(width: 58, height: 75)
-                                    .overlay(RoundedRectangle(cornerRadius: 3)
-                                        .strokeBorder(i == index ? Color.orange : Color.black.opacity(0.15),
-                                                      lineWidth: i == index ? 3 : 1))
+                                    .overlay(RoundedRectangle(cornerRadius: 4)
+                                        .strokeBorder(i == index ? Kid.yellow : Color(hex: 0xDCB9F3),
+                                                      lineWidth: i == index ? 4 : 1.5))
                                 Text(label(for: i))
-                                    .font(.caption2)
+                                    .font(Kid.bodyBold(11))
                                     .lineLimit(1)
-                                    .foregroundStyle(i == index ? .primary : .secondary)
+                                    .foregroundStyle(i == index ? Kid.ink : PlansPanel.hint)
                             }
                             .frame(width: 70)
                         }
@@ -125,7 +174,7 @@ struct PDFPreviewView: View {
                         .id(i)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 4)
             }
             .frame(height: 100)
             .onChange(of: index) { _, i in withAnimation { proxy.scrollTo(i, anchor: .center) } }
@@ -134,26 +183,35 @@ struct PDFPreviewView: View {
 
     // MARK: - Print
 
-    private var printButton: some View {
+    /// Save or share, and Print: the one Print (the corner one is gone,
+    /// polish-plan 58).
+    private var buttons: some View {
         HStack(spacing: 12) {
             // Save to Files, Mail, AirDrop, or a print shop's app.
             ShareLink(item: book.url) {
-                Label("Save or share PDF", systemImage: "square.and.arrow.up")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .foregroundStyle(.white)
-                    .background(Color(red: 0.98, green: 0.45, blue: 0.20), in: RoundedRectangle(cornerRadius: 16))
+                HStack(spacing: 8) {
+                    Image("BtnShare").resizable().scaledToFit().frame(width: 30, height: 30)
+                    Text("Save or share")
+                }
+                .font(Kid.titleBold(19))
+                .foregroundStyle(Kid.ink)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .background(Capsule().fill(Kid.yellow))
+                .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
             }
+            .buttonStyle(SquishyStyle())
             Button {
                 print()
             } label: {
                 Label("Print", systemImage: "printer.fill")
-                    .font(.headline)
-                    .frame(minWidth: 110, minHeight: 54)
-                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+                    .font(Kid.titleBold(19))
+                    .foregroundStyle(Kid.ink)
+                    .frame(minWidth: 120, minHeight: 56)
+                    .background(Capsule().fill(Color(hex: 0xEAD7F8)))
+                    .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
             }
+            .buttonStyle(SquishyStyle())
         }
-        .padding(.horizontal, 16)
     }
 
     private func print() {
@@ -171,57 +229,25 @@ struct PDFPreviewView: View {
     }
 }
 
-/// One small page picture, rendered when it scrolls into view.
-private struct PageThumbnail: View {
+/// One page as a picture, aspect-fit, rendered when it comes into view.
+private struct PageImage: View {
     let page: PDFPage?
+    /// Pixels on the page's long side.
+    let longSide: CGFloat
     @State private var image: UIImage?
 
     var body: some View {
+        let box = page?.bounds(for: .mediaBox).size ?? CGSize(width: 612, height: 792)
         ZStack {
             Color.white
             if let image { Image(uiImage: image).resizable().scaledToFit() }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 3))
-        .task { image = page?.thumbnail(of: CGSize(width: 120, height: 155), for: .mediaBox) }
-    }
-}
-
-/// The PDF as a document: pages one under another, scrolled like Files or
-/// Books would show it. Scrolling updates the thumbnail strip, and tapping a
-/// thumbnail scrolls here.
-private struct PDFDocumentView: UIViewRepresentable {
-    let document: PDFDocument
-    @Binding var index: Int
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        view.document = document
-        view.autoScales = true
-        view.displayMode = .singlePageContinuous
-        view.displayDirection = .vertical
-        view.pageShadowsEnabled = true
-        view.backgroundColor = .systemGray5
-        NotificationCenter.default.addObserver(context.coordinator, selector: #selector(Coordinator.pageChanged(_:)),
-                                               name: .PDFViewPageChanged, object: view)
-        return view
-    }
-
-    func updateUIView(_ view: PDFView, context: Context) {
-        context.coordinator.parent = self
-        guard let page = document.page(at: index), view.currentPage != page else { return }
-        view.go(to: page)
-    }
-
-    final class Coordinator: NSObject {
-        var parent: PDFDocumentView
-        init(_ parent: PDFDocumentView) { self.parent = parent }
-
-        @objc func pageChanged(_ note: Notification) {
-            guard let view = note.object as? PDFView, let page = view.currentPage else { return }
-            let i = parent.document.index(for: page)
-            if i != parent.index { parent.index = i }
+        .aspectRatio(box.width / max(box.height, 1), contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task {
+            let scale = longSide / max(box.width, box.height)
+            image = page?.thumbnail(of: CGSize(width: box.width * scale, height: box.height * scale), for: .mediaBox)
         }
     }
 }

@@ -74,53 +74,8 @@ struct CreatePageView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                if case .done(let page, let image) = phase {
-                    result(page, image)
-                } else if wide {
-                    // Phone on its side: the photo left, the choices right,
-                    // so nothing has to scroll out of a short screen.
-                    HStack(alignment: .top, spacing: 18) {
-                        photoCard
-                            .frame(maxWidth: .infinity)
-                        VStack(spacing: 16) {
-                            styleCards
-                            failure
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                } else {
-                    photoCard
-                    styleCards
-                    failure
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, wide ? 8 : 20)
-            .padding(.bottom, 12)
-        }
-        // "Draw my page" stays in sight above the tab bar, whatever the
-        // screen's height (it was pushed under the bar in landscape).
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if case .done(let page, _) = phase {
-                resultButtons(page)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 6)
-                    .background(
-                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
-                                       startPoint: .top, endPoint: .bottom))
-            } else {
-                drawButton
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 6)
-                    // Content scrolls under a soft fade, not through the button.
-                    .background(
-                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
-                                       startPoint: .top, endPoint: .bottom))
-            }
+        Group {
+            if wide && !isDone { sideBySide } else { column }
         }
         .kidTabBarClearance()
         .background(KidBackground())
@@ -193,6 +148,72 @@ struct CreatePageView: View {
         #endif
     }
 
+    /// One column, "Draw my page" (or the result's buttons) pinned above
+    /// the tab bar.
+    private var column: some View {
+        ScrollView {
+            VStack(spacing: 22) {
+                if case .done(let page, let image) = phase {
+                    result(page, image)
+                } else {
+                    photoCard
+                    styleCards
+                    failure
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, wide ? 8 : 20)
+            .padding(.bottom, 12)
+        }
+        // "Draw my page" stays in sight above the tab bar, whatever the
+        // screen's height (it was pushed under the bar in landscape).
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if case .done(let page, _) = phase {
+                resultButtons(page)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    .background(
+                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                                       startPoint: .top, endPoint: .bottom))
+            } else {
+                drawButton
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
+                    // Content scrolls under a soft fade, not through the button.
+                    .background(
+                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                                       startPoint: .top, endPoint: .bottom))
+            }
+        }
+    }
+
+    /// Phone on its side, before the page is drawn: the photo on the left at
+    /// the height there is, the style and "Draw my page" on the right, so
+    /// the button covers nothing and "Change" stays in sight
+    /// (polish-plan 7, 54).
+    private var sideBySide: some View {
+        HStack(alignment: .top, spacing: 18) {
+            photoCard
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 12) {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        styleCards
+                        failure
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                drawButton
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
     // MARK: - Steps
 
     private var photoCard: some View {
@@ -238,7 +259,7 @@ struct CreatePageView: View {
                     .padding(.vertical, 22)
                 }
             }
-            .frame(minHeight: wide ? 200 : 260)
+            .frame(minHeight: wide ? 150 : 260)
         }
         .buttonStyle(SquishyStyle())
         .overlay(alignment: .bottom) {

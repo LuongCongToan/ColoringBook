@@ -535,21 +535,23 @@ extension ExactText {
     }
 }
 
-/// The round check on a tile in Select mode (My books, My pages).
+/// The round check on a tile in Select mode (My books, My pages): a yellow
+/// circle with an ink tick when chosen, an empty white ring when not, 34 pt
+/// (it was the system's small blue tick, polish-plan 51).
 struct SelectCheck: View {
     let on: Bool
 
     var body: some View {
         ZStack {
-            Circle().fill(on ? Color.blue : Color.black.opacity(0.25))
-            Circle().strokeBorder(.white, lineWidth: 2)
+            Circle().fill(on ? Kid.yellow : Color.white.opacity(0.85))
+            Circle().strokeBorder(on ? Kid.ink : Kid.ink.opacity(0.35), lineWidth: 2.5)
             if on {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundStyle(Kid.ink)
             }
         }
-        .frame(width: 28, height: 28)
-        .shadow(color: .black.opacity(0.25), radius: 2)
+        .frame(width: 34, height: 34)
+        .shadow(color: Kid.ink.opacity(0.2), radius: 2, y: 1)
     }
 }

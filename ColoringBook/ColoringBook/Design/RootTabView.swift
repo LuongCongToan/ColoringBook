@@ -9,9 +9,16 @@ enum AppTab: Hashable { case home, create, library }
 final class AppTabs {
     static let shared = AppTabs()
     var selected: AppTab = .home
-    /// Hides the tab bar while a screen shows its own bottom bar (Select
-    /// mode in My pages and My books, as in Photos).
-    var barHidden = false
+    /// Who is hiding the tab bar: Select mode in My pages and My books (its
+    /// own bottom bar, as in Photos), the coloring screen, the book. A set,
+    /// not a flag: the screen being left used to show the bar again after
+    /// the screen being opened hid it (polish-plan 46).
+    private(set) var barHiders: Set<String> = []
+    var barHidden: Bool { !barHiders.isEmpty }
+
+    func hideBar(_ who: String, _ hidden: Bool = true) {
+        if hidden { barHiders.insert(who) } else { barHiders.remove(who) }
+    }
     /// Bumped by "Make a coloring page" on Home: Create starts a new page
     /// rather than showing the last result.
     var freshCreate = 0
@@ -20,6 +27,23 @@ final class AppTabs {
     /// Bumped by Save on the coloring screen: My library goes back to its
     /// first screen, on Pages.
     var libraryReset = 0
+    /// Bumped by tapping Home while on Home: back to its first screen.
+    var homeReset = 0
+
+    /// A tab tapped: tapping the tab already showing goes back to its first
+    /// screen, as in other apps (polish-plan 8). Create keeps its page.
+    func tap(_ tab: AppTab) {
+        if tab == selected {
+            switch tab {
+            case .home: homeReset += 1
+            case .library: libraryReset += 1
+            case .create: break
+            }
+        } else {
+            selected = tab
+        }
+    }
+
     /// The page just saved, shown first and highlighted in My pages.
     var highlightPage: UUID?
 
@@ -62,7 +86,7 @@ struct RootTabView: View {
                 tabView
                     .environment(\.kidTabBarHeight, tabs.barHidden ? 0 : barHeight - sink + (bottom > 0 ? 8 : 16))
                 if !tabs.barHidden {
-                    KidTabBar(selected: $tabs.selected)
+                    KidTabBar(selected: tabs.selected) { tabs.tap($0) }
                         .padding(.bottom, bottom > 0 ? -sink : 8)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
@@ -75,7 +99,7 @@ struct RootTabView: View {
     private var tabView: some View {
         TabView(selection: $tabs.selected) {
             Tab(value: AppTab.home) {
-                PageLibraryView().kidTabBarSpace()
+                PageLibraryView().id(tabs.homeReset).kidTabBarSpace()
             }
             Tab(value: AppTab.create) {
                 NavigationStack { CreatePageView() }.kidTabBarSpace()
@@ -94,7 +118,8 @@ struct RootTabView: View {
 /// 19 pt above the screen's bottom edge; the current tab on a 135 × 81 pt
 /// pill in #FDE695; icons about 64 pt with Fredoka Bold 16 labels.
 struct KidTabBar: View {
-    @Binding var selected: AppTab
+    let selected: AppTab
+    let onTap: (AppTab) -> Void
     static let height: CGFloat = 102
     /// Phone on its side: icon beside the word, a lower bar.
     static let compactHeight: CGFloat = 54
@@ -116,7 +141,7 @@ struct KidTabBar: View {
                 let on = selected == tab
                 Button {
                     SoundFX.shared.play(.tap)
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { selected = tab }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { onTap(tab) }
                 } label: {
                     let layout = compact ? AnyLayout(HStackLayout(spacing: 4)) : AnyLayout(VStackLayout(spacing: -4))
                     layout {

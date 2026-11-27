@@ -9,6 +9,10 @@ struct CurlPager: UIViewControllerRepresentable {
     /// Bumped to make visible pages load their picture again (after editing).
     var reloadToken = 0
     let image: (Int) async -> UIImage?
+    /// Shown at once while `image` works: the picture already made, or a
+    /// thumbnail (pages were blank with a spinner for seconds,
+    /// polish-plan 47).
+    var placeholder: ((Int) -> UIImage?)? = nil
     var onTap: ((Int) -> Void)?
     var sounds = true
 
@@ -65,7 +69,8 @@ struct CurlPager: UIViewControllerRepresentable {
         func page(_ i: Int) -> CurlPageController {
             let loader = parent.image
             let tap = parent.onTap
-            return CurlPageController(index: i, load: { await loader(i) }, onTap: tap.map { t in { t(i) } })
+            return CurlPageController(index: i, placeholder: parent.placeholder?(i), load: { await loader(i) },
+                                      onTap: tap.map { t in { t(i) } })
         }
 
         func pageViewController(_ pvc: UIPageViewController, viewControllerBefore vc: UIViewController) -> UIViewController? {
@@ -124,8 +129,11 @@ final class CurlPageController: UIViewController {
     private let picture = UIImageView()
     private let spinner = UIActivityIndicatorView(style: .large)
 
-    init(index: Int, load: @escaping () async -> UIImage?, onTap: (() -> Void)?) {
+    private let placeholder: UIImage?
+
+    init(index: Int, placeholder: UIImage? = nil, load: @escaping () async -> UIImage?, onTap: (() -> Void)?) {
         self.index = index
+        self.placeholder = placeholder
         self.load = load
         self.onTap = onTap
         super.init(nibName: nil, bundle: nil)
@@ -141,12 +149,14 @@ final class CurlPageController: UIViewController {
         }
         picture.contentMode = .scaleAspectFit
         view.addSubview(picture)
-        spinner.startAnimating()
+        picture.image = placeholder
+        if placeholder == nil { spinner.startAnimating() }
+        spinner.hidesWhenStopped = true
         view.addSubview(spinner)
         Task { [weak self] in
             guard let self else { return }
             let image = await self.load()
-            self.picture.image = image
+            if let image { self.picture.image = image }
             self.spinner.stopAnimating()
             self.view.setNeedsLayout()
         }

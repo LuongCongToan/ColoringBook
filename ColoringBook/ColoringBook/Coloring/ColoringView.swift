@@ -26,7 +26,6 @@ struct ColoringView: View {
                         header
                         HStack(spacing: 0) {
                             ToolRail(session: session, axis: .vertical)
-                                .frame(width: 100)
                             canvas
                                 .overlay(alignment: .bottomTrailing) {
                                     ZoomButtons(session: session).padding(14)
@@ -79,8 +78,8 @@ struct ColoringView: View {
         }
         // Coloring needs every bit of the screen: the tab bar steps aside
         // (it came back over the tools in landscape).
-        .onAppear { AppTabs.shared.barHidden = true }
-        .onDisappear { AppTabs.shared.barHidden = false }
+        .onAppear { AppTabs.shared.hideBar("coloring") }
+        .onDisappear { AppTabs.shared.hideBar("coloring", false) }
         .onAppear {
             #if DEBUG && targetEnvironment(simulator)
             // `-brushTool`: open with the brush, to see the size row.
@@ -226,23 +225,35 @@ private struct ToolRail: View {
 
     var body: some View {
         if axis == .horizontal {
-            HStack(spacing: 5) { buttons }
+            HStack(spacing: 5) { buttons() }
                 .padding(.horizontal, 11)
         } else {
-            // A short screen (phone on its side) cannot show six tools in a
-            // column: it scrolls.
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 10) { buttons }
+            // One column when six cards fit (iPad); a phone on its side has
+            // room for three rows only, so two columns of smaller cards, all
+            // six in sight (Sticker and Frame were hidden below the fold,
+            // polish-plan 44). Scrolls only if even that does not fit.
+            ViewThatFits(in: .vertical) {
+                VStack(spacing: 10) { buttons(width: 72) }
                     .padding(.vertical, 10)
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, 10)
+                twoColumns
+                ScrollView(.vertical, showsIndicators: false) { twoColumns }
             }
             .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
-    @ViewBuilder private var buttons: some View {
+    private var twoColumns: some View {
+        LazyVGrid(columns: [GridItem(.fixed(66), spacing: 8), GridItem(.fixed(66))], spacing: 8) {
+            buttons(width: 66, compact: true)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder private func buttons(width: CGFloat? = nil, compact: Bool = false) -> some View {
         ForEach(ColoringSession.Tool.allCases) { tool in
-            ToolButton(tool: tool, session: session)
+            ToolButton(tool: tool, session: session, width: width, compact: compact)
         }
     }
 }
@@ -250,6 +261,10 @@ private struct ToolRail: View {
 private struct ToolButton: View {
     let tool: ColoringSession.Tool
     let session: ColoringSession
+    /// A fixed card width (side rail); the bottom row shares the width.
+    var width: CGFloat? = nil
+    /// Smaller picture and card, for two columns on a short screen.
+    var compact = false
 
     private var selected: Bool { session.tool == tool }
 
@@ -264,20 +279,21 @@ private struct ToolButton: View {
                 Image(tool.art)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 54, height: 54)
+                    .frame(width: compact ? 42 : 54, height: compact ? 42 : 54)
                     // Each picture measured against the design (2026-11-25).
                     .scaleEffect(tool.artScale)
                     .offset(x: tool.artNudge, y: -2)
                     .padding(.vertical, 3)
                 Text(tool.title)
-                    .font(Kid.titleBold(14, relativeTo: .caption))
+                    .font(Kid.titleBold(compact ? 12 : 14, relativeTo: .caption))
                     .foregroundStyle(Kid.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
             .padding(.horizontal, 1)
             .padding(.bottom, 4)
-            .frame(maxWidth: 72, minHeight: 84)
+            .frame(maxWidth: width ?? 72, minHeight: compact ? 70 : 84)
+            .frame(width: width)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(selected ? Kid.yellow : .white)
@@ -374,12 +390,23 @@ private struct SizePicker: View {
     private static let dots: [CGFloat] = [12, 18, 28, 39, 50]
 
     var body: some View {
-        let layout = axis == .horizontal
-            ? AnyLayout(HStackLayout(spacing: 14))
-            : AnyLayout(VStackLayout(spacing: 4))
         let tool = session.tool
         let current = session.sizeIndex[tool] ?? 1
-        layout {
+        Group {
+            if axis == .horizontal {
+                HStack(spacing: 14) { options(tool: tool, current: current) }
+            } else {
+                // Two short rows: five dots in a column pushed the colors off
+                // a landscape phone (polish-plan 44).
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(56), spacing: 4), count: 3), spacing: 4) {
+                    options(tool: tool, current: current)
+                }
+            }
+        }
+        .sensoryFeedback(.selection, trigger: current)
+    }
+
+    @ViewBuilder private func options(tool: ColoringSession.Tool, current: Int) -> some View {
             ForEach(Self.dots.indices, id: \.self) { i in
                 Button {
                     SoundFX.shared.play(.tap)
@@ -392,13 +419,14 @@ private struct SizePicker: View {
                                 .fill(i == current ? .white : .clear)
                                 .overlay(Circle().strokeBorder(i == current ? Kid.ink : .clear, lineWidth: 3)))
                         .frame(width: 52, height: 52)
+                        // The whole 52 pt square takes the tap, not only the
+                        // dot (12 pt for the smallest, polish-plan 45).
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Size \(i + 1) of \(Self.dots.count)")
                 .accessibilityAddTraits(i == current ? .isSelected : [])
             }
-        }
-        .sensoryFeedback(.selection, trigger: current)
     }
 
     @ViewBuilder private func dot(diameter: CGFloat) -> some View {
@@ -568,18 +596,22 @@ private struct FrameTray: View {
     var body: some View {
         if axis == .horizontal {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) { items }
+                HStack(spacing: 10) { items() }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
             }
         } else {
-            VStack(spacing: 10) { items }
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity)
+            // Two columns in the side panel (one column scrolled a long way,
+            // polish-plan 53).
+            LazyVGrid(columns: [GridItem(.fixed(88), spacing: 8), GridItem(.fixed(88))], spacing: 8) {
+                items(small: true)
+            }
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
         }
     }
 
-    @ViewBuilder private var items: some View {
+    @ViewBuilder private func items(small: Bool = false) -> some View {
         ForEach(FrameLibrary.all()) { frame in
             let selected = session.art.frame == frame
             Button {
@@ -587,8 +619,9 @@ private struct FrameTray: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.setFrame(frame) }
             } label: {
                 FramePreview(frame: frame)
-                    .frame(width: 96, height: 72)
-                    .padding(6)
+                    .frame(width: small ? 76 : 96, height: small ? 56 : 72)
+                    .clipped()
+                    .padding(small ? 5 : 6)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(selected ? Theme.selected : .white)

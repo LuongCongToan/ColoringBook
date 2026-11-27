@@ -41,6 +41,7 @@ struct MyPagesView: View {
                             .overlay(alignment: .topTrailing) {
                                 if selecting { SelectCheck(on: chosen).padding(8) }
                             }
+                            .modifier(SelectedRing(on: selecting && chosen))
                             .overlay {
                                 // The page just saved (Save on the coloring screen).
                                 if tabs.highlightPage == page.id {
@@ -65,6 +66,22 @@ struct MyPagesView: View {
             .padding(18)
         }
         .background(KidBackground())
+        // Said in words too, for the grown-up (polish-plan 50).
+        .overlay(alignment: .top) {
+            if tabs.highlightPage != nil {
+                Label("Saved to My pages", systemImage: "checkmark.circle.fill")
+                    .font(Kid.titleBold(17))
+                    .foregroundStyle(Kid.ink)
+                    .padding(.horizontal, 18)
+                    .frame(height: 44)
+                    .background(Capsule().fill(Kid.yellow))
+                    .overlay(Capsule().strokeBorder(.white, lineWidth: 2.5))
+                    .shadow(color: Kid.ink.opacity(0.15), radius: 6, y: 3)
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tabs.highlightPage)
         .navigationTitle(selecting ? selectionTitle : "My pages")
         .kidBackButton(hidden: selecting)
         .toolbar {
@@ -81,11 +98,11 @@ struct MyPagesView: View {
         .kidTabBarClearance()
         // Select mode takes the tab bar's place, like Photos; leaving the
         // screen (or the tab) ends it.
-        .onChange(of: selecting) { _, on in AppTabs.shared.barHidden = on }
+        .onChange(of: selecting) { _, on in AppTabs.shared.hideBar("pagesSelect", on) }
         .onDisappear {
             selecting = false
             selection = []
-            AppTabs.shared.barHidden = false
+            AppTabs.shared.hideBar("pagesSelect", false)
         }
         .confirmationDialog("Delete this page?",
                             isPresented: Binding(get: { single != nil }, set: { if !$0 { single = nil } }),
@@ -137,27 +154,10 @@ struct MyPagesView: View {
     }
 
     private var selectionBar: some View {
-        HStack {
-            Button(allSelected ? "Deselect All" : "Select All") {
-                selection = allSelected ? [] : Set(store.pages.map(\.id))
-            }
-            .font(Kid.body(17))
-            Spacer()
-            Text(selectionTitle)
-                .font(Kid.bodyBold(15))
-                .foregroundStyle(Kid.ink.opacity(0.7))
-            Spacer()
-            Button(role: .destructive) {
-                confirmDelete = true
-            } label: {
-                Image(systemName: "trash")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
-            }
-            .tint(.red)
-            .disabled(selection.isEmpty)
-            .accessibilityLabel("Delete selected pages")
-            // On the trash button, so the question pops up next to it.
+        KidSelectionBar(title: selectionTitle, allSelected: allSelected, canDelete: !selection.isEmpty,
+                        deleteLabel: "Delete selected pages",
+                        onSelectAll: { selection = allSelected ? [] : Set(store.pages.map(\.id)) },
+                        onDelete: { confirmDelete = true })
             .confirmationDialog(selection.count == 1 ? "Delete this page?" : "Delete \(selection.count) pages?",
                                 isPresented: $confirmDelete, titleVisibility: .visible) {
                 Button(selection.count == 1 ? "Delete page" : "Delete \(selection.count) pages", role: .destructive) {
@@ -170,10 +170,6 @@ struct MyPagesView: View {
             } message: {
                 Text(deleteNote(selection))
             }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
-        .background(.bar)
     }
 
     private func open(_ id: UUID) async {

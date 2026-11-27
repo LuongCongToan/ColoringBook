@@ -15,6 +15,9 @@ struct BookReaderView: View {
     @State private var reload = 0
     @State private var coloring: PageToColor?
     @State private var cache: [String: UIImage] = [:]
+    /// Sheets being drawn, so a page asked for twice (shown, and fetched
+    /// ahead) is drawn once.
+    @State private var drawing: [String: Task<UIImage?, Never>] = [:]
     @State private var exporting = false
     @State private var exportProgress = 0.0
     @State private var pdf: BuiltBook?
@@ -73,8 +76,10 @@ struct BookReaderView: View {
     var body: some View {
         let sheets = self.sheets
         VStack(spacing: 14) {
+            if let book { actions(book) }
             CurlPager(count: sheets.count, index: $index, reloadToken: reload,
                       image: { await image(at: $0) },
+                      placeholder: { placeholder(at: $0) },
                       onTap: { i in
                           if case .picture(let id)? = self.sheets[safe: i] { Task { await open(id) } }
                       },
@@ -106,41 +111,24 @@ struct BookReaderView: View {
         .kidTabBarClearance()
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(book?.title ?? "Book")
-        .kidBackButton()
+        // No way out while the PDF or the video is being made.
+        .kidBackButton(hidden: busy)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let book {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await saveVideo() }
-                    } label: {
-                        Image(systemName: "play.rectangle.fill")
-                    }
-                    .accessibilityLabel("Save video")
-                    .disabled(makingVideo || exporting || pageIDs.isEmpty)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        BookBuilderView(book: book)
-                    } label: {
-                        Text("Edit")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task { await savePDF() }
-                    } label: {
-                        // Spelled out: an icon alone was easy to miss.
-                        Text("Save PDF")
-                            .font(.subheadline.weight(.bold))
-                            .fixedSize()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Self.accent)
-                    .disabled(exporting || pageIDs.isEmpty)
-                }
+            // The whole bar is the title's now (it was cut to "Lily's
+            // Colo…" beside three buttons, polish-plan 48).
+            ToolbarItem(placement: .principal) {
+                Text(book?.title ?? "Book")
+                    .font(Kid.titleBold(22))
+                    .foregroundStyle(Kid.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
+        // A book is read full screen: no tab bar to tap by mistake, and the
+        // loading veil covers everything (polish-plan 48, 71).
+        .onAppear { AppTabs.shared.hideBar("book") }
+        .onDisappear { AppTabs.shared.hideBar("book", false) }
         .loading(exporting, "Making the PDF…", progress: exportProgress)
         .loading(makingVideo, "Making the video…", progress: videoProgress)
         .sheet(item: $video) { video in VideoShareSheet(url: video.url) }
@@ -187,6 +175,51 @@ struct BookReaderView: View {
             }
             #endif
         }
+    }
+
+    private var busy: Bool { exporting || makingVideo }
+
+    /// Edit, Save video, Save PDF: one row of pills under the bar, all the
+    /// same height (44 pt) and always in the same place.
+    private func actions(_ book: StoredBook) -> some View {
+        HStack(spacing: 10) {
+            NavigationLink {
+                BookBuilderView(book: book)
+            } label: {
+                actionPill("Edit", symbol: "pencil", fill: Color(hex: 0xEAD7F8))
+            }
+            .buttonStyle(SquishyStyle())
+            Button {
+                Task { await saveVideo() }
+            } label: {
+                actionPill("Video", symbol: "play.rectangle.fill", fill: Color(hex: 0xEAD7F8))
+            }
+            .buttonStyle(SquishyStyle())
+            .accessibilityLabel("Save video")
+            .disabled(pageIDs.isEmpty)
+            Button {
+                Task { await savePDF() }
+            } label: {
+                actionPill("Save PDF", symbol: "printer.fill", fill: Kid.yellow)
+            }
+            .buttonStyle(SquishyStyle())
+            .disabled(pageIDs.isEmpty)
+        }
+        .disabled(busy)
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+    }
+
+    private func actionPill(_ title: String, symbol: String, fill: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .bold))
+            Text(title).font(Kid.titleBold(17)).lineLimit(1).minimumScaleFactor(0.8)
+        }
+        .foregroundStyle(Kid.ink)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .background(Capsule().fill(fill))
+        .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2))
     }
 
     private var pageLabel: String {
@@ -298,16 +331,58 @@ struct BookReaderView: View {
 
     // MARK: - Pictures
 
-    private func image(at i: Int) async -> UIImage? {
-        guard let sheet = sheets[safe: i] else { return nil }
+    private func cacheKey(_ sheet: Sheet) -> String {
         let key: String
         switch sheet {
         case .picture(let id): key = "\(sheet)-\(layout(for: id).rawValue)"
         default: key = "\(sheet)"
         }
         // Sheets look different on another background.
-        let look = "\(book?.background ?? "-")-\(book?.backgroundOnPages ?? true)-\(book?.coverArt ?? "-")"
-        if let cached = cache[key + look] { return cached }
+        return key + "\(book?.background ?? "-")-\(book?.backgroundOnPages ?? true)-\(book?.coverArt ?? "-")"
+    }
+
+    /// What a sheet shows while it is drawn: the finished picture if it is
+    /// ready, else the page's thumbnail or photo from disk.
+    private func placeholder(at i: Int) -> UIImage? {
+        guard let sheet = sheets[safe: i] else { return nil }
+        if let cached = cache[cacheKey(sheet)] { return cached }
+        switch sheet {
+        case .picture(let id):
+            return pages.pages.first { $0.id == id }.flatMap { UIImage(contentsOfFile: $0.thumbnail.path) }
+        case .photo(let id):
+            return photoURL(id).flatMap { UIImage(contentsOfFile: $0.path) }
+        default:
+            return nil
+        }
+    }
+
+    /// A sheet's picture; then the sheets on either side are drawn ahead, so
+    /// turning to them shows them at once.
+    private func image(at i: Int, ahead: Bool = true) async -> UIImage? {
+        guard let sheet = sheets[safe: i] else { return nil }
+        let key = cacheKey(sheet)
+        let result: UIImage?
+        if let cached = cache[key] {
+            result = cached
+        } else if let task = drawing[key] {
+            result = await task.value
+        } else {
+            let task = Task { await render(sheet) }
+            drawing[key] = task
+            result = await task.value
+            cache[key] = result
+            drawing[key] = nil
+        }
+        if ahead {
+            Task {
+                _ = await image(at: i + 1, ahead: false)
+                _ = await image(at: i - 1, ahead: false)
+            }
+        }
+        return result
+    }
+
+    private func render(_ sheet: Sheet) async -> UIImage? {
         let result: UIImage?
         let frame = book?.coverFrame ?? .stars
         let background = BackgroundLibrary.named(book?.background)
@@ -332,7 +407,6 @@ struct BookReaderView: View {
                 result = colored
             }
         }
-        cache[key + look] = result
         return result
     }
 

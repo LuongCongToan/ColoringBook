@@ -69,9 +69,10 @@ struct BookBuilderView: View {
         }
         .onAppear {
             store.refresh()
-            if options.childName.isEmpty && editing == nil { options.childName = savedName }
         }
-        .onChange(of: options.childName) { _, name in savedName = name }
+        // Remembered for the next book, offered there rather than filled in
+        // (polish-plan 12).
+        .onChange(of: options.childName) { _, name in if !name.isEmpty { savedName = name } }
         .task(id: coverKey) { await renderCover() }
         .sheet(isPresented: $arranging) { ArrangeSheet(selected: $selected, store: store) }
         .navigationDestination(item: $openBook) { book in BookReaderView(bookID: book.id) }
@@ -93,6 +94,7 @@ struct BookBuilderView: View {
     // MARK: - Cover
 
     private var coverCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
         HStack(alignment: .top, spacing: 14) {
             Group {
                 if let coverPreview {
@@ -109,29 +111,42 @@ struct BookBuilderView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Cover").font(Kid.titleBold(24)).foregroundStyle(Kid.ink)
                 HStack(spacing: 8) {
-                    TextField("Child's name", text: $options.childName)
+                    // The hint in the ink at half strength: lavender on the
+                    // lavender field could hardly be read (polish-plan 52).
+                    TextField("Child's name", text: $options.childName,
+                              prompt: Text("Child's name").foregroundStyle(Kid.ink.opacity(0.45)))
                         .textInputAutocapitalization(.words)
                         .font(Kid.bodyBold(20))
                         .foregroundStyle(Kid.ink)
-                    Image(systemName: "pencil")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Kid.grape)
-                        .accessibilityHidden(true)
+                    if options.childName.isEmpty && !savedName.isEmpty {
+                        // Last book's name, one tap away.
+                        Button {
+                            SoundFX.shared.play(.tap)
+                            options.childName = savedName
+                        } label: {
+                            Text(savedName)
+                                .font(Kid.bodyBold(14))
+                                .foregroundStyle(Kid.ink)
+                                .lineLimit(1)
+                                .padding(.horizontal, 10)
+                                .frame(height: 30)
+                                .background(Capsule().fill(Self.lilacPill))
+                                .frame(minHeight: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(SquishyStyle())
+                        .accessibilityLabel("Use \(savedName)")
+                    } else {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Kid.grape)
+                            .accessibilityHidden(true)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .frame(height: 46)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Self.fieldFill))
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Self.lilacLine, lineWidth: 2))
-                // The colored covers only (user, 2026-11-26). Books saved
-                // with a line frame keep it until another cover is chosen.
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(CoverLibrary.names(), id: \.self) { name in coverChip(name) }
-                    }
-                    .padding(.vertical, 9)
-                    .padding(.horizontal, 2)
-                }
-                .padding(.vertical, -9)
                 Toggle(isOn: $options.belongsToPage) {
                     Text("\u{201C}This book belongs to\u{201D} page")
                         .font(Kid.bodyBold(16))
@@ -140,7 +155,33 @@ struct BookBuilderView: View {
                 .tint(Self.toggleTint)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+            coverChips
+        }
         .kidCard()
+    }
+
+    /// The colored covers only (user, 2026-11-26), across the card's whole
+    /// width so each is big enough to tap (they were 39×48 pt in a corner,
+    /// polish-plan 52). Books saved with a line frame keep it until another
+    /// cover is chosen.
+    private var coverChips: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                ForEach(CoverLibrary.names(), id: \.self) { name in
+                    coverChip(name).frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.vertical, 9)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(CoverLibrary.names(), id: \.self) { name in coverChip(name) }
+                }
+                .padding(.vertical, 9)
+                .padding(.horizontal, 2)
+            }
+        }
+        .padding(.vertical, -9)
     }
 
     private func coverChip(_ name: String) -> some View {
@@ -154,7 +195,7 @@ struct BookBuilderView: View {
                     Image(uiImage: image).resizable().scaledToFit()
                 }
             }
-            .frame(width: 33, height: 42)
+            .frame(width: 41, height: 53)
             .padding(3)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -225,7 +266,9 @@ struct BookBuilderView: View {
                     pill("Select all", fill: Self.lilacPill) { selected = store.pages.map(\.id) }
                     // Same size as the notes below (user, 2026-11-26): two
                     // lines between the buttons.
-                    Text("Tap in the order you want\n5–20 pages")
+                    // Any number can be saved; 5–20 is advice, as in the PDF
+                    // notes (it read like a rule, polish-plan 11).
+                    Text("Tap in the order you want\n5–20 pages work best")
                         .font(Kid.bodyBold(14))
                         .foregroundStyle(Self.hint)
                         .multilineTextAlignment(.center)
@@ -384,7 +427,9 @@ struct BookBuilderView: View {
                          iconSides: [false: 47, true: 35])
                 .disabled(editing != nil)
                 .opacity(editing != nil ? 0.6 : 1)
-            Text(freshCopies
+            Text(editing != nil
+                 ? "Chosen when the book was made; it can\u{2019}t change now."
+                 : freshCopies
                  ? "The book gets new, uncolored copies, so your child can color them again. My pages stay as they are."
                  : "The book shows the pages as they are colored now. Coloring a page in the book colors it in My pages too.")
                 .font(Kid.bodyBold(14))

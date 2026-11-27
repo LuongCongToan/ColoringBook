@@ -15,5 +15,9 @@
 	     add-only, the app never reads the library this way. -->
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Saves your coloring book videos to your photos.</string>
+	<!-- The app's cream paper and ink are drawn for a light page; in Dark
+	     Mode system text turned white on cream (polish-plan 41). -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
 </dict>
 </plist>

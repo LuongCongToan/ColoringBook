@@ -69,11 +69,17 @@ final class ColoringSession {
     /// the book's "photo and page" layout. Nil for imported pages.
     let photoData: Data?
 
+    /// Whether the page is in My pages already (opened from there, or saved
+    /// once). Such a page is saved even when it is back to blank, so undo
+    /// all the way does not leave the old colors on disk (polish-plan 42).
+    @ObservationIgnored var isStored: Bool
+
     init(art: LineArt, pageID: UUID = UUID(), restoring saved: SavedPage? = nil, photo: Data? = nil) {
         self.art = art
         self.pageID = pageID
         self.photoData = photo
         self.created = saved?.created ?? Date()
+        self.isStored = saved != nil
         self.paint = PagePaint(width: art.width, height: art.height, barrier: art.barrier)
         if let saved {
             paint.set(saved.actions)
