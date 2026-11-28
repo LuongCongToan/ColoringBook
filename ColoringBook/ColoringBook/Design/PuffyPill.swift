@@ -60,13 +60,13 @@ struct PuffyPill: View {
 #Preview {
     VStack(spacing: 16) {
         HStack {
-            PuffyPill(title: "Cancel")
+            PuffyPill(title: String(localized: "Cancel"))
             Spacer()
-            PuffyPill(title: "Done", icon: .symbol("checkmark"), fill: Kid.yellow)
+            PuffyPill(title: String(localized: "Done"), icon: .symbol("checkmark"), fill: Kid.yellow)
         }
         HStack(spacing: 10) {
-            PuffyPill(title: "Edit", icon: .art("ReaderEdit"), stretches: true)
-            PuffyPill(title: "Save PDF", icon: .art("ReaderPDF"), fill: Kid.yellow, stretches: true)
+            PuffyPill(title: String(localized: "Edit"), icon: .art("ReaderEdit"), stretches: true)
+            PuffyPill(title: String(localized: "Save PDF"), icon: .art("ReaderPDF"), fill: Kid.yellow, stretches: true)
         }
     }
     .padding()

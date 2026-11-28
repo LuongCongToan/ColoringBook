@@ -579,7 +579,7 @@ private final class StickerView: UIView {
         deleteButton.layer.cornerRadius = Self.control / 2
         deleteButton.layer.borderColor = UIColor.white.cgColor
         deleteButton.layer.borderWidth = 3
-        deleteButton.accessibilityLabel = "Remove sticker"
+        deleteButton.accessibilityLabel = String(localized: "Remove sticker")
         deleteButton.addAction(UIAction { [weak self] _ in self?.onDelete?() }, for: .touchUpInside)
         addSubview(deleteButton)
 
@@ -592,7 +592,7 @@ private final class StickerView: UIView {
         arrows.frame = CGRect(x: 0, y: 0, width: Self.control, height: Self.control)
         arrows.contentMode = .center
         handle.addSubview(arrows)
-        handle.accessibilityLabel = "Resize or turn sticker"
+        handle.accessibilityLabel = String(localized: "Resize or turn sticker")
         handle.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePanned(_:))))
         addSubview(handle)
     }

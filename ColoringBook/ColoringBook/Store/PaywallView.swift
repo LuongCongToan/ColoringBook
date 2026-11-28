@@ -28,7 +28,7 @@ struct PaywallView: View {
             .background(Kid.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    KidCircleButton(symbol: "xmark", label: "Close") { dismiss() }
+                    KidCircleButton(symbol: "xmark", label: String(localized: "Close")) { dismiss() }
                 }
                 .kidPlainBackground()
             }
@@ -137,25 +137,25 @@ struct PlansPanel: View {
     private var plans: some View {
         VStack(spacing: 12) {
             if let yearly = store.yearly {
-                PlanCard(title: "Pro Yearly", price: "\(yearly.displayPrice) / year",
+                PlanCard(title: String(localized: "Pro Yearly"), price: String(localized: "\(yearly.displayPrice) / year"),
                          detail: store.trialEligible
-                            ? "3-day free trial, then \(yearly.displayPrice) per year. 60 AI pages a month, unlimited books."
-                            : "60 AI pages a month, unlimited books. Billed yearly.",
+                            ? String(localized: "3-day free trial, then \(yearly.displayPrice) per year. 60 AI pages a month, unlimited books.")
+                            : String(localized: "60 AI pages a month, unlimited books. Billed yearly."),
                          badge: savingBadge, selected: selected == yearly.id) { selected = yearly.id }
             }
             if let monthly = store.monthly {
-                PlanCard(title: "Pro Monthly", price: "\(monthly.displayPrice) / month",
-                         detail: "60 AI pages a month, unlimited books. Billed monthly.",
+                PlanCard(title: String(localized: "Pro Monthly"), price: String(localized: "\(monthly.displayPrice) / month"),
+                         detail: String(localized: "60 AI pages a month, unlimited books. Billed monthly."),
                          badge: nil, selected: selected == monthly.id) { selected = monthly.id }
             }
             if let book = store.book {
-                PlanCard(title: "One Coloring Book", price: book.displayPrice,
-                         detail: "One-time purchase: one book of up to 20 pages, ready to print.",
+                PlanCard(title: String(localized: "One Coloring Book"), price: book.displayPrice,
+                         detail: String(localized: "One-time purchase: one book of up to 20 pages, ready to print."),
                          badge: nil, selected: selected == book.id) { selected = book.id }
             }
             if let pack = store.bookPack {
-                PlanCard(title: "Three Coloring Books", price: pack.displayPrice,
-                         detail: "One-time purchase: three books of up to 20 pages each, for siblings or gifts.",
+                PlanCard(title: String(localized: "Three Coloring Books"), price: pack.displayPrice,
+                         detail: String(localized: "One-time purchase: three books of up to 20 pages each, for siblings or gifts."),
                          badge: packSavingBadge, selected: selected == pack.id) { selected = pack.id }
             }
         }
@@ -165,21 +165,21 @@ struct PlansPanel: View {
     private var savingBadge: String? {
         guard let y = store.yearly?.price, let m = store.monthly?.price, m > 0 else { return nil }
         let saving = (1 - (y as NSDecimalNumber).doubleValue / ((m as NSDecimalNumber).doubleValue * 12)) * 100
-        return saving >= 5 ? "Save \(Int(saving))%" : nil
+        return saving >= 5 ? String(localized: "Save \(Int(saving))%") : nil
     }
 
     /// How much less three books cost in the pack than one by one.
     private var packSavingBadge: String? {
         guard let p = store.bookPack?.price, let b = store.book?.price, b > 0 else { return nil }
         let saving = (1 - (p as NSDecimalNumber).doubleValue / ((b as NSDecimalNumber).doubleValue * 3)) * 100
-        return saving >= 5 ? "Save \(Int(saving))%" : nil
+        return saving >= 5 ? String(localized: "Save \(Int(saving))%") : nil
     }
 
     private var buyTitle: String {
-        if selected == ProductID.yearly && store.trialEligible { return "Start free trial" }
-        if selected == ProductID.book { return "Buy book" }
-        if selected == ProductID.bookPack { return "Buy 3 books" }
-        return "Subscribe"
+        if selected == ProductID.yearly && store.trialEligible { return String(localized: "Start free trial") }
+        if selected == ProductID.book { return String(localized: "Buy book") }
+        if selected == ProductID.bookPack { return String(localized: "Buy 3 books") }
+        return String(localized: "Subscribe")
     }
 
     /// The big yellow button, like Save book.
@@ -223,7 +223,7 @@ struct PlansPanel: View {
         .font(Kid.bodyBold(13))
         .foregroundStyle(Kid.ink)
         .lineLimit(1)
-        .minimumScaleFactor(0.8)
+        .minimumScaleFactor(0.6)
         // 44 pt targets: small type, not small to tap.
         .frame(minHeight: 44)
     }
@@ -269,6 +269,8 @@ private struct PlanCard: View {
                                 .foregroundStyle(Kid.ink)
                                 .padding(.horizontal, 8).frame(height: 22)
                                 .background(Capsule().fill(Kid.mint.opacity(0.45)))
+                                .lineLimit(1)
+                                .fixedSize()
                         }
                     }
                     Text(price).font(Kid.titleBold(22)).foregroundStyle(Kid.ink)

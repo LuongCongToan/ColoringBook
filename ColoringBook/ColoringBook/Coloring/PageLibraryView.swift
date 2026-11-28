@@ -75,7 +75,7 @@ struct PageLibraryView: View {
         .kidTabBarClearance()
             .background(KidBackground())
             .toolbar(.hidden, for: .navigationBar)
-            .loading(opening, "Opening the page…")
+            .loading(opening, String(localized: "Opening the page…"))
             .navigationDestination(item: $opened) { page in
                 ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
             }
@@ -129,7 +129,7 @@ struct PageLibraryView: View {
         } label: {
             // The camera art is taller than the book's: sized so the
             // camera body is ~80 pt wide, as in the design.
-            homeCard(title: "Make a coloring page", subtitle: "From your favorite photo",
+            homeCard(title: String(localized: "Make a coloring page"), subtitle: String(localized: "From your favorite photo"),
                      color: Kid.yellow, art: "HomeCamera",
                      artSize: small ? CGSize(width: 146, height: 95) : CGSize(width: 208, height: 136),
                      artSlot: small ? 165 : 236,
@@ -142,7 +142,7 @@ struct PageLibraryView: View {
         NavigationLink {
             BookBuilderView()
         } label: {
-            homeCard(title: "Make a coloring book", subtitle: "Create, read & print",
+            homeCard(title: String(localized: "Make a coloring book"), subtitle: String(localized: "Create, read & print"),
                      color: Kid.lavender, art: "HomeBook",
                      artSize: small ? CGSize(width: 150, height: 79) : CGSize(width: 212, height: 112),
                      cardWidth: cardWidth)
@@ -164,7 +164,7 @@ struct PageLibraryView: View {
                     .font(Kid.titleBold(38))
                     .foregroundStyle(Kid.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.5)
                 Text("Make something magical!")
                     .font(Kid.text(16))
                     .foregroundStyle(Kid.grape)
@@ -263,7 +263,7 @@ struct PageLibraryView: View {
     private var booksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
-                sectionTitle("My books", symbol: "books.vertical.fill", color: Kid.grape)
+                sectionTitle(String(localized: "My books"), symbol: "books.vertical.fill", color: Kid.grape)
                 // Design sheet: Fredoka SemiBold 18 pt, #28145C.
                 Text("\(bookStore.books.count)")
                     .font(Kid.body(18))
@@ -299,7 +299,7 @@ struct PageLibraryView: View {
     private var pagesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                sectionTitle("My pages", symbol: "paintpalette.fill", color: Kid.coral)
+                sectionTitle(String(localized: "My pages"), symbol: "paintpalette.fill", color: Kid.coral)
                 Spacer()
                 NavigationLink { MyPagesView() } label: { seeAll }
             }
@@ -332,7 +332,7 @@ struct PageLibraryView: View {
     /// Ready-made pages (R&D samples in Debug) and importing a line drawing.
     private var samplesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(samples.isEmpty ? "Import a page" : "Try these", symbol: "star.fill", color: Kid.mint)
+            sectionTitle(samples.isEmpty ? String(localized: "Import a page") : String(localized: "Try these"), symbol: "star.fill", color: Kid.mint)
             LazyVGrid(columns: columns, spacing: 16) {
                 PhotosPicker(selection: $pick, matching: .images) {
                     VStack(spacing: 8) {
@@ -373,6 +373,13 @@ struct PageLibraryView: View {
         }
         .font(Kid.text(16))
         .foregroundStyle(Color(hex: 0xFF4545))
+        // The words are 22 pt high; the touch area grows to 44 × 44+ without
+        // making the section title row taller (polish-plan 63).
+        .padding(.vertical, 11)
+        .padding(.horizontal, 8)
+        .contentShape(Rectangle())
+        .padding(.vertical, -11)
+        .padding(.horizontal, -8)
     }
 
     /// A section title with a little colored badge.
@@ -388,6 +395,8 @@ struct PageLibraryView: View {
             Text(text)
                 .font(Kid.titleBold(22))
                 .foregroundStyle(Kid.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
@@ -401,14 +410,14 @@ struct PageLibraryView: View {
             opened = OpenedPage(art: art, pageID: id, saved: saved)
             error = nil
         } catch {
-            self.error = "Could not open this page."
+            self.error = String(localized: "Could not open this page.")
         }
     }
 
     private func open(_ url: URL) async {
         opening = true
         defer { opening = false }
-        guard let data = try? Data(contentsOf: url) else { error = "Could not read this page."; return }
+        guard let data = try? Data(contentsOf: url) else { error = String(localized: "Could not read this page."); return }
         await open(data)
     }
 
@@ -417,7 +426,7 @@ struct PageLibraryView: View {
             opened = OpenedPage(art: try await prepare(data))
             error = nil
         } catch {
-            self.error = "Could not read this page."
+            self.error = String(localized: "Could not read this page.")
         }
     }
 

@@ -21,7 +21,7 @@ nonisolated enum FrameChoice: Hashable, Codable, Sendable, Identifiable {
     var title: String {
         switch self {
         case .builtIn(let frame): frame.title
-        case .image(let name): name.replacingOccurrences(of: "-", with: " ").capitalized
+        case .image(let name): DisplayName.of(name)
         }
     }
 }

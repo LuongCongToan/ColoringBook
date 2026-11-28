@@ -15,13 +15,13 @@ nonisolated enum PageFrame: String, CaseIterable, Codable, Sendable, Identifiabl
     /// Name for VoiceOver and for the brief; the screen shows pictures.
     var title: String {
         switch self {
-        case .plain: "Simple"
-        case .double: "Double"
-        case .bubbles: "Bubbles"
-        case .stars: "Stars"
-        case .hearts: "Hearts"
-        case .flowers: "Flowers"
-        case .zigzag: "Zigzag"
+        case .plain: String(localized: "Simple")
+        case .double: String(localized: "Double")
+        case .bubbles: String(localized: "Bubbles")
+        case .stars: String(localized: "Stars")
+        case .hearts: String(localized: "Hearts")
+        case .flowers: String(localized: "Flowers")
+        case .zigzag: String(localized: "Zigzag")
         }
     }
 

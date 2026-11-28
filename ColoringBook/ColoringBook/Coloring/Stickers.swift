@@ -10,7 +10,7 @@ nonisolated enum StickerKind: String, CaseIterable, Sendable, Identifiable {
          strawberry, cherries, butterfly, rocket, unicorn, cat, dog, bear, panda, rabbit
 
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String { DisplayName.of(rawValue) }
     var assetName: String { "Sticker-\(rawValue)" }
 
     /// The picture, 512 px, transparent around it.

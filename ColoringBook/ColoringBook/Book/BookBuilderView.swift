@@ -95,6 +95,13 @@ struct BookBuilderView: View {
         }
         .onAppear {
             store.refresh()
+            #if DEBUG && targetEnvironment(simulator)
+            // `-openBookBuilder -arrangePages`: the Arrange pages sheet open.
+            if ProcessInfo.processInfo.arguments.contains("-arrangePages") {
+                if selected.isEmpty { selected = Array(store.pages.prefix(5).map(\.id)) }
+                arranging = true
+            }
+            #endif
         }
         // Remembered for the next book, offered there rather than filled in
         // (polish-plan 12).
@@ -225,7 +232,7 @@ struct BookBuilderView: View {
             }
         }
         .buttonStyle(SquishyStyle())
-        .accessibilityLabel("\(name.replacingOccurrences(of: "-", with: " ").capitalized) cover")
+        .accessibilityLabel("\(DisplayName.of(name)) cover")
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
@@ -256,14 +263,21 @@ struct BookBuilderView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Text("Pages").font(Kid.titleBold(24)).foregroundStyle(Kid.ink)
+                    .lineLimit(1).fixedSize()
                 Text("\(selected.count) chosen")
                     .font(Kid.bodyBold(16))
+                    .lineLimit(1).fixedSize()
                     .foregroundStyle(Kid.ink)
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .background(Capsule().fill(Self.lilacPill))
                 Spacer(minLength: 4)
-                pill("Arrange", symbol: "arrow.up.arrow.down", fill: Self.lilacPill) { arranging = true }
+                // Longer languages keep the count whole; Arrange drops its word.
+                ViewThatFits(in: .horizontal) {
+                    pill(Self.arrangeTitle, symbol: "arrow.up.arrow.down", fill: Self.lilacPill) { arranging = true }
+                    pill("", symbol: "arrow.up.arrow.down", fill: Self.lilacPill) { arranging = true }
+                        .accessibilityLabel(Self.arrangeTitle)
+                }
                     .disabled(selected.count < 2)
                     .opacity(selected.count < 2 ? 0.5 : 1)
             }
@@ -291,7 +305,7 @@ struct BookBuilderView: View {
                     .padding(.horizontal, -6)
                 }
                 HStack(spacing: 8) {
-                    pill("Select all", fill: Self.lilacPill) { selected = store.pages.map(\.id) }
+                    pill(String(localized: "Select all"), fill: Self.lilacPill) { selected = store.pages.map(\.id) }
                     // Same size as the notes below (user, 2026-11-26): two
                     // lines between the buttons.
                     // Any number can be saved; 5–20 is advice, as in the PDF
@@ -303,7 +317,7 @@ struct BookBuilderView: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity)
-                    pill("Clear", fill: Self.peachPill) { selected = [] }
+                    pill(String(localized: "Clear"), fill: Self.peachPill) { selected = [] }
                         .disabled(selected.isEmpty)
                         .opacity(selected.isEmpty ? 0.5 : 1)
                 }
@@ -313,6 +327,11 @@ struct BookBuilderView: View {
     }
 
     /// A soft pill button: Select all, Clear, Arrange.
+    /// Its own key: "Arrange" on one page (PageArrangeView) is placing
+    /// things, here it is the order of the pages, two words in most languages.
+    private static let arrangeTitle = String(localized: "arrange.order", defaultValue: "Arrange",
+                                             comment: "Button that opens the sheet to change the order of the book's pages")
+
     private func pill(_ title: String, symbol: String? = nil, fill: Color, action: @escaping () -> Void) -> some View {
         Button {
             SoundFX.shared.play(.tap)
@@ -320,7 +339,7 @@ struct BookBuilderView: View {
         } label: {
             HStack(spacing: 6) {
                 if let symbol { Image(systemName: symbol).font(.system(size: 15, weight: .bold)) }
-                Text(title).font(Kid.bodyBold(16))
+                if !title.isEmpty { Text(title).font(Kid.bodyBold(16)) }
             }
             .foregroundStyle(Kid.ink)
             .lineLimit(1)
@@ -434,14 +453,14 @@ struct BookBuilderView: View {
     private var layoutNote: String {
         var note: String
         switch options.layout {
-        case .pagesOnly: note = "One picture on each page."
-        case .photoFacing: note = "The photo on one page, its picture to color on the next."
-        case .photoCorner: note = "The picture with its photo laid on the corner, like a snapshot."
+        case .pagesOnly: note = String(localized: "One picture on each page.")
+        case .photoFacing: note = String(localized: "The photo on one page, its picture to color on the next.")
+        case .photoCorner: note = String(localized: "The picture with its photo laid on the corner, like a snapshot.")
         }
         if options.layout != .pagesOnly && selected.count > withPhoto {
-            note += " Pages not made from a photo show the picture alone."
+            note += String(localized: " Pages not made from a photo show the picture alone.")
         }
-        return note + " You can change one page\u{2019}s layout inside the book."
+        return note + String(localized: " You can change one page\u{2019}s layout inside the book.")
     }
 
     // MARK: - Options
@@ -449,7 +468,7 @@ struct BookBuilderView: View {
     private var appOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Pages in the book").font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
-            KidSegmented(options: [(false, "As colored", "IconAsColored"), (true, "Fresh to color", "IconFreshToColor")],
+            KidSegmented(options: [(false, String(localized: "As colored"), "IconAsColored"), (true, String(localized: "Fresh to color"), "IconFreshToColor")],
                          selection: $freshCopies, height: 43,
                          // As measured: the crayons 41 pt wide, the sheet 30 pt high.
                          iconSides: [false: 47, true: 35])
@@ -570,29 +589,67 @@ private struct ArrangeSheet: View {
 
     var body: some View {
         NavigationStack {
+            // Still a List: its edit mode gives the drag handles and swipe to
+            // remove. Dressed as the app's cards on cream (polish-plan 36).
             List {
-                ForEach(selected, id: \.self) { id in
-                    HStack(spacing: 14) {
-                        if let page = store.pages.first(where: { $0.id == id }) {
-                            PageThumb(url: page.thumbnail, updated: page.updated)
-                                .frame(width: 80, height: 60)
-                        }
-                        Text("Page \((selected.firstIndex(of: id) ?? 0) + 1)")
-                            .font(Kid.bodyBold(17))
-                            .foregroundStyle(Kid.ink)
+                Section {
+                    ForEach(selected, id: \.self) { id in
+                        row(id)
+                            .listRowBackground(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .strokeBorder(Kid.lavender, lineWidth: 2))
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 14)
+                            )
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 14, bottom: 10, trailing: 14))
                     }
+                    .onMove { selected.move(fromOffsets: $0, toOffset: $1) }
+                    .onDelete { selected.remove(atOffsets: $0) }
+                } header: {
+                    Text("Drag to change the order. Swipe left to take a page out.")
+                        .font(Kid.body(15))
+                        .foregroundStyle(Kid.ink.opacity(0.7))
+                        .textCase(nil)
+                        .padding(.bottom, 4)
                 }
-                .onMove { selected.move(fromOffsets: $0, toOffset: $1) }
-                .onDelete { selected.remove(atOffsets: $0) }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Kid.background.ignoresSafeArea())
+            .tint(Kid.ink)
             .environment(\.editMode, .constant(.active))
-            .navigationTitle("Arrange pages")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .principal) {
+                    Text("Arrange pages").font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    KidDoneButton { dismiss() }
+                }
+                .kidPlainBackground()
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(Kid.background)
+    }
+
+    private func row(_ id: UUID) -> some View {
+        HStack(spacing: 14) {
+            if let page = store.pages.first(where: { $0.id == id }) {
+                PageThumb(url: page.thumbnail, updated: page.updated)
+                    .frame(width: 80, height: 60)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Kid.ink.opacity(0.15), lineWidth: 1))
+            }
+            Text("Page \((selected.firstIndex(of: id) ?? 0) + 1)")
+                .font(Kid.titleBold(18))
+                .foregroundStyle(Kid.ink)
+        }
     }
 }
 

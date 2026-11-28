@@ -201,28 +201,28 @@ struct ColoringView: View {
         // in the middle of the room between the buttons (polish-plan 64).
         TitleBarLayout {
             HStack(spacing: 8) {
-                KidCircleButton(image: "BtnBack", size: 58, label: "Back") { leave() }
+                KidCircleButton(image: "BtnBack", size: 58, label: String(localized: "Back")) { leave() }
                 if wide { SaveButton(action: saveAndShow) }
             }
             Text("Let\u{2019}s color!")
                 .font(Kid.titleBold(26))
                 .foregroundStyle(Kid.ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.5)
             HStack(spacing: 8) {
                 if wide { ZoomButtons(session: session) }
                 HStack(spacing: 0) {
-                    KidCircleButton(image: "BtnUndo", size: 58, label: "Undo") {
+                    KidCircleButton(image: "BtnUndo", size: 58, label: String(localized: "Undo")) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.undo() }
                     }
                     .opacity(session.canUndo ? 1 : 0.45)
                     .disabled(!session.canUndo)
-                    KidCircleButton(image: "BtnRedo", size: 58, label: "Redo") {
+                    KidCircleButton(image: "BtnRedo", size: 58, label: String(localized: "Redo")) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.redo() }
                     }
                     .opacity(session.canRedo ? 1 : 0.45)
                     .disabled(!session.canRedo)
-                    KidCircleButton(image: "BtnShare", size: 58, label: "Share") {
+                    KidCircleButton(image: "BtnShare", size: 58, label: String(localized: "Share")) {
                         exported = ExportedPage(image: session.renderImage())
                     }
                 }
@@ -259,7 +259,7 @@ private struct BottomPanel: View {
                 TextTray(session: session, axis: .horizontal)
             }
             if tool.usesColor {
-                PanelTitle(text: "Colors")
+                PanelTitle(text: String(localized: "Colors"))
                 ColorStrip(session: session, axis: .horizontal)
             }
             if tool == .sticker {
@@ -298,7 +298,7 @@ private struct SidePanel: View {
                     TextTray(session: session, axis: .vertical)
                 }
                 if session.tool.usesColor {
-                    PanelTitle(text: "Colors")
+                    PanelTitle(text: String(localized: "Colors"))
                     ColorStrip(session: session, axis: .vertical)
                 }
                 if session.tool == .sticker {
@@ -411,7 +411,10 @@ private struct ToolButton: View {
                     .font(Kid.titleBold(compact ? 12 : 14, relativeTo: .caption))
                     .foregroundStyle(Kid.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.55)
+                    // Clear of the 3 pt border the chosen tool gets, so the
+                    // word shrinks instead of running under it.
+                    .padding(.horizontal, 3)
             }
             .padding(.horizontal, 1)
             .padding(.bottom, 4)
@@ -477,38 +480,38 @@ private extension ColoringSession.Tool {
 
     var title: String {
         switch self {
-        case .fill: "Fill"
-        case .brush: "Brush"
-        case .rainbow: "Rainbow"
-        case .eraser: "Eraser"
-        case .sticker: "Sticker"
-        case .text: "Text"
-        case .frame: "Frame"
+        case .fill: String(localized: "Fill")
+        case .brush: String(localized: "Brush")
+        case .rainbow: String(localized: "Rainbow")
+        case .eraser: String(localized: "Eraser")
+        case .sticker: String(localized: "Sticker")
+        case .text: String(localized: "Text")
+        case .frame: String(localized: "Frame")
         }
     }
 
     /// Brush and bucket each come in kinds (crayon, glitter; patterns).
     var hasKinds: Bool { self == .brush || self == .fill }
 
-    var kindsTitle: String { self == .fill ? "Patterns" : "Brushes" }
+    var kindsTitle: String { self == .fill ? String(localized: "Patterns") : String(localized: "Brushes") }
 
     var sizeTitle: String {
         switch self {
-        case .eraser: "Eraser size"
-        case .rainbow: "Rainbow size"
-        default: "Brush size"
+        case .eraser: String(localized: "Eraser size")
+        case .rainbow: String(localized: "Rainbow size")
+        default: String(localized: "Brush size")
         }
     }
 
     var accessibilityName: String {
         switch self {
-        case .fill: "Paint bucket"
-        case .brush: "Brush"
-        case .rainbow: "Rainbow brush"
-        case .eraser: "Eraser"
-        case .sticker: "Stickers"
-        case .text: "Words"
-        case .frame: "Frames"
+        case .fill: String(localized: "Paint bucket")
+        case .brush: String(localized: "Brush")
+        case .rainbow: String(localized: "Rainbow brush")
+        case .eraser: String(localized: "Eraser")
+        case .sticker: String(localized: "Stickers")
+        case .text: String(localized: "Words")
+        case .frame: String(localized: "Frames")
         }
     }
 }
@@ -606,7 +609,7 @@ private struct KindPicker: View {
         let color = session.color
         if session.tool == .fill {
             return ([nil] + FillPattern.allCases.map(Optional.some)).map { pattern in
-                Option(id: pattern?.rawValue ?? "plain", label: pattern?.accessibilityName ?? "Plain paint",
+                Option(id: pattern?.rawValue ?? "plain", label: pattern?.accessibilityName ?? String(localized: "Plain paint"),
                        selected: session.pattern == pattern,
                        image: KindPreview.pattern(pattern, color: color)) { session.pattern = pattern }
             }
@@ -740,11 +743,11 @@ private enum KindPreview {
 private extension FillPattern {
     var accessibilityName: String {
         switch self {
-        case .stripes: "Stripes"
-        case .dots: "Polka dots"
-        case .hearts: "Hearts"
-        case .stars: "Stars"
-        case .checks: "Checks"
+        case .stripes: String(localized: "Stripes")
+        case .dots: String(localized: "Polka dots")
+        case .hearts: String(localized: "Hearts")
+        case .stars: String(localized: "Stars")
+        case .checks: String(localized: "Checks")
         }
     }
 }
@@ -752,12 +755,12 @@ private extension FillPattern {
 private extension BrushKind {
     var accessibilityName: String {
         switch self {
-        case .pen: "Plain brush"
-        case .crayon: "Crayon"
-        case .marker: "Marker"
-        case .glitter: "Glitter"
-        case .neon: "Neon"
-        case .spray: "Spray paint"
+        case .pen: String(localized: "Plain brush")
+        case .crayon: String(localized: "Crayon")
+        case .marker: String(localized: "Marker")
+        case .glitter: String(localized: "Glitter")
+        case .neon: String(localized: "Neon")
+        case .spray: String(localized: "Spray paint")
         }
     }
 }
@@ -864,7 +867,7 @@ extension ColorStrip {
 
 private extension RGBA {
     var isLight: Bool { (Int(r) * 299 + Int(g) * 587 + Int(b) * 114) / 1000 > 170 }
-    var accessibilityName: String { Palette.name(of: self) ?? "Color" }
+    var accessibilityName: String { Palette.name(of: self) ?? String(localized: "Color") }
 }
 
 // MARK: - Stickers
@@ -943,7 +946,7 @@ private struct TextTray: View {
                 .accessibilityLabel(chosen == nil ? "Words to add" : "Words on the page")
             if chosen == nil {
                 Button { add() } label: {
-                    PuffyPill(title: "Add", icon: .symbol("plus"), fill: Kid.yellow, stretches: axis == .vertical)
+                    PuffyPill(title: String(localized: "Add"), icon: .symbol("plus"), fill: Kid.yellow, stretches: axis == .vertical)
                 }
                 .buttonStyle(SquishyStyle())
                 .disabled(trimmed.isEmpty)
@@ -955,7 +958,7 @@ private struct TextTray: View {
                     focused = false
                     session.selectedSticker = nil
                 } label: {
-                    PuffyPill(title: "New", icon: .symbol("plus"), stretches: axis == .vertical)
+                    PuffyPill(title: String(localized: "New"), icon: .symbol("plus"), stretches: axis == .vertical)
                 }
                 .buttonStyle(SquishyStyle())
                 .accessibilityLabel("Add new words")
@@ -1061,7 +1064,7 @@ private struct FrameTray: View {
                     .scaleEffect(selected ? 1.05 : 1)
             }
             .buttonStyle(BounceButtonStyle())
-            .accessibilityLabel(frame == .default ? "No frame" : frame.title)
+            .accessibilityLabel(frame == .default ? String(localized: "No frame") : frame.title)
             .accessibilityAddTraits(selected ? .isSelected : [])
             .id(frame.id)
         }
@@ -1166,17 +1169,17 @@ private struct ZoomButtons: View {
     var body: some View {
         HStack(spacing: 10) {
             if session.zoom > 1.001 {
-                round("arrow.down.right.and.arrow.up.left", label: "Show whole page") {
+                round("arrow.down.right.and.arrow.up.left", label: String(localized: "Show whole page")) {
                     SoundFX.shared.play(.zoomOut)
                     session.zoom = 1
                 }
                     .transition(.scale.combined(with: .opacity))
             }
-            round("BtnMinus", label: "Zoom out", enabled: session.zoom > 1.001) {
+            round("BtnMinus", label: String(localized: "Zoom out"), enabled: session.zoom > 1.001) {
                 SoundFX.shared.play(.zoomOut)
                 session.zoomOut()
             }
-            round("BtnPlus", label: "Zoom in", enabled: session.zoom < ColoringSession.maxZoom - 0.001) {
+            round("BtnPlus", label: String(localized: "Zoom in"), enabled: session.zoom < ColoringSession.maxZoom - 0.001) {
                 SoundFX.shared.play(.zoomIn)
                 session.zoomIn()
             }
@@ -1273,7 +1276,7 @@ private final class SharedPageImage: NSObject, UIActivityItemSource {
 
     func activityViewControllerLinkMetadata(_ controller: UIActivityViewController) -> LPLinkMetadata? {
         let metadata = LPLinkMetadata()
-        metadata.title = "My coloring page"
+        metadata.title = String(localized: "My coloring page")
         let provider = NSItemProvider(object: image)
         metadata.imageProvider = provider
         metadata.iconProvider = provider

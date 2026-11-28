@@ -15,9 +15,9 @@ nonisolated enum BookLayout: String, CaseIterable, Identifiable, Codable, Sendab
 
     var title: String {
         switch self {
-        case .pagesOnly: "Coloring pages"
-        case .photoFacing: "Photo + page"
-        case .photoCorner: "Small photo"
+        case .pagesOnly: String(localized: "Coloring pages")
+        case .photoFacing: String(localized: "Photo + page")
+        case .photoCorner: String(localized: "Small photo")
         }
     }
 
@@ -31,7 +31,13 @@ nonisolated enum LineWeight: String, CaseIterable, Identifiable, Sendable {
     case thin, medium, thick
 
     var id: String { rawValue }
-    var title: String { rawValue.capitalized }
+    var title: String {
+        switch self {
+        case .thin: String(localized: "Thin", comment: "Line thickness")
+        case .medium: String(localized: "Medium", comment: "Line thickness")
+        case .thick: String(localized: "Thick", comment: "Line thickness")
+        }
+    }
 
     /// Growth of the dark lines at 300 dpi, in pixels.
     var radius: Double {
@@ -117,8 +123,8 @@ nonisolated enum BookRenderer {
             let format = UIGraphicsPDFRendererFormat()
             let name = options.childName.trimmingCharacters(in: .whitespaces)
             format.documentInfo = [
-                kCGPDFContextTitle as String: name.isEmpty ? "My Coloring Book" : "\(name)'s Coloring Book",
-                kCGPDFContextCreator as String: "Coloring Book",
+                kCGPDFContextTitle as String: BookStore.title(forChild: name),
+                kCGPDFContextCreator as String: "Colorkin",
             ]
             return format
         }())
@@ -363,7 +369,7 @@ nonisolated enum BookRenderer {
         let box = contentArea(background)
         let area = box.insetBy(dx: 18, dy: 60)
         drawPhoto(photo, in: area, ctx: ctx, corner: 18)
-        let caption = "Color me like the photo!"
+        let caption = String(localized: "Color me like the photo!")
         let font = UIFont(name: "ArialRoundedMTBold", size: 22) ?? .boldSystemFont(ofSize: 22)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: accent]
         let size = caption.size(withAttributes: attributes)
@@ -405,8 +411,7 @@ nonisolated enum BookRenderer {
             titleArea = CGRect(x: 90, y: 110, width: sheet.width - 180, height: 170)
             artArea = CGRect(x: 110, y: 310, width: sheet.width - 220, height: 380)
         }
-        let titleTop = trimmed.isEmpty ? "My" : "\(trimmed)'s"
-        drawOutlineText([titleTop, "Coloring Book"], in: titleArea, ctx: ctx)
+        drawOutlineText(coverTitleLines(trimmed), in: titleArea, ctx: ctx)
 
         // The first picture as the cover art, colorable like the rest.
         if let first {
@@ -429,8 +434,23 @@ nonisolated enum BookRenderer {
             art.draw(in: sheet)
         } else {
             drawFrame(options.coverFrame, in: ctx)
-            drawOutlineText(["The End"], in: CGRect(x: 90, y: 300, width: sheet.width - 180, height: 150), ctx: ctx)
+            drawOutlineText([String(localized: "The End")], in: CGRect(x: 90, y: 300, width: sheet.width - 180, height: 150), ctx: ctx)
         }
+    }
+
+    /// The cover title on two lines: "Mia's / Coloring Book" in English,
+    /// "Libro para colorear / de Mia" in Spanish. Each language orders the
+    /// name its own way, so both lines are translated.
+    static func coverTitleLines(_ name: String) -> [String] {
+        if name.isEmpty {
+            return [String(localized: "cover.line1", defaultValue: "My", comment: "Book cover title, first line, no child's name"),
+                    String(localized: "cover.line2", defaultValue: "Coloring Book", comment: "Book cover title, second line, no child's name")]
+        }
+        // Templates, filled with the name afterwards: either line may hold
+        // the %@ ("Mia's / Coloring Book", "Libro para colorear / de Mia").
+        let line1 = NSLocalizedString("cover.line1.named", value: "%@'s", comment: "Book cover title, first line. %@, on either line, is the child's name")
+        let line2 = NSLocalizedString("cover.line2.named", value: "Coloring Book", comment: "Book cover title, second line. %@, on either line, is the child's name")
+        return [String(format: line1, name), String(format: line2, name)]
     }
 
     private static let endArt: UIImage? = Bundle.main.url(forResource: "end-page", withExtension: "png")
@@ -488,6 +508,10 @@ nonisolated enum BookRenderer {
             NSAttributedString(string: text, attributes: [.font: font]))
         let path = CGMutablePath()
         for run in (CTLineGetGlyphRuns(line) as? [CTRun]) ?? [] {
+            // Japanese and Thai fall back to another font for this run; its
+            // glyph numbers only make sense in that font.
+            let attributes = CTRunGetAttributes(run) as NSDictionary
+            let font = attributes[kCTFontAttributeName] as! CTFont? ?? font
             let count = CTRunGetGlyphCount(run)
             var glyphs = [CGGlyph](repeating: 0, count: count)
             var positions = [CGPoint](repeating: .zero, count: count)

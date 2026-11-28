@@ -7,7 +7,7 @@ import SwiftUI
 /// (2026-11-27); the card and dots are drawn here in the design's colors so
 /// the card can grow with its words.
 struct LoadingOverlay: View {
-    var text: String = "Loading…"
+    var text: String = String(localized: "Loading…")
     /// 0…1 to show a bar instead of the dots.
     var progress: Double?
     /// Lines that take turns instead of `text`, for a long wait (the AI
@@ -96,7 +96,7 @@ private struct Words: View {
 /// The card itself: mascot, words, dots or bar. Also the app's launch
 /// screen (LaunchSplash, and the still `LaunchCard` picture drawn from it).
 struct LoadingCard: View {
-    var text: String = "Loading…"
+    var text: String = String(localized: "Loading…")
     var progress: Double?
     var lines: [String] = []
     var animated = true
@@ -179,7 +179,7 @@ private struct ProgressBar: View {
 
 extension View {
     /// Shows `LoadingOverlay` while `active`.
-    func loading(_ active: Bool, _ text: String = "Loading…", progress: Double? = nil) -> some View {
+    func loading(_ active: Bool, _ text: String = String(localized: "Loading…"), progress: Double? = nil) -> some View {
         overlay {
             if active { LoadingOverlay(text: text, progress: progress) }
         }
@@ -188,14 +188,14 @@ extension View {
 }
 
 #Preview("Opening") {
-    Color(hex: 0xFFF8EB).loading(true, "Opening the page…")
+    Color(hex: 0xFFF8EB).loading(true, String(localized: "Opening the page…"))
 }
 
 #Preview("Drawing") {
-    LoadingOverlay(lines: ["Sharpening the pencils…", "Drawing the outlines…",
-                           "Adding big smiles…", "Making room for colors…"])
+    LoadingOverlay(lines: [String(localized: "Sharpening the pencils…"), String(localized: "Drawing the outlines…"),
+                           String(localized: "Adding big smiles…"), String(localized: "Making room for colors…")])
 }
 
 #Preview("Progress") {
-    Color(hex: 0xFFF8EB).loading(true, "Making the PDF…", progress: 0.45)
+    Color(hex: 0xFFF8EB).loading(true, String(localized: "Making the PDF…"), progress: 0.45)
 }

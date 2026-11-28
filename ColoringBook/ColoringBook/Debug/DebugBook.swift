@@ -92,7 +92,7 @@ enum DebugBook {
         let (data, kinds) = BookRenderer.makePDF(pages: sources, options: options)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("Mia's Coloring Book.pdf")
         guard (try? data.write(to: url)) != nil else { return nil }
-        return BuiltBook(url: url, title: "Mia's Coloring Book", kinds: kinds, pictures: sources.count,
+        return BuiltBook(url: url, title: BookStore.title(forChild: "Mia"), kinds: kinds, pictures: sources.count,
                          withoutPhoto: sources.filter { $0.photo == nil }.count, options: options)
     }
 

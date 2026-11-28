@@ -56,7 +56,7 @@ struct PDFPreviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    KidCircleButton(image: "BtnBack", label: "Back") { dismiss() }
+                    KidCircleButton(image: "BtnBack", label: String(localized: "Back")) { dismiss() }
                 }
                 .kidPlainBackground()
                 ToolbarItem(placement: .principal) {
@@ -82,7 +82,7 @@ struct PDFPreviewView: View {
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                Text(label(for: index) + "  ·  \(index + 1) of \(document.pageCount)")
+                Text(label(for: index) + String(localized: "  ·  \(index + 1) of \(document.pageCount)"))
                     .font(Kid.bodyBold(15))
                     .foregroundStyle(PlansPanel.hint)
             } else {
@@ -127,18 +127,18 @@ struct PDFPreviewView: View {
     private var notes: [String] {
         var out: [String] = []
         if book.pictures < 5 {
-            out.append(book.pictures == 1 ? "Only 1 picture. 5 to 20 make a nicer book."
-                       : "Only \(book.pictures) pictures. 5 to 20 make a nicer book.")
+            out.append(book.pictures == 1 ? String(localized: "Only 1 picture. 5 to 20 make a nicer book.")
+                       : String(localized: "Only \(book.pictures) pictures. 5 to 20 make a nicer book."))
         }
         if book.options.layout != .pagesOnly && book.withoutPhoto > 0 {
-            out.append(book.withoutPhoto == 1 ? "1 picture has no photo and prints without one."
-                       : "\(book.withoutPhoto) pictures have no photo and print without one.")
+            out.append(book.withoutPhoto == 1 ? String(localized: "1 picture has no photo and prints without one.")
+                       : String(localized: "\(book.withoutPhoto) pictures have no photo and print without one."))
         }
         if book.options.layout == .photoFacing {
-            out.append("Print single-sided if you color with markers: the photos would be on the backs.")
+            out.append(String(localized: "Print single-sided if you color with markers: the photos would be on the backs."))
         }
         if book.options.blankBacks {
-            out.append("Blank backs are included, so print single-sided.")
+            out.append(String(localized: "Blank backs are included, so print single-sided."))
         }
         return out
     }
@@ -146,11 +146,11 @@ struct PDFPreviewView: View {
     private func label(for i: Int) -> String {
         guard book.kinds.indices.contains(i) else { return "" }
         switch book.kinds[i] {
-        case .cover: return "Cover"
-        case .photo(let n): return "Photo \(n)"
-        case .picture(let n): return "Picture \(n)"
-        case .blank: return "Blank back"
-        case .end: return "The End"
+        case .cover: return String(localized: "Cover")
+        case .photo(let n): return String(localized: "Photo \(n)")
+        case .picture(let n): return String(localized: "Picture \(n)")
+        case .blank: return String(localized: "Blank back")
+        case .end: return String(localized: "The End")
         }
     }
 

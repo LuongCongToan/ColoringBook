@@ -109,7 +109,7 @@ struct CreatePageView: View {
                     // A finished page stayed on this tab with no way to make
                     // another (full-flow test, 2026-11-26). The app's round
                     // plus, not the system's grey one (polish-plan 66).
-                    KidCircleButton(image: "BtnPlus", size: 52, label: "New page") { startOver() }
+                    KidCircleButton(image: "BtnPlus", size: 52, label: String(localized: "New page")) { startOver() }
                 }
                 .kidPlainBackground()
             }
@@ -146,7 +146,7 @@ struct CreatePageView: View {
                 Task { await draw() }
             }
         }
-        .loading(opening, "Opening the page…")
+        .loading(opening, String(localized: "Opening the page…"))
         .navigationDestination(item: $coloring) { item in
             ColoringView(art: item.art, photo: item.photo)
         }
@@ -393,6 +393,10 @@ struct CreatePageView: View {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles").foregroundStyle(Kid.grape)
                 Text(left.leftText).foregroundStyle(Kid.ink)
+                    // One line in every language: a taller chip covered the
+                    // style cards' captions on small phones.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
             .font(Kid.bodyBold(16))
             .padding(.horizontal, 14)
@@ -535,7 +539,7 @@ struct CreatePageView: View {
                 SoundFX.shared.play(.tap)
                 Task { await openColoring(page) }
             } label: {
-                kidButton("Color it!", art: "EditorBrush", color: Kid.yellow, size: wide ? 26 : 32, height: wide ? 56 : 72)
+                kidButton(String(localized: "Color it!"), art: "EditorBrush", color: Kid.yellow, size: wide ? 26 : 32, height: wide ? 56 : 72)
             }
             .buttonStyle(SquishyStyle())
 
@@ -545,7 +549,7 @@ struct CreatePageView: View {
                 style = next
                 startDrawing()
             } label: {
-                kidButton(next == .chibi ? "Try chibi style" : "Try cartoon style",
+                kidButton(next == .chibi ? String(localized: "Try chibi style") : String(localized: "Try cartoon style"),
                           art: next == .chibi ? "EditorChibi" : "StyleCartoon",
                           color: Kid.lavender, size: wide ? 20 : 24, height: wide ? 46 : 56)
                     .padding(.horizontal, 16)
@@ -598,7 +602,7 @@ struct CreatePageView: View {
         preview = nil
         guard let data = try? await item.loadTransferable(type: Data.self),
               let result = try? await prepare(data) else {
-            phase = .failed("This photo could not be read. Try another one.")
+            phase = .failed(String(localized: "This photo could not be read. Try another one."))
             return
         }
         prepared = result
@@ -657,7 +661,7 @@ struct CreatePageView: View {
         opening = true
         defer { opening = false }
         guard let art = try? await lineArt(page.imageData) else {
-            phase = .failed("This page could not be opened. Try drawing it again.")
+            phase = .failed(String(localized: "This page could not be opened. Try drawing it again."))
             return
         }
         coloring = ArtToColor(art: art, photo: colorPhoto)
@@ -776,19 +780,19 @@ struct CreatePageView: View {
     private static func message(for error: GenerationError) -> String {
         switch error {
         case .unreachable:
-            "No connection. Check the internet and try again. No page was used."
+            String(localized: "No connection. Check the internet and try again. No page was used.")
         case .notEntitled:
-            "Drawing pages needs Pro or a coloring book."
+            String(localized: "Drawing pages needs Pro or a coloring book.")
         case .rejected:
-            "This photo could not be drawn. Try a different photo."
+            String(localized: "This photo could not be drawn. Try a different photo.")
         case .quotaExhausted(let resetAt):
             if let resetAt {
-                "All pages for now are used. More on \(resetAt.formatted(date: .abbreviated, time: .omitted))."
+                String(localized: "All pages for now are used. More on \(resetAt.formatted(date: .abbreviated, time: .omitted)).")
             } else {
-                "All pages are used. Get more to keep drawing."
+                String(localized: "All pages are used. Get more to keep drawing.")
             }
         case .server:
-            "Something went wrong while drawing. Try again in a moment. No page was used."
+            String(localized: "Something went wrong while drawing. Try again in a moment. No page was used.")
         }
     }
 
@@ -827,17 +831,17 @@ private struct StyleCard: View {
 
     private var title: String {
         switch style {
-        case .cartoon: "Cartoon"
-        case .chibi: "Chibi"
-        case .sketch: "Sketch"
+        case .cartoon: String(localized: "Cartoon")
+        case .chibi: String(localized: "Chibi")
+        case .sketch: String(localized: "Sketch")
         }
     }
 
     private var caption: String {
         switch style {
-        case .cartoon: "Fun & friendly"
-        case .chibi: "Tiny & cute"
-        case .sketch: "Simple lines"
+        case .cartoon: String(localized: "Fun & friendly")
+        case .chibi: String(localized: "Tiny & cute")
+        case .sketch: String(localized: "Simple lines")
         }
     }
 
@@ -902,7 +906,7 @@ private struct StyleCard: View {
             }
         }
         .buttonStyle(SquishyStyle())
-        .accessibilityLabel(style.onDevice ? "\(title), free" : title)
+        .accessibilityLabel(style.onDevice ? String(localized: "\(title), free") : title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
@@ -912,10 +916,10 @@ private struct StyleCard: View {
 /// (brief 7, "Hiệu ứng").
 private struct DrawingWaitView: View {
     private static let lines = [
-        "Sharpening the pencils…",
-        "Drawing the outlines…",
-        "Adding big smiles…",
-        "Making room for colors…",
+        String(localized: "Sharpening the pencils…"),
+        String(localized: "Drawing the outlines…"),
+        String(localized: "Adding big smiles…"),
+        String(localized: "Making room for colors…"),
     ]
 
     var body: some View {

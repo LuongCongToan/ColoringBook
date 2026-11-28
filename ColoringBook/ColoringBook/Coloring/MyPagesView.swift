@@ -121,7 +121,7 @@ struct MyPagesView: View {
         } message: {
             Text(single.map { deleteNote([$0]) } ?? "")
         }
-        .loading(opening, "Opening the page…")
+        .loading(opening, String(localized: "Opening the page…"))
         .navigationDestination(item: $opened) { page in
             ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
         }
@@ -142,9 +142,9 @@ struct MyPagesView: View {
 
     private var selectionTitle: String {
         switch selection.count {
-        case 0: "Select pages"
-        case 1: "1 page selected"
-        default: "\(selection.count) pages selected"
+        case 0: String(localized: "Select pages")
+        case 1: String(localized: "1 page selected")
+        default: String(localized: "\(selection.count) pages selected")
         }
     }
 
@@ -153,17 +153,17 @@ struct MyPagesView: View {
     /// What deleting costs: the coloring is gone, and books lose the page.
     private func deleteNote(_ ids: Set<UUID>) -> String {
         let books = store.booksUsing(ids)
-        let base = "The coloring cannot be brought back."
+        let base = String(localized: "The coloring cannot be brought back.")
         switch books {
         case 0: return base
-        case 1: return base + " It also leaves the book that uses it."
-        default: return base + " It also leaves the \(books) books that use it."
+        case 1: return base + String(localized: " It also leaves the book that uses it.")
+        default: return base + String(localized: " It also leaves the \(books) books that use it.")
         }
     }
 
     private var selectionBar: some View {
         KidSelectionBar(title: selectionTitle, allSelected: allSelected, canDelete: !selection.isEmpty,
-                        deleteLabel: "Delete selected pages",
+                        deleteLabel: String(localized: "Delete selected pages"),
                         onSelectAll: { selection = allSelected ? [] : Set(store.pages.map(\.id)) },
                         onDelete: { confirmDelete = true })
             .confirmationDialog(selection.count == 1 ? "Delete this page?" : "Delete \(selection.count) pages?",

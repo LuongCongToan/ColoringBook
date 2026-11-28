@@ -54,7 +54,7 @@ nonisolated enum BookVideoMaker {
         try? FileManager.default.removeItem(at: folder)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = title.replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespaces)
-        let output = folder.appendingPathComponent((name.isEmpty ? "Coloring Book" : name) + ".mp4")
+        let output = folder.appendingPathComponent((name.isEmpty ? "Colorkin" : name) + ".mp4")
 
         _ = try await writeVideo(sheets: sheets, title: title, to: output, progress: progress)
         progress(1)
@@ -202,7 +202,7 @@ nonisolated enum BookVideoMaker {
             let ink = color(0x28145C)
             let centered = NSMutableParagraphStyle()
             centered.alignment = .center
-            let titleFont = UIFont(name: "Fredoka-Bold", size: 76) ?? .systemFont(ofSize: 76, weight: .heavy)
+            let titleFont = KidFonts.ui("Fredoka-Bold", 76)
             let titleBox = CGRect(x: 60, y: 150, width: size.width - 120, height: 200)
             (title as NSString).draw(with: titleBox, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
                                      attributes: [.font: titleFont, .foregroundColor: ink, .paragraphStyle: centered],
@@ -215,8 +215,8 @@ nonisolated enum BookVideoMaker {
             cg.fill(pageRect)
             cg.restoreGState()
 
-            let footFont = UIFont(name: "Nunito-ExtraBold", size: 38) ?? .systemFont(ofSize: 38, weight: .bold)
-            ("Made with Coloring Book" as NSString).draw(
+            let footFont = KidFonts.ui("Nunito-ExtraBold", 38)
+            (String(localized: "Made with Colorkin") as NSString).draw(
                 with: CGRect(x: 60, y: pageRect.maxY + 90, width: size.width - 120, height: 60),
                 options: .usesLineFragmentOrigin,
                 attributes: [.font: footFont, .foregroundColor: ink.withAlphaComponent(0.6), .paragraphStyle: centered],

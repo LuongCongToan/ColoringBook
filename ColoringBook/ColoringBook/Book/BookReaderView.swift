@@ -89,9 +89,9 @@ struct BookReaderView: View {
                 // layouts in a column on the right (the page was 100 pt wide
                 // under them, polish-plan 27, 71).
                 HStack(spacing: 12) {
-                    arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
+                    arrow(back: true, label: String(localized: "Previous page"), enabled: index > 0) { index -= 1 }
                     pager
-                    arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                    arrow(back: false, label: String(localized: "Next page"), enabled: index < sheets.count - 1) { index += 1 }
                     VStack(spacing: 14) {
                         if let book { actions(book, vertical: true) }
                         Spacer(minLength: 0)
@@ -110,7 +110,7 @@ struct BookReaderView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
                     HStack(spacing: 10) {
-                        arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
+                        arrow(back: true, label: String(localized: "Previous page"), enabled: index > 0) { index -= 1 }
                         // Room between the arrows: the screen less the
                         // margins (32), the arrows (120) and the spacing
                         // (20). Four 56 pt tiles need 248 pt; a 390 pt
@@ -121,7 +121,7 @@ struct BookReaderView: View {
                             // stay put (they jumped between the cover and a
                             // page, polish-plan 27, 83).
                             .frame(maxWidth: .infinity, minHeight: 112, alignment: .top)
-                        arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                        arrow(back: false, label: String(localized: "Next page"), enabled: index < sheets.count - 1) { index += 1 }
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
@@ -130,7 +130,7 @@ struct BookReaderView: View {
         }
         .kidTabBarClearance()
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
-        .navigationTitle(book?.title ?? "Book")
+        .navigationTitle(book?.title ?? String(localized: "Book"))
         // No way out while the PDF or the video is being made.
         .kidBackButton(hidden: busy, hidesBarAs: "book")
         .navigationBarTitleDisplayMode(.inline)
@@ -138,7 +138,7 @@ struct BookReaderView: View {
             // The whole bar is the title's now (it was cut to "Lily's
             // Colo…" beside three buttons, polish-plan 48).
             ToolbarItem(placement: .principal) {
-                Text(book?.title ?? "Book")
+                Text(book?.title ?? String(localized: "Book"))
                     .font(Kid.titleBold(22))
                     .foregroundStyle(Kid.ink)
                     .lineLimit(1)
@@ -149,14 +149,14 @@ struct BookReaderView: View {
         // loading veil covers everything (polish-plan 48, 71).
         .onAppear { AppTabs.shared.hideBar("book") }
         .onDisappear { AppTabs.shared.hideBar("book", false) }
-        .loading(exporting, "Making the PDF…", progress: exportProgress)
-        .loading(makingVideo, "Making the video…", progress: videoProgress)
+        .loading(exporting, String(localized: "Making the PDF…"), progress: exportProgress)
+        .loading(makingVideo, String(localized: "Making the video…"), progress: videoProgress)
         // The rating dialog, if due, once the grown-up is back from sharing
         // (ReviewPrompt): never over the child's coloring.
         .sheet(item: $video, onDismiss: { ReviewPrompt.askIfDue(requestReview) }) { video in
             VideoShareSheet(url: video.url)
         }
-        .loading(opening, "Opening the page…")
+        .loading(opening, String(localized: "Opening the page…"))
         .alert("Save PDF", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -248,13 +248,13 @@ struct BookReaderView: View {
             NavigationLink {
                 BookBuilderView(book: book)
             } label: {
-                PuffyPill(title: "Edit", icon: .art("ReaderEdit"), stretches: true)
+                PuffyPill(title: String(localized: "Edit"), icon: .art("ReaderEdit"), stretches: true)
             }
             .buttonStyle(SquishyStyle())
             Button {
                 Task { await saveVideo() }
             } label: {
-                PuffyPill(title: "Video", icon: .art("ReaderVideo"), stretches: true)
+                PuffyPill(title: String(localized: "Video"), icon: .art("ReaderVideo"), stretches: true)
             }
             .buttonStyle(SquishyStyle())
             .accessibilityLabel("Save video")
@@ -262,7 +262,7 @@ struct BookReaderView: View {
             Button {
                 Task { await savePDF() }
             } label: {
-                PuffyPill(title: "Save PDF", icon: .art("ReaderPDF"), fill: Kid.yellow, stretches: true)
+                PuffyPill(title: String(localized: "Save PDF"), icon: .art("ReaderPDF"), fill: Kid.yellow, stretches: true)
             }
             .buttonStyle(SquishyStyle())
             .disabled(pageIDs.isEmpty)
@@ -274,10 +274,10 @@ struct BookReaderView: View {
 
     private var pageLabel: String {
         switch current {
-        case .cover?: return "Cover"
-        case .photo(let id)?: return "Photo for page \(number(of: id))"
-        case .picture(let id)?: return "Page \(number(of: id)) of \(pageIDs.count)"
-        case .end?: return "The End"
+        case .cover?: return String(localized: "Cover")
+        case .photo(let id)?: return String(localized: "Photo for page \(number(of: id))")
+        case .picture(let id)?: return String(localized: "Page \(number(of: id)) of \(pageIDs.count)")
+        case .end?: return String(localized: "The End")
         case nil: return ""
         }
     }
@@ -520,7 +520,7 @@ struct BookReaderView: View {
             video = SharedVideo(url: url)
             ReviewPrompt.note(.videoMade)
         } catch {
-            exportError = "The video could not be made. Please try again."
+            exportError = String(localized: "The video could not be made. Please try again.")
         }
     }
 
@@ -548,7 +548,7 @@ struct BookReaderView: View {
             exportProgress = Double(i + 1) / Double(ids.count) * 0.4
         }
         guard !sources.isEmpty else {
-            exportError = "The pages of this book could not be opened."
+            exportError = String(localized: "The pages of this book could not be opened.")
             return
         }
 
@@ -574,7 +574,7 @@ struct BookReaderView: View {
             pdf = BuiltBook(url: url, title: book.title, kinds: kinds, pictures: sources.count,
                             withoutPhoto: sources.filter { $0.photo == nil }.count, options: opts)
         } catch {
-            exportError = "The PDF could not be saved."
+            exportError = String(localized: "The PDF could not be saved.")
         }
     }
 }

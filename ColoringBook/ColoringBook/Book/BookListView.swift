@@ -125,14 +125,14 @@ struct BookListView: View {
 
     private var selectionTitle: String {
         switch selection.count {
-        case 0: "Select books"
-        case 1: "1 book selected"
-        default: "\(selection.count) books selected"
+        case 0: String(localized: "Select books")
+        case 1: String(localized: "1 book selected")
+        default: String(localized: "\(selection.count) books selected")
         }
     }
 
     private var deleteTitle: String {
-        selection.count == 1 ? "Delete this book?" : "Delete \(selection.count) books?"
+        selection.count == 1 ? String(localized: "Delete this book?") : String(localized: "Delete \(selection.count) books?")
     }
 
     private var allSelected: Bool { !books.books.isEmpty && selection.count == books.books.count }
@@ -145,7 +145,7 @@ struct BookListView: View {
     /// Select all on the left, the trash on the right, in the app's style.
     private var selectionBar: some View {
         KidSelectionBar(title: selectionTitle, allSelected: allSelected, canDelete: !selection.isEmpty,
-                        deleteLabel: "Delete selected books",
+                        deleteLabel: String(localized: "Delete selected books"),
                         onSelectAll: { selection = allSelected ? [] : Set(books.books.map(\.id)) },
                         onDelete: { confirmDelete = true })
             .confirmationDialog(deleteTitle, isPresented: $confirmDelete, titleVisibility: .visible) {
@@ -180,7 +180,7 @@ struct BookListView: View {
     private func pageCountLabel(_ book: StoredBook) -> String {
         let existing = Set(pages.pages.map(\.id))
         let n = book.pageIDs.filter(existing.contains).count
-        return n == 1 ? "1 page" : "\(n) pages"
+        return n == 1 ? String(localized: "1 page") : String(localized: "\(n) pages")
     }
 }
 
@@ -237,10 +237,14 @@ enum ShelfCovers {
     }
 
     /// Changes whenever the cover would look different: the book was saved
-    /// (name, cover, background, pages) or its first page was.
+    /// (name, cover, background, pages), its first page was, or the app's
+    /// language changed.
     static func key(_ book: StoredBook, first: SavedPageInfo?) -> String {
         let firstPart = first.map { "\($0.id.uuidString)-\(Int($0.updated.timeIntervalSince1970 * 1000))" } ?? "none"
-        return "\(book.id.uuidString)-\(Int(book.updated.timeIntervalSince1970 * 1000))-\(firstPart)"
+        // The title on the cover is in the app's language: a new language
+        // draws the cover again.
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        return "\(book.id.uuidString)-\(Int(book.updated.timeIntervalSince1970 * 1000))-\(firstPart)-\(language)"
     }
 
     static func image(for book: StoredBook, first: SavedPageInfo?) async -> UIImage? {

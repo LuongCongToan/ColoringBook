@@ -20,7 +20,7 @@ struct ColoringBookApp: App {
             root
                 // Text without its own font is usually longer copy (lists,
                 // sheets, notes): Nunito, the second font.
-                .font(.custom("Nunito-Bold", size: 17, relativeTo: .body))
+                .font(Kid.bodyBold(17))
                 // No .fontDesign(.rounded) here: it swaps every custom font
                 // (Fredoka, Nunito) for SF Rounded.
                 .tint(Kid.ink)
@@ -47,6 +47,9 @@ struct ColoringBookApp: App {
         #if DEBUG && targetEnvironment(simulator)
         if DebugBook.wantsReview, let book = DebugBook.reviewBook() {
             PDFPreviewView(book: book)
+        } else if ProcessInfo.processInfo.arguments.contains("-paywall") {
+            // `-paywall`: the paywall on its own, to check its words.
+            PaywallView()
         } else if ProcessInfo.processInfo.arguments.contains("-sketchTest") {
             DebugHomeRoot { CreatePageView() }
         } else if DebugBook.wantsBookList {

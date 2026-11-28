@@ -85,14 +85,14 @@ struct PageArrangeView: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: {
-                        PuffyPill(title: "Cancel")
+                        PuffyPill(title: String(localized: "Cancel"))
                     }
                     .buttonStyle(SquishyStyle())
                 }
                 .kidPlainBackground()
                 ToolbarItem(placement: .confirmationAction) {
                     Button { save() } label: {
-                        PuffyPill(title: "Done", icon: .symbol("checkmark"), fill: Kid.yellow)
+                        PuffyPill(title: String(localized: "Done"), icon: .symbol("checkmark"), fill: Kid.yellow)
                     }
                     .buttonStyle(SquishyStyle())
                 }
@@ -134,7 +134,7 @@ struct PageArrangeView: View {
         layout {
             if hasPhoto && !showsPhoto {
                 Button { addPhoto() } label: {
-                    PuffyPill(title: "Add the photo", icon: .symbol("photo"))
+                    PuffyPill(title: String(localized: "Add the photo"), icon: .symbol("photo"))
                 }
                 .buttonStyle(SquishyStyle())
             }
@@ -144,7 +144,7 @@ struct PageArrangeView: View {
             } label: {
                 // Lilac like Cancel: the peach pill turned a muddy beige when
                 // it was off (polish-plan 86).
-                PuffyPill(title: "Reset", icon: .symbol("arrow.counterclockwise"))
+                PuffyPill(title: String(localized: "Reset"), icon: .symbol("arrow.counterclockwise"))
             }
             .buttonStyle(SquishyStyle())
             .disabled(placement == PagePlacement())

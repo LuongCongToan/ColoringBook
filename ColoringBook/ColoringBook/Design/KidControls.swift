@@ -33,10 +33,33 @@ struct KidSelectButton: View {
                 }
             }
             .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
-            .contentShape(Capsule())
+            // Drawn 37 pt as designed, touched over 44 pt (polish-plan 63).
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(SquishyStyle())
         .accessibilityLabel(selecting ? "Cancel" : "Select")
+    }
+}
+
+/// "Done" in a sheet's bar: a lavender pill 37 pt high like Select, touched
+/// over 44 pt (Grown-ups, Arrange pages).
+struct KidDoneButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            SoundFX.shared.play(.tap)
+            action()
+        } label: {
+            Text("Done").font(Kid.titleBold(17)).foregroundStyle(Kid.ink)
+                .padding(.horizontal, 16).frame(height: 37)
+                .background(Capsule().fill(Color(hex: 0xEFE1FC)))
+                .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(SquishyStyle())
     }
 }
 

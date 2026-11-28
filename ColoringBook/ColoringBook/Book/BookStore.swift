@@ -54,16 +54,22 @@ struct StoredBook: Codable, Identifiable, Hashable {
         backgroundOnPages = try c.decodeIfPresent(Bool.self, forKey: .backgroundOnPages) ?? true
     }
 
-    var title: String {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        return trimmed.isEmpty ? "My Coloring Book" : "\(trimmed)'s Coloring Book"
-    }
+    var title: String { BookStore.title(forChild: name) }
 }
 
 /// "My books", on this device only, in one small JSON file.
 @MainActor
 @Observable
 final class BookStore {
+    /// "Mia's Coloring Book", or "My Coloring Book" without a name. In the
+    /// app's language, so the same book reads in Spanish on a Spanish phone.
+    nonisolated static func title(forChild name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty
+            ? String(localized: "My Coloring Book")
+            : String(localized: "book.title.named", defaultValue: "\(trimmed)'s Coloring Book", comment: "Book title; %@ is the child's name")
+    }
+
     static let shared = BookStore()
 
     private(set) var books: [StoredBook] = []

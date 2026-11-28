@@ -1,0 +1,26 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "comment" : "App name under the icon. The brand stays the same in every language.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "new", "value" : "Colorkin" } }
+      }
+    },
+    "NSPhotoLibraryAddUsageDescription" : {
+      "comment" : "Asked once, the first time a book video is saved to Photos.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Speichert die Videos deiner Malbücher in deinen Fotos." } },
+        "en" : { "stringUnit" : { "state" : "new", "value" : "Saves your coloring book videos to your photos." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Guarda los videos de tus libros para colorear en tus fotos." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Enregistre les vidéos de tes cahiers de coloriage dans tes photos." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ぬりえブックの動画を写真に保存します。" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Salva os vídeos dos seus livros de colorir nas suas fotos." } },
+        "th" : { "stringUnit" : { "state" : "translated", "value" : "บันทึกวิดีโอสมุดระบายสีของคุณลงในรูปภาพ" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -18,7 +18,7 @@ nonisolated struct BookBackground: @unchecked Sendable, Hashable, Identifiable {
     let inner: CGRect
 
     var id: String { name }
-    var title: String { name.replacingOccurrences(of: "-", with: " ").capitalized }
+    var title: String { DisplayName.of(name) }
 
     static func == (a: Self, b: Self) -> Bool { a.name == b.name }
     func hash(into hasher: inout Hasher) { hasher.combine(name) }

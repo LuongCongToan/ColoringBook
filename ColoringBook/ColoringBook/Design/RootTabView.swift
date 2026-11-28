@@ -133,9 +133,9 @@ struct KidTabBar: View {
 
     /// Tab, label, icon asset (rawassets/ColoringBook-Navigation, 2026-11-26).
     private let items: [(AppTab, String, String)] = [
-        (.home, "Home", "TabHome"),
-        (.create, "Create", "TabCreate"),
-        (.library, "My library", "TabLibrary"),
+        (.home, String(localized: "Home"), "TabHome"),
+        (.create, String(localized: "Create"), "TabCreate"),
+        (.library, String(localized: "My library"), "TabLibrary"),
     ]
 
     var body: some View {
@@ -230,7 +230,7 @@ struct LibraryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            KidSegmented(options: [(Shelf.books, "Books", "IconBooks"), (Shelf.pages, "Pages", "IconPages")],
+            KidSegmented(options: [(Shelf.books, String(localized: "Books"), "IconBooks"), (Shelf.pages, String(localized: "Pages"), "IconPages")],
                          selection: $tabs.libraryShelf)
                 .padding(.horizontal, 16.5)
                 .padding(.vertical, 8)
@@ -267,22 +267,22 @@ struct SettingsView: View {
                                 .padding(16)
                                 .background(card)
                         }
-                        sectionTitle("Plans")
+                        sectionTitle(String(localized: "Plans"))
                         PlansPanel(showLinks: false)
                             .padding(16)
                             .background(card)
                     }
-                    sectionTitle("Help")
+                    sectionTitle(String(localized: "Help"))
                     VStack(spacing: 0) {
-                        row("Restore purchases", symbol: "arrow.clockwise") {
+                        row(String(localized: "Restore purchases"), symbol: "arrow.clockwise") {
                             Task { await store.restore() }
                         }
                         divider
-                        row("Help & contact", symbol: "questionmark.circle") { openURL(AppLinks.support) }
+                        row(String(localized: "Help & contact"), symbol: "questionmark.circle") { openURL(AppLinks.support) }
                         divider
-                        row("Privacy policy", symbol: "hand.raised") { openURL(AppLinks.privacy) }
+                        row(String(localized: "Privacy policy"), symbol: "hand.raised") { openURL(AppLinks.privacy) }
                         divider
-                        row("Terms of use", symbol: "doc.text") { openURL(AppLinks.terms) }
+                        row(String(localized: "Terms of use"), symbol: "doc.text") { openURL(AppLinks.terms) }
                     }
                     .background(card)
                     #if DEBUG
@@ -317,16 +317,7 @@ struct SettingsView: View {
                     Text("Grown-ups").font(Kid.titleBold(24)).foregroundStyle(Kid.ink)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        SoundFX.shared.play(.tap)
-                        dismiss()
-                    } label: {
-                        Text("Done").font(Kid.titleBold(17)).foregroundStyle(Kid.ink)
-                            .padding(.horizontal, 16).frame(height: 37)
-                            .background(Capsule().fill(Color(hex: 0xEFE1FC)))
-                            .overlay(Capsule().strokeBorder(Kid.ink, lineWidth: 2.5))
-                    }
-                    .buttonStyle(SquishyStyle())
+                    KidDoneButton { dismiss() }
                 }
                 .kidPlainBackground()
             }

@@ -30,22 +30,33 @@ enum Kid {
     // and easy to read, for descriptions and longer text (Design/Fonts, SIL
     // Open Font License; registered in KidFonts).
     static func title(_ size: CGFloat, relativeTo style: Font.TextStyle = .title) -> Font {
-        .custom("Fredoka-SemiBold", size: size, relativeTo: style)
+        font("Fredoka-SemiBold", size, style)
     }
     static func titleBold(_ size: CGFloat, relativeTo style: Font.TextStyle = .largeTitle) -> Font {
-        .custom("Fredoka-Bold", size: size, relativeTo: style)
+        font("Fredoka-Bold", size, style)
     }
     /// Short labels and buttons: Fredoka SemiBold.
     static func body(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom("Fredoka-SemiBold", size: size, relativeTo: style)
+        font("Fredoka-SemiBold", size, style)
     }
     /// Descriptions, captions and notes: Nunito Bold.
     static func bodyBold(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom("Nunito-Bold", size: size, relativeTo: style)
+        font("Nunito-Bold", size, style)
     }
     /// Longer text that should stand out a little: Nunito ExtraBold.
     static func text(_ size: CGFloat, relativeTo style: Font.TextStyle = .body) -> Font {
-        .custom("Nunito-ExtraBold", size: size, relativeTo: style)
+        font("Nunito-ExtraBold", size, style)
+    }
+
+    /// Fredoka and Nunito have no Japanese or Thai letters. Left to
+    /// themselves those fall back to the system font at regular weight, so
+    /// headings lost their weight; the rounded system font at the same weight
+    /// keeps the hierarchy (its CJK and Thai fallbacks follow the weight).
+    private static func font(_ name: String, _ size: CGFloat, _ style: Font.TextStyle) -> Font {
+        if KidFonts.usesSystemType {
+            return .system(size: size, weight: KidFonts.weight(of: name), design: .rounded)
+        }
+        return .custom(name, size: size, relativeTo: style)
     }
 
     /// Card corners from the design sheet: 24–28 pt.
@@ -69,7 +80,29 @@ enum KidFonts {
     }
 
     static func ui(_ name: String, _ size: CGFloat) -> UIFont {
-        UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: .heavy)
+        if usesSystemType {
+            let w: UIFont.Weight = switch weight(of: name) {
+            case .heavy: .heavy
+            case .bold: .bold
+            default: .semibold
+            }
+            return .systemFont(ofSize: size, weight: w)
+        }
+        return UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: .heavy)
+    }
+
+    /// The app runs in Japanese or Thai (see Kid.font).
+    static let usesSystemType: Bool = {
+        let language = Bundle.main.preferredLocalizations.first ?? "en"
+        return language.hasPrefix("ja") || language.hasPrefix("th")
+    }()
+
+    static func weight(of name: String) -> Font.Weight {
+        switch name {
+        case "Fredoka-Bold", "Nunito-ExtraBold": .heavy
+        case "Fredoka-SemiBold", "Nunito-Bold": .bold
+        default: .semibold
+        }
     }
 }
 
@@ -206,6 +239,9 @@ struct KidCircleButton: View {
                     .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
             } else {
                 circle
+                    // The circle is drawn 42 pt; touched over 44 (polish-plan 63).
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
         }
         .buttonStyle(SquishyStyle())
@@ -239,7 +275,7 @@ struct KidBackButton: ViewModifier {
             .toolbar {
                 if isPresented && !hidden {
                     ToolbarItem(placement: .topBarLeading) {
-                        KidCircleButton(image: "BtnBack", label: "Back") {
+                        KidCircleButton(image: "BtnBack", label: String(localized: "Back")) {
                             if let hidesBarAs { AppTabs.shared.hideBar(hidesBarAs, false) }
                             dismiss()
                         }
@@ -296,23 +332,63 @@ struct ExactText: UIViewRepresentable {
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView label: UILabel, context: Context) -> CGSize? {
         let width = proposal.width ?? .greatestFiniteMagnitude
+        // Longer languages ("Ausmalbild erstellen", "Créer un coloriage"):
+        // smaller type rather than a word cut in two or a lost last line.
+        let scale = fittingScale(width: width)
+        label.attributedText = attributed(scale: scale)
         let fitted = label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
         // Lines shorter than the font's own leave ascenders and descenders
         // hanging out of the box; room for them above and below (the label
         // centers its text, so it lands in the middle).
-        return CGSize(width: min(width, ceil(fitted.width)), height: ceil(fitted.height + 2 * overhang))
+        return CGSize(width: min(width, ceil(fitted.width)), height: ceil(fitted.height + 2 * overhang(scale)))
     }
 
-    private var overhang: CGFloat { max(0, font.lineHeight - lineHeight) / 2 }
+    private func overhang(_ scale: CGFloat) -> CGFloat { max(0, font.lineHeight - lineHeight) * scale / 2 }
 
-    private var attributed: NSAttributedString {
+    private var attributed: NSAttributedString { attributed(scale: 1) }
+
+    private static let measuringLabel: UILabel = {
+        let label = UILabel()
+        label.numberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
+        return label
+    }()
+
+    /// The largest size, down to 60 %, at which every word fits on a line
+    /// and the text fits in `lines` lines.
+    private func fittingScale(width: CGFloat) -> CGFloat {
+        guard width.isFinite, width > 0 else { return 1 }
+        // Only words of spaced scripts: Japanese and Thai have no spaces and
+        // break anywhere between characters or syllables.
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+            .filter { $0.unicodeScalars.allSatisfy { $0.value < 0x0250 } }
+        let measure = Self.measuringLabel
+        var scale: CGFloat = 1
+        while scale > 0.6 {
+            let string = attributed(scale: scale)
+            let wordsFit = words.allSatisfy { word in
+                NSAttributedString(string: word, attributes: string.attributes(at: 0, effectiveRange: nil))
+                    .size().width <= width
+            }
+            // Measured by a label, which wraps exactly as the one on screen.
+            measure.attributedText = string
+            let height = measure.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+            let linesFit = lines == 0 || height <= CGFloat(lines) * lineHeight * scale + 1
+            if wordsFit && linesFit { return scale }
+            scale -= 0.05
+        }
+        return 0.6
+    }
+
+    private func attributed(scale: CGFloat) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.minimumLineHeight = lineHeight
-        paragraph.maximumLineHeight = lineHeight
+        paragraph.minimumLineHeight = lineHeight * scale
+        paragraph.maximumLineHeight = lineHeight * scale
         paragraph.alignment = .left
         paragraph.lineBreakMode = .byWordWrapping
         return NSAttributedString(string: text, attributes: [
-            .font: font, .foregroundColor: color, .kern: kerning, .paragraphStyle: paragraph,
+            .font: font.withSize(font.pointSize * scale), .foregroundColor: color, .kern: kerning * scale,
+            .paragraphStyle: paragraph,
         ])
     }
 }

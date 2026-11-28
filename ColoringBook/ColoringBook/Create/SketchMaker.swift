@@ -28,12 +28,12 @@ nonisolated enum SketchMaker {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .black: "Black"
-            case .blue: "Blue"
-            case .brown: "Brown"
-            case .purple: "Purple"
-            case .green: "Green"
-            case .pink: "Pink"
+            case .black: String(localized: "Black")
+            case .blue: String(localized: "Blue")
+            case .brown: String(localized: "Brown")
+            case .purple: String(localized: "Purple")
+            case .green: String(localized: "Green")
+            case .pink: String(localized: "Pink")
             }
         }
         var rgb: (r: Double, g: Double, b: Double) {

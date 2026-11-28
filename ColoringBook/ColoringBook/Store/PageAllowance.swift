@@ -20,14 +20,14 @@ struct Allowance: Codable, Equatable, Sendable {
     var limit: Int
     var kind: Kind
 
-    private var pages: String { remaining == 1 ? "1 AI page" : "\(remaining) AI pages" }
-
     /// "42 AI pages left this month", for the Create and result screens.
+    /// Whole sentences per case, with plural forms in the string catalog.
     var leftText: String {
         switch kind {
-        case .monthly, .family: "\(pages) left this month"
-        case .trial: "\(pages) left in your free trial"
-        case .book: "\(pages) left in your \(limit > 30 ? "books" : "book")"
+        case .monthly, .family: String(localized: "\(remaining) AI pages left this month")
+        case .trial: String(localized: "\(remaining) AI pages left in your free trial")
+        case .book where limit > 30: String(localized: "\(remaining) AI pages left in your books")
+        case .book: String(localized: "\(remaining) AI pages left in your book")
         }
     }
 
@@ -35,9 +35,10 @@ struct Allowance: Codable, Equatable, Sendable {
     var usedText: String {
         let used = max(0, limit - remaining)
         switch kind {
-        case .monthly, .family: return "\(used) of \(limit) AI pages used this month"
-        case .trial: return "\(used) of \(limit) AI pages used in your free trial"
-        case .book: return "\(used) of \(limit) AI pages used in your \(limit > 30 ? "books" : "book")"
+        case .monthly, .family: return String(localized: "\(used) of \(limit) AI pages used this month")
+        case .trial: return String(localized: "\(used) of \(limit) AI pages used in your free trial")
+        case .book where limit > 30: return String(localized: "\(used) of \(limit) AI pages used in your books")
+        case .book: return String(localized: "\(used) of \(limit) AI pages used in your book")
         }
     }
 }

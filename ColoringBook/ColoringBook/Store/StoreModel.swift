@@ -92,7 +92,7 @@ final class StoreModel {
             print("[Store] missing: \(ProductID.all.filter { id in !products.contains { $0.id == id } }) trialEligible \(trialEligible)")
             #endif
         } catch {
-            message = "The App Store could not be reached. Check the connection and try again."
+            message = String(localized: "The App Store could not be reached. Check the connection and try again.")
         }
     }
 
@@ -106,7 +106,7 @@ final class StoreModel {
             switch try await product.purchase() {
             case .success(let verification):
                 guard case .verified(let transaction) = verification else {
-                    message = "That purchase could not be verified."
+                    message = String(localized: "That purchase could not be verified.")
                     return false
                 }
                 // A book's pages are counted by the Worker, keyed on this
@@ -120,7 +120,7 @@ final class StoreModel {
             case .userCancelled:
                 return false
             case .pending:
-                message = "Waiting for approval. Drawing unlocks as soon as it goes through."
+                message = String(localized: "Waiting for approval. Drawing unlocks as soon as it goes through.")
                 return false
             @unknown default:
                 return false
@@ -138,7 +138,7 @@ final class StoreModel {
             try await AppStore.sync()
             await refresh()
             Task { await PageAllowance.shared.refresh() }
-            if await currentJWS() == nil { message = "No previous purchase found on this Apple Account." }
+            if await currentJWS() == nil { message = String(localized: "No previous purchase found on this Apple Account.") }
         } catch StoreKitError.userCancelled {
         } catch {
             message = error.localizedDescription
