@@ -144,6 +144,7 @@ Kiểm lại các mục cũ (2026-11-28): còn 21, 27 (iPhone ngang trang 100×1
 |---|---|---|---|
 | ~~TabHome, TabCreate, TabLibrary~~ | ~~Ngôi nhà, nút cộng, chồng sách~~ | | Đã xong |
 | ~~BtnNext, BtnPrev~~ | | | Đã xong: `BtnArrowLavender` cho thẻ lớn màn chính và nút lật sách (bản lật ngược cho trang trước) (2026-11-27) |
+| EditorText | Thẻ công cụ Text: chữ "Aa" kawaii, kiểu giống EditorSticker (hiện là hình tạm vẽ bằng script, 2026-11-28) | `EditorText` tạm | Hàng công cụ màn tô màu |
 | BtnSettings | Nút tròn lavender có bánh răng kawaii (hoặc "chìa khoá người lớn") | `gearshape.fill` | Màn chính (`PageLibraryView.swift:120`) |
 | DecoSparkle | Ngôi sao 4 cánh mũm mĩm, 3 màu (san hô, vàng, bạc hà) | `star.fill`, `sparkles` | Đầu màn chính, màn kết quả |
 | BadgeBooks, BadgePages, BadgeIdeas | Huy hiệu tròn: sách (tím), bảng màu (san hô), ngôi sao (bạc hà) | SF trong vòng tròn màu | Tiêu đề mục (`PageLibraryView.swift:308`) |

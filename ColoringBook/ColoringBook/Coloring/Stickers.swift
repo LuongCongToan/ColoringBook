@@ -229,6 +229,33 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
     var rotation: CGFloat
     /// Fills inside the old line stickers; kept only so saved pages decode.
     var ops: [FillOp] = []
+    /// Words placed on the page (the Text tool, 2026-11-28): drawn in
+    /// `textColor` instead of the picture of `kind`. Nil for pictures, and
+    /// in pages saved before text, which decode as pictures.
+    var text: String? = nil
+    var textColor: RGBA? = nil
+
+    var isText: Bool { text != nil }
+
+    /// What is drawn in the unit square: the words, or the picture.
+    var image: CGImage? {
+        if let text { return TextStickerArt.image(text, color: textColor ?? RGBA(0x28, 0x14, 0x5C)) }
+        return kind.image
+    }
+
+    /// The part of the unit square that is drawn: taps outside it fall
+    /// through to the page.
+    var hitBox: CGRect {
+        if let text { return TextStickerArt.box(text) }
+        return kind.hitBox
+    }
+
+    /// Where the selection and its corner handles go, in the unit square:
+    /// around the words for text (a long name is a thin strip), the whole
+    /// square for a picture.
+    var controlBox: CGRect {
+        isText ? hitBox.insetBy(dx: -0.03, dy: -0.03) : CGRect(x: 0, y: 0, width: 1, height: 1)
+    }
 
     /// Page pixel → unit square of the sticker (0...1 inside).
     func unitPoint(fromPage p: CGPoint) -> CGPoint {
@@ -238,7 +265,7 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
     }
 
     func contains(pagePoint p: CGPoint) -> Bool {
-        kind.hitBox.contains(unitPoint(fromPage: p))
+        hitBox.contains(unitPoint(fromPage: p))
     }
 
     /// Unit square → page pixels.
@@ -247,5 +274,79 @@ nonisolated struct PlacedSticker: Identifiable, Hashable, Codable, Sendable {
             .rotated(by: rotation)
             .scaledBy(x: size, y: size)
             .translatedBy(x: -0.5, y: -0.5)
+    }
+}
+
+/// Words as a sticker picture: one line in Fredoka Bold, as wide as the
+/// unit square allows, in the chosen color with a thin ink edge and a thick
+/// white one, so they read over the page's lines and any paint. Drawn once
+/// per words and color, kept.
+nonisolated enum TextStickerArt {
+    /// Pixels on a side; the page is 1600 px, a sticker at most 1.2 × its
+    /// short side, so this stays sharp.
+    static let side: CGFloat = 1024
+    static let maxLength = 40
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var images: [String: CGImage] = [:]
+    nonisolated(unsafe) private static var boxes: [String: CGRect] = [:]
+
+    static func image(_ text: String, color: RGBA) -> CGImage? {
+        let key = "\(text)|\(color.r),\(color.g),\(color.b)"
+        lock.lock()
+        if let cached = images[key] { lock.unlock(); return cached }
+        lock.unlock()
+        let layout = Self.layout(text)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            let fill = UIColor(red: CGFloat(color.r) / 255, green: CGFloat(color.g) / 255,
+                               blue: CGFloat(color.b) / 255, alpha: 1)
+            let ink = UIColor(red: 0x28 / 255, green: 0x14 / 255, blue: 0x5C / 255, alpha: 1)
+            // White halo first, then the color with a thin ink edge.
+            let halo = NSAttributedString(string: layout.text, attributes: [
+                .font: layout.font, .foregroundColor: UIColor.white,
+                .strokeColor: UIColor.white, .strokeWidth: 26,
+            ])
+            halo.draw(at: layout.origin)
+            let face = NSAttributedString(string: layout.text, attributes: [
+                .font: layout.font, .foregroundColor: fill,
+                .strokeColor: ink, .strokeWidth: -3.5,
+            ])
+            face.draw(at: layout.origin)
+        }.cgImage
+        lock.lock()
+        if let image { images[key] = image }
+        lock.unlock()
+        return image
+    }
+
+    /// The words' box in the unit square, halo included.
+    static func box(_ text: String) -> CGRect {
+        lock.lock()
+        if let cached = boxes[text] { lock.unlock(); return cached }
+        lock.unlock()
+        let layout = Self.layout(text)
+        let pad = layout.font.pointSize * 0.14
+        let rect = CGRect(origin: layout.origin, size: layout.size).insetBy(dx: -pad, dy: -pad)
+        let box = CGRect(x: rect.minX / side, y: rect.minY / side, width: rect.width / side, height: rect.height / side)
+            .intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+        lock.lock()
+        boxes[text] = box
+        lock.unlock()
+        return box
+    }
+
+    private static func layout(_ raw: String) -> (text: String, font: UIFont, origin: CGPoint, size: CGSize) {
+        let text = raw.isEmpty ? " " : String(raw.prefix(maxLength))
+        let base = UIFont(name: "Fredoka-Bold", size: 100) ?? .systemFont(ofSize: 100, weight: .heavy)
+        let width = NSAttributedString(string: text, attributes: [.font: base]).size().width
+        // As wide as 88% of the square, but never taller than a third of it.
+        let size = min(100 * side * 0.88 / max(width, 1), side / 3 / 1.2)
+        let font = base.withSize(size)
+        let measured = NSAttributedString(string: text, attributes: [.font: font]).size()
+        let origin = CGPoint(x: (side - measured.width) / 2, y: (side - measured.height) / 2)
+        return (text, font, origin, measured)
     }
 }

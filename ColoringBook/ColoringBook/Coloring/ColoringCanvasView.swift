@@ -241,14 +241,15 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
             // Order follows the session: last is on top.
             stickerLayer.addSubview(view)
             view.update(
-                image: sticker.kind.image,
+                image: sticker.image,
+                box: sticker.controlBox,
                 side: sticker.size * fitScale,
                 center: CGPoint(x: sticker.center.x * fitScale, y: sticker.center.y * fitScale),
                 rotation: sticker.rotation,
                 zoom: scrollView.zoomScale,
-                selected: session.tool == .sticker && session.selectedSticker == sticker.id)
+                selected: session.tool.movesStickers && session.selectedSticker == sticker.id)
         }
-        stickerLayer.isUserInteractionEnabled = session.tool == .sticker
+        stickerLayer.isUserInteractionEnabled = session.tool.movesStickers
     }
 
     private func makeStickerView(_ sticker: PlacedSticker) -> StickerView {
@@ -332,7 +333,7 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
     /// The scroll view asks before it zooms or pans: a pinch or drag that
     /// starts on a sticker belongs to the sticker.
     private func stickerOwns(_ recognizer: UIGestureRecognizer) -> Bool {
-        guard session.tool == .sticker else { return false }
+        guard session.tool.movesStickers else { return false }
         if recognizer is UIPanGestureRecognizer, recognizer.numberOfTouches < 2 { return false }
         return session.sticker(at: pagePoint(recognizer)) != nil || activeSticker != nil
     }
@@ -343,10 +344,11 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
         guard recognizer.view === page else { return super.gestureRecognizerShouldBegin(recognizer) }
         switch recognizer {
         case is UITapGestureRecognizer:
-            return session.tool == .fill || session.tool == .sticker
+            return session.tool == .fill || session.tool.movesStickers
         default:
-            // Sticker gestures only: on a sticker, with the sticker tool.
-            return session.tool == .sticker && (activeSticker != nil || session.sticker(at: pagePoint(recognizer)) != nil)
+            // Sticker gestures only: on a sticker (or words), with the
+            // sticker (or text) tool.
+            return session.tool.movesStickers && (activeSticker != nil || session.sticker(at: pagePoint(recognizer)) != nil)
         }
     }
 
@@ -367,7 +369,7 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
         switch session.tool {
         case .fill:
             session.fill(atPage: point)
-        case .sticker:
+        case .sticker, .text:
             let hit = session.sticker(at: point)
             if hit != session.selectedSticker {
                 selectionFeedback.selectionChanged()
@@ -457,9 +459,13 @@ final class ColoringCanvasUIView: UIView, UIScrollViewDelegate, UIGestureRecogni
         case .began:
             session.beginStickerGesture()
         case .changed:
-            // The handle sits on the bottom-right corner: at distance
-            // size/√2 from the center, 45° below the horizontal.
-            session.updateSticker(id, size: hypot(dx, dy) * sqrt(2), rotation: atan2(dy, dx) - .pi / 4)
+            // The handle sits on the bottom-right corner of the control box:
+            // for a picture the square's corner (size/√2 away, 45° below the
+            // horizontal); for words the corner of their strip.
+            let box = sticker.controlBox
+            let corner = CGPoint(x: box.maxX - 0.5, y: box.maxY - 0.5)
+            let reach = max(hypot(corner.x, corner.y), 0.05)
+            session.updateSticker(id, size: hypot(dx, dy) / reach, rotation: atan2(dy, dx) - atan2(corner.y, corner.x))
             layoutStickers()
         default:
             break
@@ -601,7 +607,9 @@ private final class StickerView: UIView {
         selection.contentsScale = scale
     }
 
-    func update(image: CGImage?, side: CGFloat, center: CGPoint, rotation: CGFloat, zoom: CGFloat, selected: Bool) {
+    /// `box`: where the selection and the corner controls go, in the unit
+    /// square (around the words for text, the whole square for a picture).
+    func update(image: CGImage?, box: CGRect, side: CGFloat, center: CGPoint, rotation: CGFloat, zoom: CGFloat, selected: Bool) {
         transform = .identity
         bounds = CGRect(x: 0, y: 0, width: side, height: side)
         self.center = center
@@ -619,9 +627,10 @@ private final class StickerView: UIView {
         selection.isHidden = !selected
         selection.lineWidth = 3 / z
         selection.lineDashPattern = [NSNumber(value: Double(10 / z)), NSNumber(value: Double(7 / z))]
-        selection.path = UIBezierPath(roundedRect: bounds.insetBy(dx: -8 / z, dy: -8 / z), cornerRadius: 12 / z).cgPath
-        for (view, origin) in [(deleteButton as UIView, CGPoint(x: side - c / 2, y: -c / 2)),
-                               (handle, CGPoint(x: side - c / 2, y: side - c / 2))] {
+        let frame = CGRect(x: box.minX * side, y: box.minY * side, width: box.width * side, height: box.height * side)
+        selection.path = UIBezierPath(roundedRect: frame.insetBy(dx: -8 / z, dy: -8 / z), cornerRadius: 12 / z).cgPath
+        for (view, origin) in [(deleteButton as UIView, CGPoint(x: frame.maxX - c / 2, y: frame.minY - c / 2)),
+                               (handle, CGPoint(x: frame.maxX - c / 2, y: frame.maxY - c / 2))] {
             view.isHidden = !selected
             // Frame only with an identity transform; it is undefined otherwise.
             view.transform = .identity

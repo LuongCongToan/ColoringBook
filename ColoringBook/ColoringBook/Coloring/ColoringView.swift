@@ -108,6 +108,12 @@ struct ColoringView: View {
             if ProcessInfo.processInfo.arguments.contains("-brushTool") { session.tool = .brush }
             // `-frameTool`: open with the frame tray.
             if ProcessInfo.processInfo.arguments.contains("-frameTool") { session.tool = .frame }
+            // `-demoText`: the Text tool with words on the page, chosen.
+            if ProcessInfo.processInfo.arguments.contains("-demoText"), !session.stickers.contains(where: \.isText) {
+                session.tool = .text
+                session.color = Palette.colors[7]
+                session.addText("Mia\u{2019}s Page")
+            }
             // `-frame <name>`: start with that picture frame (FrameLibrary).
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-frame"), i + 1 < args.count { Task { await session.setFrame(.image(args[i + 1])) } }
@@ -231,6 +237,9 @@ private struct BottomPanel: View {
                 SizePicker(session: session, axis: .horizontal)
                     .frame(maxWidth: .infinity)
             }
+            if tool == .text {
+                TextTray(session: session, axis: .horizontal)
+            }
             if tool.usesColor {
                 PanelTitle(text: "Colors")
                 ColorStrip(session: session, axis: .horizontal)
@@ -267,6 +276,9 @@ private struct SidePanel: View {
                     SizePicker(session: session, axis: .vertical)
                         .frame(maxWidth: .infinity)
                 }
+                if session.tool == .text {
+                    TextTray(session: session, axis: .vertical)
+                }
                 if session.tool.usesColor {
                     PanelTitle(text: "Colors")
                     ColorStrip(session: session, axis: .vertical)
@@ -302,8 +314,10 @@ private struct ToolRail: View {
             // an iPad, polish-plan 81).
             // 16 pt from the edges, 7 between cards (they touched the edge
             // and each other, polish-plan 56).
-            HStack(spacing: horizontalSizeClass == .regular ? 10 : 7) {
-                buttons(width: horizontalSizeClass == .regular ? cardWidth : nil)
+            // Seven cards on a phone: the smaller ones, so all fit.
+            HStack(spacing: horizontalSizeClass == .regular ? 10 : 6) {
+                buttons(width: horizontalSizeClass == .regular ? cardWidth : nil,
+                        compact: horizontalSizeClass != .regular)
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
@@ -317,6 +331,7 @@ private struct ToolRail: View {
                     .padding(.vertical, 10)
                     .padding(.horizontal, 10)
                 twoColumns
+                threeColumns
                 ScrollView(.vertical, showsIndicators: false) { twoColumns }
             }
             .frame(maxHeight: fills ? .infinity : nil, alignment: .top)
@@ -328,6 +343,16 @@ private struct ToolRail: View {
             buttons(width: 66, compact: true)
         }
         .padding(.vertical, fills ? 10 : 4)
+        .padding(.horizontal, 8)
+    }
+
+    /// Seven tools on a phone on its side with the size dots under them:
+    /// three short rows.
+    private var threeColumns: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.fixed(58), spacing: 6), count: 3), spacing: 6) {
+            buttons(width: 58, compact: true)
+        }
+        .padding(.vertical, 4)
         .padding(.horizontal, 8)
     }
 
@@ -397,6 +422,7 @@ private extension ColoringSession.Tool {
         case .rainbow: "EditorRainbow"
         case .eraser: "EditorEraser"
         case .sticker: "EditorSticker"
+        case .text: "EditorText"
         case .frame: "EditorFrame"
         }
     }
@@ -412,6 +438,7 @@ private extension ColoringSession.Tool {
         case .rainbow: 1.24
         case .eraser: 1.38
         case .sticker: 1.27
+        case .text: 1.12
         case .frame: 1.15
         }
     }
@@ -425,6 +452,7 @@ private extension ColoringSession.Tool {
         case .rainbow: -1.6
         case .eraser: -0.3
         case .sticker: 5
+        case .text: 0
         case .frame: -2.3
         }
     }
@@ -436,6 +464,7 @@ private extension ColoringSession.Tool {
         case .rainbow: "Rainbow"
         case .eraser: "Eraser"
         case .sticker: "Sticker"
+        case .text: "Text"
         case .frame: "Frame"
         }
     }
@@ -460,6 +489,7 @@ private extension ColoringSession.Tool {
         case .rainbow: "Rainbow brush"
         case .eraser: "Eraser"
         case .sticker: "Stickers"
+        case .text: "Words"
         case .frame: "Frames"
         }
     }
@@ -856,6 +886,97 @@ private struct StickerTray: View {
             .buttonStyle(BounceButtonStyle())
             .accessibilityLabel(kind.title)
         }
+    }
+}
+
+// MARK: - Text
+
+/// Words for the page, its name most of all: type, then "Add" puts them on
+/// the page in the chosen color. With words chosen on the page, the field
+/// changes those words as they are typed, and a color recolors them. On the
+/// page they move, grow and turn like stickers.
+private struct TextTray: View {
+    let session: ColoringSession
+    let axis: Axis
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+    /// The words being typed into, for one undo step per edit.
+    @State private var editing: UUID?
+
+    private var chosen: PlacedSticker? {
+        session.selectedItem.flatMap { $0.isText ? $0 : nil }
+    }
+
+    var body: some View {
+        let layout = axis == .horizontal ? AnyLayout(HStackLayout(spacing: 10)) : AnyLayout(VStackLayout(spacing: 10))
+        layout {
+            TextField(chosen == nil ? "Type a name\u{2026}" : "Change the words", text: words)
+                .font(Kid.titleBold(20))
+                .foregroundStyle(Kid.ink)
+                .textInputAutocapitalization(.words)
+                .submitLabel(.done)
+                .focused($focused)
+                .onSubmit { if chosen == nil { add() } }
+                .padding(.horizontal, 16)
+                .frame(height: 50)
+                .background(Capsule().fill(.white))
+                .overlay(Capsule().strokeBorder(Color(hex: 0xDCB9F3), lineWidth: 2.5))
+                .accessibilityLabel(chosen == nil ? "Words to add" : "Words on the page")
+            if chosen == nil {
+                Button { add() } label: {
+                    PuffyPill(title: "Add", icon: .symbol("plus"), fill: Kid.yellow, stretches: axis == .vertical)
+                }
+                .buttonStyle(SquishyStyle())
+                .disabled(trimmed.isEmpty)
+                .opacity(trimmed.isEmpty ? 0.5 : 1)
+                .accessibilityLabel("Add the words to the page")
+            } else {
+                Button {
+                    SoundFX.shared.play(.tap)
+                    focused = false
+                    session.selectedSticker = nil
+                } label: {
+                    PuffyPill(title: "New", icon: .symbol("plus"), stretches: axis == .vertical)
+                }
+                .buttonStyle(SquishyStyle())
+                .accessibilityLabel("Add new words")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+        .onChange(of: focused) { _, on in
+            if on, let id = chosen?.id {
+                editing = id
+                session.beginTextEdit()
+            } else if !on {
+                finishEditing()
+            }
+        }
+        .onChange(of: chosen?.id) { _, _ in finishEditing() }
+        .onDisappear { finishEditing() }
+    }
+
+    private var trimmed: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var words: Binding<String> {
+        if let item = chosen {
+            return Binding(get: { item.text ?? "" }, set: { session.setText(item.id, $0) })
+        }
+        return Binding(get: { draft }, set: { draft = String($0.prefix(TextStickerArt.maxLength)) })
+    }
+
+    private func add() {
+        guard !trimmed.isEmpty else { return }
+        SoundFX.shared.play(.sticker)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.addText(trimmed) }
+        draft = ""
+        focused = false
+    }
+
+    private func finishEditing() {
+        if let id = editing { session.endTextEdit(id) }
+        editing = nil
     }
 }
 

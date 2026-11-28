@@ -12,16 +12,32 @@ import UIKit
 @Observable
 final class ColoringSession {
     enum Tool: String, CaseIterable, Identifiable {
-        case fill, brush, rainbow, eraser, sticker, frame
+        case fill, brush, rainbow, eraser, sticker, text, frame
         var id: String { rawValue }
 
         var usesSize: Bool { self == .brush || self == .rainbow || self == .eraser }
-        var usesColor: Bool { self == .fill || self == .brush }
+        var usesColor: Bool { self == .fill || self == .brush || self == .text }
+        /// Stickers and words can be picked up, moved, resized and turned.
+        var movesStickers: Bool { self == .sticker || self == .text }
     }
 
     private(set) var art: LineArt
-    var tool: Tool = .fill { didSet { if tool != .sticker { selectedSticker = nil } } }
-    var color: RGBA = Palette.colors[0]
+    var tool: Tool = .fill {
+        didSet {
+            // Words are picked in the Text tool, pictures in the Sticker tool.
+            if !tool.movesStickers || selectedItem?.isText != (tool == .text) { selectedSticker = nil }
+        }
+    }
+    /// With the Text tool, choosing a color recolors the chosen words.
+    var color: RGBA = Palette.colors[0] {
+        didSet {
+            guard tool == .text, color != oldValue, let item = selectedItem, item.isText,
+                  item.textColor != color, let i = stickers.firstIndex(where: { $0.id == item.id }) else { return }
+            record()
+            stickers[i].textColor = color
+            revision += 1
+        }
+    }
     /// What the brush draws with: plain paint, crayon or glitter.
     var brushKind: BrushKind = .pen
     /// What the bucket pours: plain paint (nil) or a pattern.
@@ -123,7 +139,7 @@ final class ColoringSession {
         case .brush: brushKind.ink(color)
         case .rainbow: .rainbow
         case .eraser: .eraser
-        case .fill, .sticker, .frame: nil
+        case .fill, .sticker, .text, .frame: nil
         }
     }
 
@@ -272,8 +288,53 @@ final class ColoringSession {
         revision += 1
     }
 
+    /// The sticker or words under a page point; in the Text tool only
+    /// words, in the Sticker tool only pictures.
     func sticker(at point: CGPoint) -> UUID? {
-        stickers.last(where: { $0.contains(pagePoint: point) })?.id
+        stickers.last(where: { $0.isText == (tool == .text) && $0.contains(pagePoint: point) })?.id
+    }
+
+    var selectedItem: PlacedSticker? {
+        selectedSticker.flatMap { id in stickers.first { $0.id == id } }
+    }
+
+    // MARK: - Words
+
+    /// New words in the middle of the page, in the chosen color, chosen.
+    func addText(_ text: String) {
+        let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !reframing, !words.isEmpty else { return }
+        record()
+        let width = CGFloat(min(art.width, art.height)) * 0.75
+        let offset = CGFloat(stickers.filter(\.isText).count % 4) * width * 0.08
+        let item = PlacedSticker(
+            id: UUID(), kind: .star,
+            center: CGPoint(x: CGFloat(art.width) / 2 + offset, y: CGFloat(art.height) * 0.2 + offset),
+            size: width, rotation: 0, text: String(words.prefix(TextStickerArt.maxLength)), textColor: color)
+        stickers.append(item)
+        selectedSticker = item.id
+        revision += 1
+    }
+
+    /// Changes the chosen words as they are typed. One undo step for the
+    /// whole edit: `beginTextEdit` records it.
+    func setText(_ id: UUID, _ text: String) {
+        guard let i = stickers.firstIndex(where: { $0.id == id }), stickers[i].isText else { return }
+        let words = String(text.prefix(TextStickerArt.maxLength))
+        guard stickers[i].text != words else { return }
+        stickers[i].text = words
+        revision += 1
+    }
+
+    func beginTextEdit() { record() }
+
+    /// Words left empty after editing are taken away.
+    func endTextEdit(_ id: UUID) {
+        guard let item = stickers.first(where: { $0.id == id }), item.isText,
+              item.text?.trimmingCharacters(in: .whitespaces).isEmpty == true else { return }
+        stickers.removeAll { $0.id == id }
+        if selectedSticker == id { selectedSticker = nil }
+        revision += 1
     }
 
     func stickerState(_ id: UUID) -> PlacedSticker? {
@@ -389,10 +450,10 @@ final class ColoringSession {
         }.cgImage
     }
 
-    /// The stickers, each in its square on the page.
+    /// The stickers and words, each in its square on the page.
     private func drawStickers(in cg: CGContext) {
         for sticker in stickers {
-            guard let image = sticker.kind.image else { continue }
+            guard let image = sticker.image else { continue }
             cg.saveGState()
             cg.concatenate(sticker.transform)
             UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: 1, height: 1))
