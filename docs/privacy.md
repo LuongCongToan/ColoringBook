@@ -53,8 +53,34 @@ Viết mới, không dùng lại [Reference/Haru/docs/privacy.html](../Reference
 - App dành cho phụ huynh; trẻ em không tự dùng (app không vào Kids Category, brief mục 2).
 - Liên hệ để hỏi hoặc yêu cầu xoá.
 
+## Điều khoản BFL (đọc 2026-11-28, khách API tự đăng ký, không phải enterprise)
+
+Nguồn: [FLUX API Service Terms](https://bfl.ai/legal/flux-api-service-terms) và [Developer Terms of Service](https://bfl.ai/legal/developer-terms-of-service) (sửa 2026-08-04), [Privacy Policy](https://bfl.ai/legal/privacy-policy) (sửa 2026-08-01). Khách ở EU theo bản EU riêng, chưa đọc.
+
+- **Cấm ảnh trẻ em.** Developer Terms 6(k): không được "Upload images, videos or personal data ... relating to individuals under the age of 18." Privacy Policy mục 6 cũng nói BFL không cố ý thu dữ liệu của người dưới 18. App này lấy ảnh gia đình làm điểm chính, nên **đang trái điều khoản BFL** nếu không có thoả thuận khác.
+- **Mặc định dùng để huấn luyện.** API Terms 2(b): "the Company may use Inputs and Outputs to train and improve its artificial intelligence models". Từ chối bằng email tới privacy@blackforestlabs.ai, tiêu đề "Training Opt Out", kèm thông tin tài khoản. Không có nút trong tài khoản. **Đã gửi 2026-11-28**; chờ BFL xác nhận.
+- **Thời gian giữ: không nêu.** Chỉ có "as long as is reasonably necessary ... or for other legitimate business purposes". Không có zero data retention cho khách thường, không có DPA.
+- Developer Terms 6(j) và 3(a): phải có sự đồng ý của người trong ảnh. 1(c), 2(c): app phải có privacy policy và điều khoản cho người dùng, không lỏng hơn điều khoản BFL.
+
+Hệ quả: chưa thể ghi "ảnh không dùng để huấn luyện" hay "không lưu ở nhà cung cấp AI" lên store hay privacy policy. App Privacy phải khai **có thu thập** Photos (App Functionality, không liên kết danh tính, không tracking) cho tới khi có cam kết khác.
+
+## Các hướng thay thế (tra 2026-11-28)
+
+Lệnh cấm dưới 18 tuổi nằm trong hợp đồng API của BFL, không nằm trong model. Nó áp dụng cho mọi bên chuyển request sang API của BFL (Runware, fal, Replicate, Together đều ghi người dùng phải theo điều khoản của model gốc).
+
+| Hướng | Ảnh trẻ em | Huấn luyện | Không lưu dữ liệu | DPA | Giá/tranh |
+|---|---|---|---|---|---|
+| BFL tài khoản thường (đang dùng) | **Cấm** (6k) | Có, phải email từ chối | Không | Không | ~$0.008 |
+| Bên trung gian chuyển sang BFL | Cấm (theo điều khoản BFL) | Tuỳ bên | Chỉ enterprise | Tuỳ bên | — |
+| [Cloudflare Workers AI, FLUX.2 klein 4B](https://developers.cloudflare.com/workers-ai/models/flux-2-klein-4b/) | Không cấm (model Apache 2.0, Cloudflare tự host) | Không | Có, mặc định | Có (phải chấp nhận) | ~$0.0014 |
+| OpenAI gpt-image-1-mini | Cho phép nếu vô hại và có đồng ý | Không (mặc định) | Phải xin duyệt; không thì giữ tới 30 ngày | Có, tự ký | $0.005–0.011 |
+| Gemini / Vertex | Chưa rõ, có bộ lọc ảnh trẻ em | Không (gói trả phí) | Vertex: có | Có | ~$0.034 |
+
+FLUX.2 klein 9B là giấy phép phi thương mại, không dùng được. Qwen-Image-Edit (Apache 2.0) phải tự host.
+
 ## Việc phải làm
 
+0. **Giải quyết điều khoản ảnh dưới 18 tuổi** trước khi phát hành (xem mục trên): thoả thuận enterprise với BFL, hoặc nhà cung cấp khác chạy cùng model mà cho phép và không lưu dữ liệu.
 1. **Hỏi rõ BFL:** API thường giữ ảnh gửi lên và tranh trả về bao lâu, có dùng để huấn luyện không, có tuỳ chọn không lưu (zero data retention) không. Trang privacy của BFL không áp dụng cho khách hàng enterprise, và không nêu thời hạn cụ thể cho API; một nguồn thứ ba nói chỉ gói enterprise mới có zero data retention (chưa kiểm chứng). Gửi tới privacy@blackforestlabs.ai. Ghi câu trả lời vào đây kèm ngày.
 2. Nếu BFL không cam kết được: cân nhắc nhà cung cấp có zero data retention cho cùng model, hoặc khai "có thu thập" như trên.
 3. Brief mục 9 đề xuất ghi "ảnh không được lưu và không dùng để huấn luyện" vào mô tả trên store. **Chỉ ghi khi đã có cam kết của BFL bằng văn bản.**

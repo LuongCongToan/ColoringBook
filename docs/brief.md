@@ -447,6 +447,54 @@ Model rẻ → sửa tự động → đo trên máy
 
 Giữ bộ tranh đã chấm làm bộ kiểm thử, và chạy lại mỗi lần đổi model hay chỉnh prompt.
 
+### 4.1 Đổi sang Cloudflare Workers AI, FLUX.2 klein 4B (R&D 2026-11-28, cho bản hotfix)
+
+**Vì sao đổi:** Developer Terms 6(k) của BFL cấm gửi ảnh người dưới 18 tuổi qua API (chi tiết ở [privacy.md](privacy.md)). Bản 1.0 vẫn phát hành với BFL FLUX 3 Image Klein; bản hotfix chuyển sang `@cf/black-forest-labs/flux-2-klein-4b`. Model này mã nguồn mở Apache 2.0, do Cloudflare tự host: request không tới BFL, không lưu dữ liệu, không dùng để huấn luyện. Giá khoảng $0.0010–0.0014 mỗi tranh 768×1024 (94–126 neuron, $0.011/1.000 neuron), miễn phí 10.000 neuron/ngày cho cả tài khoản (~80–100 tranh). Không cần nạp trước.
+
+**Cách gọi:** binding `[ai]` trong `wrangler.toml`, `env.AI.run(model, { multipart: { body, contentType } })`. Form gồm `input_image_0` (ảnh), `prompt`, `width`, `height`. Ảnh nhận được dù trang model ghi "Text-to-Image". Mỗi tranh khoảng 4–6 s. `seed` không có tác dụng (cùng seed ra tranh khác).
+
+**Kết quả thử** (ảnh 3nguoi, f1, f2, f3; ảnh test giữ trong `tempdrawing_img/`, không commit):
+
+| Thay đổi | Kết quả |
+|---|---|
+| Prompt của BFL, ảnh màu | Cartoon giống ảnh thật, giữ hoa văn áo; Chibi bị tô màu da, tóc |
+| **Ảnh xám đầu vào** (như PhotoPrep) | Hết tô màu: 8/8 lần |
+| `steps` 12, `guidance` 8 | Tệ hơn: tô xám, tô đen tóc |
+| Bỏ chữ "glasses", "giữ phụ kiện như trong ảnh, không thêm gì" | Hết vẽ kính cho người không đeo (0/8) |
+| "Clothes are blank..." đặt trước, "only the people, cut out on white" | Áo trơn 7/8, nền sạch 8/8 với ảnh cận; ảnh có cả căn phòng (f3) vẫn giữ nền |
+| Hậu xử lý xám → trắng (giữ < 70, bỏ > 140, nội suy giữa) | Sửa hết tô xám; không sửa được tô đen đặc |
+
+- **Cartoon (`cartoon-v3`):** ảnh cận 6/6 đạt sau hậu xử lý; ảnh rộng giữ nền phòng. Khoảng 80–90% chất lượng BFL.
+- **Chibi (`chibi-v4`):** khoảng 3/9 lần ra chibi đẹp (người dùng duyệt f2 lần 1, 2); còn lại vẽ như người thật, mắt sau kính tô đen, logo trên áo.
+- Đôi khi có nét như chữ ký ở góc dưới phải: thêm "No signature, no text" vào prompt.
+
+**Thiết kế cho hotfix (đã chốt với người dùng 2026-11-28):**
+1. Worker gọi model **2–3 lần song song** cho mỗi lượt, hậu xử lý xám → trắng, bỏ tranh có vùng đen đặc lớn, trả về các tranh còn lại. Vẫn trừ **1 lượt** của người dùng.
+2. App thêm màn **"Pick your favorite"** trước "Your page is ready", cho cả Cartoon và Chibi.
+3. Cập nhật privacy (không lưu, không huấn luyện), App Privacy và `PrivacyInfo.xcprivacy` sang không thu thập ảnh. Hỏi Cloudflare: DPA có gồm Workers AI không; ảnh trả về có dấu đánh dấu AI phải giữ không (BFL ToS 1.3(p)).
+4. Chưa chốt: 2 hay 3 tranh mỗi lượt.
+
+Prompt Cartoon (`cartoon-v3`):
+
+```
+Kids' coloring book page: black outlines on white, nothing filled in.
+Draw only the people from this photo in a cute, friendly cartoon style, cut out on a plain white background with no furniture, pillows, bed, hammock or walls.
+Keep the same people, their poses, hairstyles, face shapes, smiles and accessories exactly as in the photo, and each person's age and gender. Do not add anything that is not in the photo.
+Simple cartoon faces like a children's picture book: small dot pupils, nose as one small curved line.
+Clothes are blank: plain shapes with no words, no logos, no printed pictures and no patterns.
+Hair is an empty outline with a few strand lines. Phone screens are blank. Smooth, even black outlines.
+```
+
+Prompt Chibi (`chibi-v4`):
+
+```
+Chibi coloring page for kids. Black outlines on a white page, every area empty white.
+Only the people, no background at all.
+Turn each person in this photo into a chibi: huge round head, tiny body two heads tall, big round eyes with small black pupils, simple happy face.
+Same people, same order, same hair and the same accessories they have in the photo, nothing added.
+Plain blank clothes: no text, no logos, no pictures, no patterns. Blank phone screen.
+```
+
 ## 5. Giá bán và lợi nhuận
 
 Bản 2026-11-15 định bán $4.99/tuần hoặc $29.99/năm, trần 100 tranh/tuần. Bản dưới đây (2026-11-22) thay thế phương án đó và **vẫn là đề xuất, cần chốt**.
