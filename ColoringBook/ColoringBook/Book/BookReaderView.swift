@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /// A book in the app, for the child: pages turn like paper, big arrows for
@@ -29,6 +30,7 @@ struct BookReaderView: View {
     @State private var makingVideo = false
     @State private var videoProgress = 0.0
     @State private var video: SharedVideo?
+    @Environment(\.requestReview) private var requestReview
 
     // Reader design (rawassets/ColoringBook-Reader-Assets, 2026-11-27).
     private static let hint = Color(hex: 0x796790)
@@ -141,14 +143,18 @@ struct BookReaderView: View {
         .onDisappear { AppTabs.shared.hideBar("book", false) }
         .loading(exporting, "Making the PDF…", progress: exportProgress)
         .loading(makingVideo, "Making the video…", progress: videoProgress)
-        .sheet(item: $video) { video in VideoShareSheet(url: video.url) }
+        // The rating dialog, if due, once the grown-up is back from sharing
+        // (ReviewPrompt): never over the child's coloring.
+        .sheet(item: $video, onDismiss: { ReviewPrompt.askIfDue(requestReview) }) { video in
+            VideoShareSheet(url: video.url)
+        }
         .loading(opening, "Opening the page…")
         .alert("Save PDF", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(exportError ?? "")
         }
-        .sheet(item: $pdf) { book in PDFPreviewView(book: book) }
+        .sheet(item: $pdf, onDismiss: { ReviewPrompt.askIfDue(requestReview) }) { book in PDFPreviewView(book: book) }
         .fullScreenCover(item: $arranging, onDismiss: {
             cache = [:]
             reload += 1
@@ -165,6 +171,8 @@ struct BookReaderView: View {
                 }
         }
         .onAppear {
+            // A book just saved opens here: a good moment to ask (ReviewPrompt).
+            ReviewPrompt.askIfDue(requestReview)
             pages.refresh()
             if index == 0 && startPage > 0 { index = startPage }
             #if DEBUG && targetEnvironment(simulator)
@@ -493,6 +501,7 @@ struct BookReaderView: View {
             }.value
             SoundFX.shared.play(.sticker)
             video = SharedVideo(url: url)
+            ReviewPrompt.note(.videoMade)
         } catch {
             exportError = "The video could not be made. Please try again."
         }
@@ -544,6 +553,7 @@ struct BookReaderView: View {
         do {
             try data.write(to: url, options: .atomic)
             SoundFX.shared.play(.sticker)
+            ReviewPrompt.note(.pdfMade)
             pdf = BuiltBook(url: url, title: book.title, kinds: kinds, pictures: sources.count,
                             withoutPhoto: sources.filter { $0.photo == nil }.count, options: opts)
         } catch {

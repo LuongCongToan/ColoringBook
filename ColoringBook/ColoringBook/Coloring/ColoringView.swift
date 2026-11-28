@@ -173,6 +173,7 @@ struct ColoringView: View {
     private func saveAndShow() {
         autosave?.cancel()
         PageStore.shared.save(session, force: true)
+        ReviewPrompt.note(.pageSaved)
         SoundFX.shared.play(.sticker)
         AppTabs.shared.showSavedPage(session.pageID)
         dismiss()

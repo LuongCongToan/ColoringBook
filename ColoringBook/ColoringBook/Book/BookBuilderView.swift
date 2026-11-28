@@ -541,6 +541,7 @@ struct BookBuilderView: View {
         book.layout = options.layout
         book.pageSounds = pageSounds
         BookStore.shared.save(book)
+        if editing == nil { ReviewPrompt.note(.bookSaved) }
         SoundFX.shared.play(.sticker)
         if editing != nil { dismiss() } else { openBook = book }
     }
