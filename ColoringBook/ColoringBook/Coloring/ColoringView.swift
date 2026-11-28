@@ -867,14 +867,14 @@ private struct FrameTray: View {
                     .scaleEffect(selected ? 1.05 : 1)
             }
             .buttonStyle(BounceButtonStyle())
-            .accessibilityLabel(frame.title)
+            .accessibilityLabel(frame == .default ? "No frame" : frame.title)
             .accessibilityAddTraits(selected ? .isSelected : [])
         }
     }
 }
 
-/// A frame for the tray: a colored frame whole; a line frame (the plain
-/// one, "no frame") as a small white page with its line and a smile.
+/// A frame for the tray: a colored frame whole; the plain one as the "no
+/// frame" icon; an older line frame as a small white page with its line.
 struct FramePreview: View {
     let frame: FrameChoice
 
@@ -890,6 +890,13 @@ struct FramePreview: View {
                         .background(Color.white)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
+            case .builtIn(.plain):
+                // "No frame": the drawn icon (rawassets/coloring_frames/
+                // frame_none.png, 2026-11-28).
+                Image("FrameNone")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: geo.size.width, height: geo.size.height)
             case .builtIn:
                 // The whole line frame at tile size. (It was its corner drawn
                 // three times as big and clipped, and the clipped part still

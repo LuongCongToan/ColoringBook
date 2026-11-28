@@ -803,12 +803,20 @@ private struct ConsentSheet: View {
                 .background(Capsule().fill(Kid.yellow.darker(0.15)).offset(y: 5))
             }
             .buttonStyle(SquishyStyle())
+            // The second choice: the lavender button, smaller, as "Try chibi
+            // style" under "Color it!".
             Button(action: decline) {
                 Text("Not now")
-                    .font(Kid.bodyBold(17))
-                    .foregroundStyle(Color(hex: 0x796790))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .font(Kid.titleBold(20))
+                    .foregroundStyle(Kid.ink)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(Capsule().fill(Kid.lavender))
+                    .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+                    .background(Capsule().fill(Kid.lavender.darker(0.15)).offset(y: 4))
+                    .padding(.horizontal, 16)
             }
+            .buttonStyle(SquishyStyle())
+            .padding(.top, 4)
         }
         .padding(.horizontal, 24)
         .padding(.top, 28)

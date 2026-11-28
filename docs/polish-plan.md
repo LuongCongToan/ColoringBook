@@ -98,7 +98,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 36. **Điều khiển hệ thống:** ~~bộ chọn Books/Pages và As colored/Fresh, công tắc và ô tên ở Make a book, danh sách Grown-ups~~ (xong). Còn lại: danh sách Arrange. ~~Thanh công cụ của chế độ chọn~~ (xong).
 37. ~~Đường chọn sticker~~ — Nét đứt tím, nút xoá san hô, tay cầm màu nho. (2026-11-28)
 38. ~~AccentColor~~ — Tím mực `#28145C`, như `tint` của app. (2026-11-28)
-39. ~~Màn khởi động~~ — Nền kem `LaunchBackground` với linh vật bút sáp `LaunchMascot`. (2026-11-28)
+39. ~~Màn khởi động~~ — Thẻ loading (`LaunchCard`, vẽ từ `LoadingCard` bằng cờ `-renderLaunchCard`) trên nền kem; `LaunchSplash` thay vào cùng chỗ và cho linh vật, 3 chấm chuyển động rồi mờ sang Home. (2026-11-28)
 40. **Dọn code:** KawaiiFace/Camera/Book/Pencil/Smiley/Chibi trong `Design/Kid.swift`, `PaintBucketIcon` và `UndoButton` trong `ColoringView.swift` không còn dùng.
 
 ## Thứ tự đề nghị (sau lượt thử 2026-11-26 tối)
@@ -134,7 +134,7 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 | ~~LoadingSpinner~~ | ~~Giọt sơn xoay hoặc bút sáp nhún~~ | | Đã xong: linh vật nhún và 3 chấm vẽ bằng code (2026-11-27) |
 | TileNewBook | Cuốn sách kawaii kèm dấu cộng lấp lánh | `plus` trong ô nét đứt | Ô "New book" (`BookListView.swift:193`) |
 | EmptyBooks, EmptyPages | Linh vật cạnh kệ sách trống; linh vật cầm bút sáp và trang trắng | Chỉ có chữ | Màn trống My books, My pages |
-| FrameNone | Trang trắng có mặt cười, nghĩa là "không khung" | Góc khung cũ kèm `face.smiling` | Ô đầu khay khung (`ColoringView.swift:610`) |
+| ~~FrameNone~~ | | | Đã xong: `rawassets/coloring_frames/frame_none.png` → asset `FrameNone`, ô đầu khay khung (2026-11-28) |
 | ~~LayoutPagesOnly, LayoutPhotoFacing, LayoutPhotoCorner~~ | | | Đã xong: dùng hình thỏ của thẻ Page layout ở cả màn đọc sách (2026-11-27) |
 
 ### Ưu tiên vừa

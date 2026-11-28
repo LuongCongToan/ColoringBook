@@ -33,6 +33,10 @@ struct ColoringBookApp: App {
                        let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
                         scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
                     }
+                    // `-renderLaunchCard`: draw the still launch picture.
+                    if ProcessInfo.processInfo.arguments.contains("-renderLaunchCard") {
+                        print("LAUNCH CARD", LaunchSplash.renderLaunchCard()?.path ?? "failed")
+                    }
                     await DebugBook.runIfRequested()
                     #endif
                 }
@@ -58,10 +62,10 @@ struct ColoringBookApp: App {
         } else if ProcessInfo.processInfo.arguments.contains("-openBookBuilder") {
             DebugHomeRoot { BookBuilderView() }
         } else {
-            RootTabView()
+            AppRoot()
         }
         #else
-        RootTabView()
+        AppRoot()
         #endif
     }
 }

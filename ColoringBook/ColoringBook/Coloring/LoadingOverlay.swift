@@ -30,28 +30,7 @@ struct LoadingOverlay: View {
                 .onTapGesture {}
                 .ignoresSafeArea()
 
-            VStack(spacing: 8) {
-                Mascot(animated: !reduceMotion)
-                Words(text: text, lines: lines)
-                if let progress {
-                    ProgressBar(value: progress)
-                        .frame(width: 170, height: 13)
-                        .padding(.top, 4)
-                } else {
-                    BouncingDots(animated: !reduceMotion)
-                        .padding(.top, 4)
-                }
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 18)
-            .padding(.bottom, 24)
-            .frame(minWidth: 260)
-            .background(
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(Self.cream)
-                    .overlay(RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .strokeBorder(Self.border, lineWidth: 5))
-                    .shadow(color: Kid.ink.opacity(0.25), radius: 22, y: 10))
+            LoadingCard(text: text, progress: progress, lines: lines, animated: !reduceMotion)
             .padding(24)
         }
         .transition(.opacity)
@@ -114,8 +93,49 @@ private struct Words: View {
     }
 }
 
-/// Light, medium and dark lilac, each growing in turn.
-private struct BouncingDots: View {
+/// The card itself: mascot, words, dots or bar. Also the app's launch
+/// screen (LaunchSplash, and the still `LaunchCard` picture drawn from it).
+struct LoadingCard: View {
+    var text: String = "Loading…"
+    var progress: Double?
+    var lines: [String] = []
+    var animated = true
+    /// The cream card with its lilac edge; off on the launch screen, which
+    /// is already cream (user, 2026-11-28).
+    var card = true
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Mascot(animated: animated)
+            Words(text: text, lines: lines)
+            if let progress {
+                ProgressBar(value: progress)
+                    .frame(width: 170, height: 13)
+                    .padding(.top, 4)
+            } else {
+                BouncingDots(animated: animated)
+                    .padding(.top, 4)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 18)
+        .padding(.bottom, 24)
+        .frame(minWidth: 260)
+        .background {
+            if card {
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(LoadingOverlay.cream)
+                    .overlay(RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        .strokeBorder(LoadingOverlay.border, lineWidth: 5))
+                    .shadow(color: Kid.ink.opacity(0.25), radius: 22, y: 10)
+            }
+        }
+    }
+}
+
+/// Light, medium and dark lilac, each growing in turn. Also under the
+/// mascot while the app starts (LaunchSplash).
+struct BouncingDots: View {
     let animated: Bool
 
     var body: some View {
