@@ -1,3 +1,4 @@
+import LinkPresentation
 import SwiftUI
 
 /// The coloring screen, built for children who cannot read yet:
@@ -182,6 +183,14 @@ struct ColoringView: View {
         ReviewPrompt.note(.pageSaved)
         SoundFX.shared.play(.sticker)
         AppTabs.shared.showSavedPage(session.pageID)
+        leave()
+    }
+
+    /// Back to where the page was opened from. The tab bar comes back with
+    /// the pop, not after it (onDisappear runs once the animation has
+    /// ended: the bar appeared a beat late, polish-plan 60).
+    private func leave() {
+        AppTabs.shared.hideBar("coloring", false)
         dismiss()
     }
 
@@ -192,7 +201,7 @@ struct ColoringView: View {
         // in the middle of the room between the buttons (polish-plan 64).
         TitleBarLayout {
             HStack(spacing: 8) {
-                KidCircleButton(image: "BtnBack", size: 58, label: "Back") { dismiss() }
+                KidCircleButton(image: "BtnBack", size: 58, label: "Back") { leave() }
                 if wide { SaveButton(action: saveAndShow) }
             }
             Text("Let\u{2019}s color!")
@@ -855,7 +864,7 @@ extension ColorStrip {
 
 private extension RGBA {
     var isLight: Bool { (Int(r) * 299 + Int(g) * 587 + Int(b) * 114) / 1000 > 170 }
-    var accessibilityName: String { self == .white ? "White" : "Color" }
+    var accessibilityName: String { Palette.name(of: self) ?? "Color" }
 }
 
 // MARK: - Stickers
@@ -1126,31 +1135,6 @@ struct FramePreview: View {
     .background(Color(red: 1, green: 0.93, blue: 0.82))
 }
 
-// MARK: - Undo
-
-private struct UndoButton: View {
-    let session: ColoringSession
-
-    var body: some View {
-        Button {
-            SoundFX.shared.play(.undo)
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.undo() }
-        } label: {
-            Image(systemName: "arrow.uturn.backward")
-                .font(.system(size: 28, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 64, height: 64)
-                .background(Circle().fill(Theme.accent).shadow(color: .black.opacity(0.2), radius: 4, y: 2))
-        }
-        .buttonStyle(BounceButtonStyle())
-        .opacity(session.canUndo ? 1 : 0.35)
-        .disabled(!session.canUndo)
-        .accessibilityLabel("Undo")
-    }
-}
-
-/// Big magnifier buttons: small children cannot pinch, so zooming must work
-/// with plain taps. "Fit" appears only while zoomed in.
 /// The yellow "Save" pill, beside the zoom buttons.
 private struct SaveButton: View {
     let action: () -> Void
@@ -1174,6 +1158,8 @@ private struct SaveButton: View {
     }
 }
 
+/// Big magnifier buttons: small children cannot pinch, so zooming must work
+/// with plain taps. "Fit" appears only while zoomed in.
 private struct ZoomButtons: View {
     let session: ColoringSession
 
@@ -1242,43 +1228,6 @@ private enum Theme {
 
 // MARK: - Paint bucket icon
 
-/// SF Symbols has no paint bucket, and children know the tool by its pail.
-///
-/// The 3D bucket artwork, split into three layers by
-/// `Tools/icons/split_paint_bucket.py` so the paint can take any color:
-/// the can (paint removed), the paint's shape tinted with the current color,
-/// and the paint's light and shadow laid back on top.
-struct PaintBucketIcon: View {
-    let paint: Color
-
-    var body: some View {
-        ZStack {
-            Image("PaintBucketBody").resizable()
-            Image("PaintBucketPaint").resizable()
-                .renderingMode(.template)
-                .foregroundStyle(paint)
-            Image("PaintBucketShade").resizable()
-        }
-        .scaledToFit()
-        // White paint would vanish on the white button.
-        .shadow(color: .black.opacity(paint == .white ? 0.25 : 0), radius: 1)
-        .accessibilityHidden(true)
-    }
-}
-
-#Preview("Paint bucket") {
-    HStack(spacing: 12) {
-        ForEach([Palette.colors[0], Palette.colors[2], Palette.colors[6], RGBA.white], id: \.self) { color in
-            PaintBucketIcon(paint: Color(uiColor: color.uiColor))
-                .frame(width: 50, height: 50)
-                .frame(width: 72, height: 72)
-                .background(RoundedRectangle(cornerRadius: 22).fill(.white))
-        }
-    }
-    .padding()
-    .background(Color(red: 1, green: 0.93, blue: 0.82))
-}
-
 // MARK: - Shared pieces
 
 /// A sticker drawn as SwiftUI shapes for the tray.
@@ -1301,10 +1250,35 @@ private struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // A page image goes in with its own preview and title: the sheet's
+        // header showed a generic icon (polish-plan 24).
+        let shared: [Any] = items.map { item in
+            (item as? UIImage).map { SharedPageImage(image: $0) } ?? item
+        }
+        return UIActivityViewController(activityItems: shared, applicationActivities: nil)
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+/// The page for the share sheet, with the thumbnail and name in its header.
+private final class SharedPageImage: NSObject, UIActivityItemSource {
+    let image: UIImage
+    init(image: UIImage) { self.image = image }
+
+    func activityViewControllerPlaceholderItem(_ controller: UIActivityViewController) -> Any { image }
+
+    func activityViewController(_ controller: UIActivityViewController,
+                                itemForActivityType activityType: UIActivity.ActivityType?) -> Any? { image }
+
+    func activityViewControllerLinkMetadata(_ controller: UIActivityViewController) -> LPLinkMetadata? {
+        let metadata = LPLinkMetadata()
+        metadata.title = "My coloring page"
+        let provider = NSItemProvider(object: image)
+        metadata.imageProvider = provider
+        metadata.iconProvider = provider
+        return metadata
+    }
 }
 
 #if DEBUG && targetEnvironment(simulator)

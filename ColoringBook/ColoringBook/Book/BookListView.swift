@@ -62,6 +62,7 @@ struct BookListView: View {
                             .font(Kid.bodyBold(15))
                             .foregroundStyle(Color(hex: 0x796790))
                     }
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
             }
             .padding(16)

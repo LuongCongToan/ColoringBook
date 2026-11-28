@@ -59,6 +59,9 @@ final class AppTabs {
         #if DEBUG && targetEnvironment(simulator)
         // `-createTab`: start on Create.
         if ProcessInfo.processInfo.arguments.contains("-createTab") { selected = .create }
+        // `-libraryTab`: start on My library; `-pagesShelf` on its pages.
+        if ProcessInfo.processInfo.arguments.contains("-libraryTab") { selected = .library }
+        if ProcessInfo.processInfo.arguments.contains("-pagesShelf") { selected = .library; libraryShelf = .pages }
         #endif
     }
 }

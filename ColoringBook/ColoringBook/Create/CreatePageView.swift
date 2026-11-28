@@ -136,7 +136,9 @@ struct CreatePageView: View {
             }
             // On an iPad just its own height (the half-screen detent left a
             // 320 pt gap, polish-plan 85).
-            .presentationDetents(horizontalSizeClass == .regular ? [.height(470)] : [.medium, .large])
+            // Its own height everywhere: on an iPhone SE half the screen hid
+            // "Not now" (audit 2026-11-28).
+            .presentationDetents(horizontalSizeClass == .regular ? [.height(470)] : [.height(480), .large])
         }
         .sheet(isPresented: $showPlans) {
             PaywallView {
@@ -340,8 +342,8 @@ struct CreatePageView: View {
             if prepared?.faceTouchesEdge == true {
                 Label("A face is at the edge. A photo with more space around it draws better.",
                       systemImage: "exclamationmark.circle.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .font(Kid.bodyBold(14))
+                    .foregroundStyle(Kid.orange)
                     .padding(10)
                     .background(.white, in: RoundedRectangle(cornerRadius: 12))
                     .offset(y: 30)
@@ -368,7 +370,8 @@ struct CreatePageView: View {
                 .foregroundStyle(Kid.ink)
             HStack(spacing: 10) {
                 ForEach(PageStyle.allCases) { s in
-                    StyleCard(style: s, selected: style == s, compact: wide) {
+                    StyleCard(style: s, selected: style == s, compact: wide,
+                              large: horizontalSizeClass == .regular && !wide) {
                         SoundFX.shared.play(.tap)
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { style = s }
                     }
@@ -809,6 +812,9 @@ private struct StyleCard: View {
     /// A phone on its side: a smaller picture, so the three cards and "Draw
     /// my page" fit the short screen (polish-plan 76).
     var compact = false
+    /// An iPad: bigger pictures and words (the cards looked lost on the wide
+    /// column, audit 2026-11-28).
+    var large = false
     let action: () -> Void
 
     private var art: String {
@@ -851,12 +857,12 @@ private struct StyleCard: View {
                 Image(art)
                     .resizable()
                     .scaledToFit()
-                    .frame(height: compact ? 58 : 92)
+                    .frame(height: compact ? 58 : (large ? 140 : 92))
                 Text(title)
-                    .font(Kid.titleBold(20))
+                    .font(Kid.titleBold(large ? 26 : 20))
                     .foregroundStyle(Kid.ink)
                 Text(caption)
-                    .font(Kid.bodyBold(13))
+                    .font(Kid.bodyBold(large ? 16 : 13))
                     .foregroundStyle(Kid.ink.opacity(0.65))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)

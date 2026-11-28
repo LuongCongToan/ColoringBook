@@ -9,6 +9,7 @@ struct PageArrangeView: View {
     let bookID: UUID
     let pageID: UUID
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dismiss) private var dismiss
     @State private var books = BookStore.shared
     @State private var pages = PageStore.shared
@@ -76,7 +77,9 @@ struct PageArrangeView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("Arrange page")
+                    // "Arrange page" was cut to "Arrange p…" between Cancel
+                    // and Done on a phone (audit 2026-11-28).
+                    Text(horizontalSizeClass == .compact ? "Arrange" : "Arrange page")
                         .font(Kid.titleBold(22))
                         .foregroundStyle(Kid.ink)
                 }

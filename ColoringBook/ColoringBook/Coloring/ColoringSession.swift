@@ -489,6 +489,15 @@ enum Palette {
         RGBA(hex: 0x8E24AA), RGBA(hex: 0xF06292), RGBA(hex: 0x8D6E63), RGBA(hex: 0xFFCCBC),
         RGBA(hex: 0xD7A86E), RGBA(hex: 0x9E9E9E), RGBA(hex: 0x212121), .white,
     ]
+
+    /// What VoiceOver says for each swatch, in the order above (every one
+    /// was read as "Color", polish-plan 22).
+    static let names = ["Red", "Orange", "Yellow", "Light green", "Green", "Turquoise", "Sky blue", "Navy blue",
+                        "Purple", "Pink", "Brown", "Peach", "Tan", "Gray", "Black", "White"]
+
+    static func name(of color: RGBA) -> String? {
+        colors.firstIndex(of: color).flatMap { names.indices.contains($0) ? names[$0] : nil }
+    }
 }
 
 extension RGBA {

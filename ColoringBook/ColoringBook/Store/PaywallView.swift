@@ -301,11 +301,13 @@ struct ParentalGate: View {
     var body: some View {
         VStack(spacing: 16) {
             Text("Ask a grown-up")
-                .font(.title2.weight(.heavy))
+                .font(Kid.titleBold(24))
+                .foregroundStyle(Kid.ink)
             Text("What is \(a) × \(b)?")
-                .font(.title3)
+                .font(Kid.body(20))
+                .foregroundStyle(Kid.ink)
             Text(entry.isEmpty ? " " : entry)
-                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .font(Kid.titleBold(40))
                 .frame(minWidth: 120, minHeight: 50)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
                 .modifier(Shake(amount: wrong ? 1 : 0))
@@ -315,7 +317,8 @@ struct ParentalGate: View {
                         press(key)
                     } label: {
                         Text(key)
-                            .font(.title2.weight(.bold))
+                            .font(Kid.titleBold(24))
+                            .foregroundStyle(Kid.ink)
                             .frame(width: 78, height: 54)
                             .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
                     }

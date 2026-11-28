@@ -50,14 +50,14 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 ## P3
 
 17. ~~PDF preview: sai số ít/số nhiều~~
-18. **Màn kết quả (dọc):** dòng "59 pages left this month" và ghi chú bị nút ghim che. Đưa lên gần ảnh, hoặc vào khối nút ghim.
+18. ~~Màn kết quả (dọc)~~ — Dòng số lượt nằm ngay dưới hàng màu; màn kết quả tự co tranh cho vừa (2026-11-28)
 19. ~~Bấm "Color it!" chờ 1–2 giây không phản hồi~~ — Hiện popup "Opening the page…", chặn bấm hai lần. (2026-11-27)
 20. ~~Khay khung ở màn tô màu~~ — Ô "Simple" vẽ nguyên khung vừa ô kèm mặt cười, vùng chạm đúng bằng ô; xoay ngang thì Save và −/+ lên thanh trên; nút − khi khoá có nền đặc. (2026-11-28)
 21. ~~Bìa sách khi đang chọn: vòng chọn che cuối tên sách~~ — Dấu tick dời ra góc ô. (2026-11-28)
-22. **Trợ năng:** ảnh trang ở My pages chưa có nhãn; ô màu đều đọc là "Color" (chỉ White và Any color có tên). Đặt tên màu ("Red", "Orange"…). Ngôi sao trang trí ở Home bị VoiceOver đọc là "Favorite": ẩn khỏi trợ năng. *Thử lại: vẫn còn.*
-23. **Sách, sau khi đổi layout hoặc Arrange:** trang thành trắng kèm vòng xoay vài giây. Giữ ảnh cũ tới khi ảnh mới sẵn sàng. Xem thêm mục 47.
-24. **Bảng chia sẻ** ở màn tô màu hiện icon chung chung. Gửi kèm ảnh thu nhỏ và tên trang (`LPLinkMetadata` hoặc `ShareLink`).
-25. **Hiệu ứng xoá trang:** thẻ trượt chéo đè nhau khi lưới dồn lại. Dùng mờ dần hoặc thu nhỏ.
+22. ~~Trợ năng~~ — Tên từng màu cho VoiceOver, ẩn sao trang trí, tiêu đề mục là heading, nhãn cho ảnh trang ở Home và My pages (2026-11-28)
+23. ~~Sách, sau khi đổi layout hoặc Arrange~~ — Giữ ảnh cũ tới khi ảnh mới vẽ xong (CurlPager) (2026-11-28)
+24. ~~Bảng chia sẻ~~ — Ảnh thu nhỏ và tiêu đề "My coloring page" trong bảng chia sẻ (LPLinkMetadata) (2026-11-28)
+25. ~~Hiệu ứng xoá trang~~ — Thẻ mờ dần và thu nhỏ tại chỗ, ở My pages và My books (2026-11-28)
 26. ~~Màn tô màu (dọc): khoảng trống giữa hàng Save/zoom và hàng dụng cụ~~ — Tranh lấy hết chỗ còn lại sau khi chừa chỗ cho bảng công cụ cao nhất (Brush), nên không nhảy cỡ khi đổi công cụ. Với Fill, Sticker, Frame phần dư (145–200 pt) nằm dưới khay. (2026-11-28)
 27. **Màn đọc sách:** ~~icon layout và dòng "Tap the page to color it" quá nhỏ~~ (ô 60×52 pt, chữ 15 pt màu tím, 2026-11-27). Còn: khi xoay ngang, trang chỉ khoảng 115×151 pt trên iPhone: xếp trang bên trái, nút bên phải. Mũi tên trước/sau nhảy chỗ giữa trang bìa và trang tô.
 28. ~~Arrange page: chấm kéo đổi cỡ khó thấy~~ — Tay cầm 22 pt, viền 3 pt. (2026-11-28)
@@ -68,8 +68,8 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 57. ~~Ảnh sách trong My library khác bìa thật~~ — Ô sách vẽ từ bìa thật (cùng code với trình đọc sách), lưu đệm trong Caches tới khi sách hoặc trang đầu đổi. (2026-11-27)
 58. ~~Xem trước PDF có hai nút Print~~ — Bỏ nút góc trên. (2026-11-27)
 59. ~~New page: thẻ kiểu vẽ đang chọn to ra~~ (kiểm lại 2026-11-28: không còn) — (132 so với 126 pt), làm khoảng cách hai bên lệch (4 và 10 pt). Dùng `scaleEffect` không đổi bố cục. Nhãn "FREE" chỉ khoảng 11 pt.
-60. **Thanh tab hiện lại chậm** khoảng 1 giây sau khi rời màn tô màu hoặc chế độ chọn. Cho hiện cùng hiệu ứng quay lại.
-61. **Home:** khi cuộn, nội dung chạy dưới thanh trạng thái, không có nền. Ô "Try these" dọc nằm trong ô ngang có viền xám. Ảnh trang hiện trễ khoảng 1 giây (ô trắng); ô "Import a page" cao 150 pt, các ô khác 160 pt.
+60. ~~Thanh tab hiện lại chậm~~ — Thanh tab hiện lại ngay khi bấm Back ở màn tô màu và sách (2026-11-28)
+61. ~~Home~~ — Dải nền sau thanh trạng thái; ô "Import a page" cao 160 pt như các ô khác (2026-11-28)
 62. ~~Lưới 2 cột khi xoay ngang (iPhone)~~ — Lưới tự thêm cột (`adaptive(minimum: 180)`) ở Home và My pages; hai thẻ lớn cạnh nhau khi rộng hơn 760 pt, hình nhỏ lại trên iPhone ngang. (2026-11-28)
 63. **Vùng chạm nhỏ:** "See all" cao 22 pt; Select, Cancel, Done 37 pt; nút Home ở Make a book 42 pt. ~~Số trang dưới sách 12 pt xám~~ (Nunito 15 pt tím, 2026-11-28).
 64. ~~Tiêu đề "Let's color!" lệch tâm~~ — Giữa màn hình khi đủ chỗ (ngang, iPad); iPhone dọc không đủ chỗ nên canh giữa khoảng giữa hai cụm nút. (2026-11-28)
@@ -115,12 +115,12 @@ Kiểm lại các mục cũ (2026-11-28): còn 21, 27 (iPhone ngang trang 100×1
 ## Đổi giao diện bằng code (không cần hình mới)
 
 34. **Các màn chưa đổi giao diện:** ~~Make a book~~, ~~paywall~~, ~~màn Grown-ups~~ (xong 2026-11-26). Còn lại: ~~đọc sách~~ (xong 2026-11-27 theo `rawassets/ColoringBook-Reader-Assets`: nút Edit/Video/Save PDF có hình, mũi tên tím, ô layout dùng chung hình thỏ của thẻ Page layout, ô đang chọn màu chanh), ~~xem trước PDF~~ (xong 2026-11-27), ~~Arrange~~ (xong 2026-11-27: nút Cancel/Done/Reset cùng kiểu PuffyPill với màn đọc sách, cao 48 pt; khung chọn và tay cầm tím), ~~lớp loading~~ (xong 2026-11-27: thẻ kem viền tím, linh vật bút sáp, 3 chấm, dùng cho cả màn chờ AI vẽ), ~~hộp hỏi đồng ý~~ (xong 2026-11-28: nền kem, Fredoka/Nunito, nút vàng to). Đổi sang bảng màu Kid, Fredoka/Nunito, thẻ trắng, nút viên thuốc.
-35. **Font:** thay `.font(.headline/.caption/.footnote…)` bằng `Kid.title/body/bodyBold`.
+35. ~~Font~~ — Thay hết font hệ thống còn lại bằng Kid (2026-11-28)
 36. **Điều khiển hệ thống:** ~~bộ chọn Books/Pages và As colored/Fresh, công tắc và ô tên ở Make a book, danh sách Grown-ups~~ (xong). Còn lại: danh sách Arrange. ~~Thanh công cụ của chế độ chọn~~ (xong).
 37. ~~Đường chọn sticker~~ — Nét đứt tím, nút xoá san hô, tay cầm màu nho. (2026-11-28)
 38. ~~AccentColor~~ — Tím mực `#28145C`, như `tint` của app. (2026-11-28)
 39. ~~Màn khởi động~~ — Thẻ loading (`LaunchCard`, vẽ từ `LoadingCard` bằng cờ `-renderLaunchCard`) trên nền kem; `LaunchSplash` thay vào cùng chỗ và cho linh vật, 3 chấm chuyển động rồi mờ sang Home. (2026-11-28)
-40. **Dọn code:** KawaiiFace/Camera/Book/Pencil/Smiley/Chibi trong `Design/Kid.swift`, `PaintBucketIcon` và `UndoButton` trong `ColoringView.swift` không còn dùng.
+40. ~~Dọn code~~ — Đã xoá; cả 3 ảnh xô sơn trong Assets (2026-11-28)
 
 ## Thứ tự đề nghị (sau lượt thử 2026-11-26 tối)
 
@@ -203,3 +203,8 @@ IconPlans, IconRestore, IconPrivacy, IconTerms (màn Grown-ups); HandleTurn (nú
 10. CheckOn, CheckOff
 
 Tiếp theo: IconMagicWand, TileNewBook, EmptyBooks/EmptyPages, FrameNone, 3 hình Layout.
+88. ~~P2 · Hộp hỏi đồng ý trên iPhone SE~~ — Nửa màn che mất "Not now"; giờ cao 480 pt (2026-11-28).
+89. ~~P2 · Home ngang trên iPhone~~ — Hai thẻ xếp chồng, thanh tab che thẻ thứ hai; giờ cạnh nhau từ 700 pt (2026-11-28).
+90. ~~P3 · My pages và Home trên điện thoại~~ — Một cột ảnh to; giờ hai cột (ô tối thiểu 150 pt) (2026-11-28).
+91. ~~P3 · Arrange~~ — Tiêu đề bị cắt "Arrange p…" giữa Cancel và Done; điện thoại hiện "Arrange" (2026-11-28).
+92. ~~P3 · Thẻ kiểu vẽ trên iPad~~ — Hình và chữ to hơn trên cột rộng (2026-11-28).

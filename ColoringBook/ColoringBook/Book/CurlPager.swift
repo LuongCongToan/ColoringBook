@@ -42,7 +42,11 @@ struct CurlPager: UIViewControllerRepresentable {
             coordinator.token = reloadToken
             // The page may have moved (a photo page added before it).
             let target = (0..<count).contains(index) ? index : shown.index
-            pager.setViewControllers([coordinator.page(target)], direction: .forward, animated: false)
+            // The same page redrawn (a new layout, Arrange): keep the picture
+            // on screen until the new one is ready, instead of a thumbnail
+            // or a blank page with a spinner (polish-plan 23).
+            let keep = target == shown.index ? shown.shownImage : nil
+            pager.setViewControllers([coordinator.page(target, keeping: keep)], direction: .forward, animated: false)
             return
         }
         // An arrow or thumbnail moved the index: turn to that page.
@@ -66,10 +70,10 @@ struct CurlPager: UIViewControllerRepresentable {
             self.token = parent.reloadToken
         }
 
-        func page(_ i: Int) -> CurlPageController {
+        func page(_ i: Int, keeping shown: UIImage? = nil) -> CurlPageController {
             let loader = parent.image
             let tap = parent.onTap
-            return CurlPageController(index: i, placeholder: parent.placeholder?(i), load: { await loader(i) },
+            return CurlPageController(index: i, placeholder: shown ?? parent.placeholder?(i), load: { await loader(i) },
                                       onTap: tap.map { t in { t(i) } })
         }
 
@@ -163,6 +167,9 @@ final class CurlPageController: UIViewController {
     }
 
     @objc private func tapped() { onTap?() }
+
+    /// The picture on the page now (the finished one, or the placeholder).
+    var shownImage: UIImage? { picture.image }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()

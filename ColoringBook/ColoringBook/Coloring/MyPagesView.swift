@@ -18,7 +18,7 @@ struct MyPagesView: View {
 
     /// Two columns on a phone held upright, more as the screen widens
     /// (polish-plan 31, 62).
-    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 320), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 320), spacing: 16)]
 
     var body: some View {
         ScrollView {
@@ -57,12 +57,18 @@ struct MyPagesView: View {
                             .id(page.id)
                     }
                     .buttonStyle(SquishyStyle())
+                    // The picture had no name for VoiceOver (polish-plan 22).
+                    .accessibilityLabel("Page \(index + 1), saved \(page.updated.formatted(date: .abbreviated, time: .omitted))")
+                    .accessibilityHint(selecting ? "Selects this page" : "Opens it to color")
                     .accessibilityAddTraits(chosen ? .isSelected : [])
                     .contextMenu {
                         if !selecting {
                             Button("Delete page", systemImage: "trash", role: .destructive) { single = page.id }
                         }
                     }
+                    // A deleted page fades and shrinks where it was; the grid
+                    // closes up after (tiles slid across each other, polish-plan 25).
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
             }
             .padding(18)

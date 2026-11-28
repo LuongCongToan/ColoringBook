@@ -132,7 +132,7 @@ struct BookReaderView: View {
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
         .navigationTitle(book?.title ?? "Book")
         // No way out while the PDF or the video is being made.
-        .kidBackButton(hidden: busy)
+        .kidBackButton(hidden: busy, hidesBarAs: "book")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             // The whole bar is the title's now (it was cut to "Lily's

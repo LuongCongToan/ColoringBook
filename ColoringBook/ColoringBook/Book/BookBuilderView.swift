@@ -578,7 +578,8 @@ private struct ArrangeSheet: View {
                                 .frame(width: 80, height: 60)
                         }
                         Text("Page \((selected.firstIndex(of: id) ?? 0) + 1)")
-                            .font(.headline)
+                            .font(Kid.bodyBold(17))
+                            .foregroundStyle(Kid.ink)
                     }
                 }
                 .onMove { selected.move(fromOffsets: $0, toOffset: $1) }

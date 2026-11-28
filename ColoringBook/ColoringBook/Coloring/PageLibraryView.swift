@@ -16,7 +16,7 @@ struct PageLibraryView: View {
 
     /// Two columns on a phone held upright, more as the screen widens (a
     /// phone on its side, an iPad: polish-plan 31, 62).
-    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 320), spacing: 16)]
+    private let columns = [GridItem(.adaptive(minimum: 150, maximum: 320), spacing: 16)]
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// How wide the screen's content is: the two big cards go side by side
     /// past 760 pt.
@@ -35,7 +35,10 @@ struct PageLibraryView: View {
                     // Side by side when the screen is wide enough, one above
                     // the other on a phone held upright (they filled the
                     // whole height in landscape, polish-plan 62).
-                    if contentWidth > 760 {
+                    // 700: an iPhone on its side (about 750 pt between the
+                    // safe areas) gets them side by side too; stacked, the tab
+                    // bar covered the second card (audit 2026-11-28).
+                    if contentWidth > 700 {
                         // Narrow cards (a phone on its side): smaller pictures,
                         // so the words keep whole lines.
                         let small = contentWidth < 1000
@@ -64,6 +67,11 @@ struct PageLibraryView: View {
                 .frame(maxWidth: .infinity)
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
+            // A band behind the status bar: the cards scrolled under the
+            // clock with nothing behind it (polish-plan 61).
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear.frame(height: 0).background(Kid.background.opacity(0.96), ignoresSafeAreaEdges: .top)
+            }
         .kidTabBarClearance()
             .background(KidBackground())
             .toolbar(.hidden, for: .navigationBar)
@@ -193,6 +201,8 @@ struct PageLibraryView: View {
                 .offset(x: 250, y: 92)
         }
         .allowsHitTesting(false)
+        // Decoration: VoiceOver read each star as "Favorite" (polish-plan 22).
+        .accessibilityHidden(true)
     }
 
     // MARK: - Cards
@@ -301,6 +311,8 @@ struct PageLibraryView: View {
                         PageTile(url: page.thumbnail, updated: page.updated, tint: Kid.coverTint(index))
                     }
                     .buttonStyle(SquishyStyle())
+                    .accessibilityLabel("Page \(index + 1), saved \(page.updated.formatted(date: .abbreviated, time: .omitted))")
+                    .accessibilityHint("Opens it to color")
                     .contextMenu {
                         #if DEBUG && targetEnvironment(simulator)
                         Button(page.photo == nil ? "Debug: add test photo" : "Debug: remove photo",
@@ -330,7 +342,8 @@ struct PageLibraryView: View {
                             .font(Kid.body(15))
                     }
                     .foregroundStyle(Kid.mint.darker(0.25))
-                    .frame(maxWidth: .infinity, minHeight: 150)
+                    // As tall as a page tile (140 + 2 × 10), polish-plan 61.
+                    .frame(maxWidth: .infinity, minHeight: 160)
                     .background(RoundedRectangle(cornerRadius: Kid.radius).fill(.white.opacity(0.75)))
                     .overlay(RoundedRectangle(cornerRadius: Kid.radius)
                         .strokeBorder(Kid.mint, style: StrokeStyle(lineWidth: 3, dash: [9, 6])))
@@ -344,6 +357,8 @@ struct PageLibraryView: View {
                         PageTile(url: sample.url, updated: .distantPast, tint: Kid.coverTint(index + 1))
                     }
                     .buttonStyle(SquishyStyle())
+                    .accessibilityLabel("Sample page \(index + 1)")
+                    .accessibilityHint("Opens it to color")
                 }
             }
         }
@@ -368,11 +383,14 @@ struct PageLibraryView: View {
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
                 .background(Circle().fill(color))
+                .accessibilityHidden(true)
             // Design sheet: Fredoka Bold 22 pt, #28145C.
             Text(text)
                 .font(Kid.titleBold(22))
                 .foregroundStyle(Kid.ink)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func openSaved(_ id: UUID) async {
