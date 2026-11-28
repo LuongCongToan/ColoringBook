@@ -753,6 +753,7 @@ describe("5B.5 operational failures", () => {
   it("fails closed when the counter cannot be reached", async () => {
     const broken: QuotaPort = {
       reserve: () => Promise.reject(new Error("storage unavailable")),
+      peek: () => Promise.reject(new Error("storage unavailable")),
       refund: () => Promise.reject(new Error("storage unavailable")),
     };
     const model = fakeModel();
@@ -766,6 +767,7 @@ describe("5B.5 operational failures", () => {
     let used = 0;
     const flaky: QuotaPort = {
       reserve: async () => ({ ok: true, used: ++used, charged: true }),
+      peek: async () => used,
       refund: () => Promise.reject(new Error("storage unavailable")),
     };
     const response = await post(body(await sign(apple, payload())), {
@@ -852,7 +854,11 @@ describe("5B.6 privacy", () => {
       await post(body(jws, { image }), {
         env,
         model: fakeModel(),
-        quota: { reserve: () => Promise.reject(new Error(`UPSTREAM ${image}`)), refund: async () => {} },
+        quota: {
+          reserve: () => Promise.reject(new Error(`UPSTREAM ${image}`)),
+          refund: async () => {},
+          peek: async () => 0,
+        },
       });
     });
     expectClean(logs, jws, id, image);

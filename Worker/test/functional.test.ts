@@ -2,6 +2,7 @@ import { env as bindings } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LIMITS, MODEL_ENDPOINT, PROMPTS, PROMPT_VERSION, PRO_YEARLY, SAFETY_TOLERANCE } from "../src/config";
 import type { Env } from "../src/env";
+import { handle } from "../src/handler";
 import worker from "../src/index";
 import {
   PNG,
@@ -45,6 +46,9 @@ describe("a subscriber makes a coloring page", () => {
     expect(await response.json()).toEqual({
       image: toBase64Bytes(PNG),
       remaining: LIMITS.monthly - 1,
+      limit: LIMITS.monthly,
+      kind: "monthly",
+      resetAt: expect.stringMatching(/^\d{4}-\d{2}-01T00:00:00\.000Z$/),
       style: "cartoon",
       promptVersion: PROMPT_VERSION,
     });
@@ -185,16 +189,69 @@ describe("what is sent to the model", () => {
   });
 });
 
+describe("asking what is left (POST /quota)", () => {
+  const quota = (body: unknown, env: Env, model = fakeModel()) =>
+    handle(new Request("https://coloring-api.example/quota", { method: "POST", body: JSON.stringify(body) }), env, {
+      fetch: model.fetch,
+      now: () => new Date(),
+      sleep: async () => {},
+    });
+
+  it("tells a new subscriber the whole month is left, without calling the model or charging", async () => {
+    const jws = await sign(chain, payload());
+    const env = testEnv(chain);
+    const model = fakeModel();
+    const response = await quota({ jws }, env, model);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      remaining: LIMITS.monthly,
+      limit: LIMITS.monthly,
+      kind: "monthly",
+      resetAt: expect.stringMatching(/^\d{4}-\d{2}-01T00:00:00\.000Z$/),
+    });
+    expect(model.submits()).toHaveLength(0);
+    // Asking twice still takes nothing.
+    await quota({ jws }, env);
+    expect(await remainingOf(await post(request(jws), { env, model: fakeModel() }))).toBe(LIMITS.monthly - 1);
+  });
+
+  it("counts the pages already made", async () => {
+    const jws = await sign(chain, payload());
+    const env = testEnv(chain);
+    for (let i = 0; i < 2; i++) await post(request(jws, { image: photo({ size: 700 + i }) }), { env, model: fakeModel() });
+    expect(await remainingOf(await quota({ jws }, env))).toBe(LIMITS.monthly - 2);
+  });
+
+  it("names a book's allowance, with no reset date", async () => {
+    const response = await quota({ jws: await sign(chain, bookPayload()) }, testEnv(chain));
+    expect(await response.json()).toEqual({ remaining: LIMITS.book, limit: LIMITS.book, kind: "book" });
+  });
+
+  it("names a trial and a family member's allowance", async () => {
+    const trial = await quota({ jws: await sign(chain, payload({ productId: PRO_YEARLY, offerType: 1 })) }, testEnv(chain));
+    expect(await trial.json()).toMatchObject({ remaining: LIMITS.trial, limit: LIMITS.trial, kind: "trial" });
+    const family = await quota({ jws: await sign(chain, payload({ inAppOwnershipType: "FAMILY_SHARED" })) }, testEnv(chain));
+    expect(await family.json()).toMatchObject({ remaining: LIMITS.family, limit: LIMITS.family, kind: "family" });
+  });
+
+  it("turns away a request without a valid purchase", async () => {
+    expect((await quota({}, testEnv(chain))).status).toBe(401);
+    expect((await quota({ jws: "not-a-jws" }, testEnv(chain))).status).toBe(401);
+  });
+});
+
 describe("the deployed entry point", () => {
   const env = bindings as unknown as Env;
 
-  it("serves POST /generate and nothing else", async () => {
+  it("serves POST /generate and POST /quota and nothing else", async () => {
     for (const [method, path] of [
       ["GET", "/generate"],
       ["GET", "/"],
       ["POST", "/"],
       ["POST", "/check"],
       ["POST", "/generate/"],
+      ["GET", "/quota"],
+      ["POST", "/quota/"],
       ["PUT", "/generate"],
       ["DELETE", "/generate"],
       ["OPTIONS", "/generate"],

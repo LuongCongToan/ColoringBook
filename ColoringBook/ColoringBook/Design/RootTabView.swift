@@ -256,6 +256,14 @@ struct SettingsView: View {
                     if store.hasPro && !Self.debugShowPlans {
                         proCard
                     } else {
+                        // Books bought, no plan: what is left of them.
+                        if let left = PageAllowance.shared.current, left.kind == .book {
+                            Label(left.leftText, systemImage: "book.closed.fill")
+                                .font(Kid.bodyBold(16)).foregroundStyle(Kid.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(16)
+                                .background(card)
+                        }
                         sectionTitle("Plans")
                         PlansPanel(showLinks: false)
                             .padding(16)
@@ -318,6 +326,7 @@ struct SettingsView: View {
                 .kidPlainBackground()
             }
             .manageSubscriptionsSheet(isPresented: $manage)
+            .task { await PageAllowance.shared.refresh() }
         }
     }
 
@@ -340,6 +349,11 @@ struct SettingsView: View {
                 Text("Pro is on").font(Kid.titleBold(22)).foregroundStyle(Kid.ink)
                 Text("60 AI pages a month, unlimited books.")
                     .font(Kid.bodyBold(14)).foregroundStyle(PlansPanel.hint)
+                // How much of it is used (2026-11-28): a parent paying for
+                // a plan wants to see it working.
+                if let left = PageAllowance.shared.current, left.kind != .book {
+                    Text(left.usedText).font(Kid.bodyBold(14)).foregroundStyle(Kid.ink)
+                }
                 Button {
                     SoundFX.shared.play(.tap)
                     manage = true

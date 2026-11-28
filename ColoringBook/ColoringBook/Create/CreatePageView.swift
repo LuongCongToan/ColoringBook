@@ -151,6 +151,7 @@ struct CreatePageView: View {
         #if DEBUG && targetEnvironment(simulator)
         // `-showConsent`: open the photo consent sheet, to see it.
         .onAppear { if ProcessInfo.processInfo.arguments.contains("-showConsent") { askConsent = true } }
+        .task { await PageAllowance.shared.refresh() }
         .task {
             // `-sketchTest`: draw a page from the test photo at once.
             guard ProcessInfo.processInfo.arguments.contains("-sketchTest"), prepared == nil,
@@ -217,7 +218,10 @@ struct CreatePageView: View {
                         LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
                                        startPoint: .top, endPoint: .bottom))
             } else {
-                drawButton
+                VStack(spacing: 8) {
+                    pagesLeft
+                    drawButton
+                }
                     .frame(maxWidth: 600)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
@@ -251,6 +255,7 @@ struct CreatePageView: View {
                     .padding(.bottom, 10)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                pagesLeft
                 drawButton
             }
             .frame(maxWidth: .infinity)
@@ -300,9 +305,13 @@ struct CreatePageView: View {
                             Text("Choose a family photo")
                                 .font(Kid.titleBold(tightPhotoCard ? 22 : 26))
                                 .foregroundStyle(Kid.ink)
-                            Text("People and pets, close up, work best.")
-                                .font(Kid.bodyBold(15))
-                                .foregroundStyle(Kid.ink.opacity(0.65))
+                            // Left out when short of room (iPhone SE): the
+                            // pages-left line under the styles needs the space.
+                            if !tightPhotoCard {
+                                Text("People and pets, close up, work best.")
+                                    .font(Kid.bodyBold(15))
+                                    .foregroundStyle(Kid.ink.opacity(0.65))
+                            }
                         }
                         .multilineTextAlignment(tightPhotoCard ? .leading : .center)
                         .frame(maxWidth: tightPhotoCard ? .infinity : nil, alignment: .leading)
@@ -334,10 +343,10 @@ struct CreatePageView: View {
     }
 
     /// The column's height less the style cards, the 22 pt gap and the
-    /// padding (20 + 12). Only in the one-column layout; never under 160.
+    /// padding (20 + 12). Only in the one-column layout; never under 130.
     private var photoCardMaxHeight: CGFloat? {
         guard !wide, visibleHeight > 0, styleCardsHeight > 0 else { return nil }
-        return max(160, visibleHeight - styleCardsHeight - 22 - 32 - 4)
+        return max(130, visibleHeight - styleCardsHeight - 22 - 32 - 20)
     }
 
     /// Little room for the empty photo card (iPhone SE): smaller words and
@@ -359,6 +368,20 @@ struct CreatePageView: View {
             }
             // Line color is chosen on the result screen only, for every style
             // (user, 2026-11-26): the pre-draw picker for Sketch was a duplicate.
+
+        }
+    }
+
+    /// How many AI pages are left before one is used (they showed only after
+    /// a page was made, 2026-11-28). Above "Draw my page", in the pinned part,
+    /// so a short screen (iPhone SE) cannot push it out of sight. Sketch is
+    /// free: nothing to count.
+    @ViewBuilder private var pagesLeft: some View {
+        if !style.onDevice, let left = PageAllowance.shared.current {
+            Label(left.leftText, systemImage: "sparkles")
+                .font(Kid.bodyBold(15))
+                .foregroundStyle(Kid.ink.opacity(0.7))
+                .frame(maxWidth: .infinity)
         }
     }
 
@@ -467,8 +490,10 @@ struct CreatePageView: View {
     private func resultDetails(_ page: GeneratedPage) -> some View {
         VStack(spacing: 18) {
             inkPicker(for: page.style) { recolor($0) }
-            if let remaining = page.remaining {
-                Text("\(remaining) pages left this month")
+            // What is left after this page, in the words of the purchase
+            // that pays (a book has no "this month", 2026-11-28).
+            if !page.style.onDevice, let left = PageAllowance.shared.current {
+                Text(left.leftText)
                     .font(Kid.bodyBold(15))
                     .foregroundStyle(Kid.ink.opacity(0.65))
             }
@@ -597,6 +622,8 @@ struct CreatePageView: View {
             guard let image = UIImage(data: page.imageData) else { throw GenerationError.server }
             SoundFX.shared.play(.sticker)
             phase = .done(page, image)
+            // One page fewer: the count on this screen and the next follows.
+            if !style.onDevice { Task { await PageAllowance.shared.refresh() } }
         } catch GenerationError.notEntitled {
             phase = .choosing
             showPlans = true

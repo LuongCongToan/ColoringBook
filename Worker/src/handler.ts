@@ -20,6 +20,8 @@ import type { Reservation } from "./quota";
 export interface QuotaPort {
   reserve(name: string, period: string, limit: number, nowMs: number, replayKey?: string): Promise<Reservation>;
   refund(name: string, period: string): Promise<void>;
+  /// Pages used so far in the period; takes nothing.
+  peek(name: string, period: string): Promise<number>;
 }
 
 export interface Deps {
@@ -60,6 +62,7 @@ function durableQuota(env: Env): QuotaPort {
   return {
     reserve: (name, period, limit, nowMs, replayKey) => stub(name).reserve(period, limit, nowMs, replayKey),
     refund: (name, period) => stub(name).refund(period),
+    peek: (name, period) => stub(name).peek(period),
   };
 }
 
@@ -153,13 +156,68 @@ async function planFor(tx: Transaction, now: Date): Promise<Plan> {
   };
 }
 
+/// The verified purchase in `body.jws`, or the refusal to send back. The
+/// same check for /generate and /quota: only Apple's signature decides.
+async function verifiedPurchase(body: Record<string, unknown>, env: Env, now: Date): Promise<Transaction | Response> {
+  try {
+    if (typeof body.jws !== "string" || body.jws.length === 0) {
+      throw new EntitlementError(401, "missing");
+    }
+    const transaction = await verifyTransaction(body.jws, trustedRoot(env), now);
+    authorize(
+      transaction,
+      {
+        bundleId: BUNDLE_ID,
+        subscriptions: SUBSCRIPTIONS,
+        consumables: BOOKS,
+        allowSandbox: cap(env.SANDBOX_DAILY_CAP) > 0,
+      },
+      now,
+    );
+    return transaction;
+  } catch (error) {
+    if (!(error instanceof EntitlementError)) throw error;
+    record(error.status, error.reason);
+    return reply(error.status, { error: error.status === 401 ? "unauthorized" : "forbidden" });
+  }
+}
+
+/// What a plan has left, as the app shows it: pages left, the allowance,
+/// which kind of allowance ("monthly", "family", "trial", "book") and, for a
+/// month, when it comes back.
+function allowance(plan: Plan, used: number): Record<string, unknown> {
+  return {
+    remaining: Math.max(0, plan.limit - used),
+    limit: plan.limit,
+    kind: plan.reason,
+    ...(plan.resetAt ? { resetAt: plan.resetAt.toISOString() } : {}),
+  };
+}
+
+/// POST /quota: how many pages the purchase in `jws` has left. Reads the
+/// counter and nothing else: no model call, no charge.
+async function quotaOnly(body: Record<string, unknown>, env: Env, deps: Deps): Promise<Response> {
+  const now = deps.now();
+  const transaction = await verifiedPurchase(body, env, now);
+  if (transaction instanceof Response) return transaction;
+  const plan = await planFor(transaction, now);
+  try {
+    const used = await (deps.quota ?? durableQuota(env)).peek(plan.counter, plan.period);
+    record(200, "quota");
+    return reply(200, allowance(plan, used));
+  } catch {
+    record(503, "quota-store");
+    return reply(503, { error: "unavailable" });
+  }
+}
+
 /// The whole endpoint. The order of the steps is the security design:
 /// nothing that costs money happens until the caller has been proven to have
 /// paid, and nothing is counted against them until their input has been
 /// accepted (SCOPE.md 5B.0, I1).
 export async function handle(request: Request, env: Env, deps: Deps): Promise<Response> {
   const url = new URL(request.url);
-  if (request.method !== "POST" || url.pathname !== "/generate") {
+  if (request.method !== "POST" || (url.pathname !== "/generate" && url.pathname !== "/quota")) {
     return reply(404, { error: "not_found" });
   }
 
@@ -178,32 +236,14 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     record(400, "json");
     return reply(400, { error: "bad_request" });
   }
+  if (url.pathname === "/quota") return quotaOnly(body, env, deps);
 
   // 1. Who is this? Only `jws` is consulted. A `userId` or `deviceId` in the
   //    body is not read by anything below (SCOPE.md 5B.0, I2).
   const now = deps.now();
   const sandboxCap = cap(env.SANDBOX_DAILY_CAP);
-  let transaction: Transaction;
-  try {
-    if (typeof body.jws !== "string" || body.jws.length === 0) {
-      throw new EntitlementError(401, "missing");
-    }
-    transaction = await verifyTransaction(body.jws, trustedRoot(env), now);
-    authorize(
-      transaction,
-      {
-        bundleId: BUNDLE_ID,
-        subscriptions: SUBSCRIPTIONS,
-        consumables: BOOKS,
-        allowSandbox: sandboxCap > 0,
-      },
-      now,
-    );
-  } catch (error) {
-    if (!(error instanceof EntitlementError)) throw error;
-    record(error.status, error.reason);
-    return reply(error.status, { error: error.status === 401 ? "unauthorized" : "forbidden" });
-  }
+  const transaction = await verifiedPurchase(body, env, now);
+  if (transaction instanceof Response) return transaction;
 
   // 2. Is the upload something this endpoint draws?
   let photo;
@@ -232,14 +272,14 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
   const dailyCounter = `day:${plan.person}`;
   const replayKey = await sha256Hex(`${style}\n${photo.base64}`);
   const charged: [string, string][] = [];
-  let remaining: number;
+  let used: number;
   try {
     const own = await quota.reserve(plan.counter, plan.period, plan.limit, now.getTime(), replayKey);
     if (!own.ok) {
       record(429, `quota-${plan.reason}`);
       return exhausted(plan.resetAt);
     }
-    remaining = Math.max(0, plan.limit - own.used);
+    used = own.used;
 
     // A free retry is not counted anywhere: it was paid for the first time.
     if (own.charged) {
@@ -291,7 +331,7 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       now: () => deps.now().getTime(),
     });
     record(200, "ok");
-    return reply(200, { image: bytesToBase64(page.png), remaining, style, promptVersion: PROMPT_VERSION });
+    return reply(200, { image: bytesToBase64(page.png), ...allowance(plan, used), style, promptVersion: PROMPT_VERSION });
   } catch (error) {
     if (error instanceof Moderated) {
       record(422, "moderated");

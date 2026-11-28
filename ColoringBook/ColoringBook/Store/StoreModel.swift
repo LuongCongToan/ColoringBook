@@ -112,6 +112,7 @@ final class StoreModel {
                 // SKIncludeConsumableInAppPurchaseHistory).
                 await transaction.finish()
                 await refresh()
+                Task { await PageAllowance.shared.refresh() }
                 return true
             case .userCancelled:
                 return false
@@ -133,6 +134,7 @@ final class StoreModel {
         do {
             try await AppStore.sync()
             await refresh()
+            Task { await PageAllowance.shared.refresh() }
             if await currentJWS() == nil { message = "No previous purchase found on this Apple Account." }
         } catch StoreKitError.userCancelled {
         } catch {

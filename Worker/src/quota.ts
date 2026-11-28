@@ -70,6 +70,12 @@ export class QuotaCounter extends DurableObject {
     return { ok: true, used: state.used, charged: true };
   }
 
+  /// Pages counted against the period so far, without taking one (POST
+  /// /quota: what the app shows before a page is made).
+  async peek(day: string): Promise<number> {
+    return (await this.load(day)).used;
+  }
+
   /// Gives a page back when the model call failed. Charging for an answer
   /// that never came is the quickest route to a one-star review.
   async refund(day: string): Promise<void> {
