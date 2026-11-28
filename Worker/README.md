@@ -82,7 +82,7 @@ Chỉ có Worker production. Giao dịch phải do Apple ký: TestFlight, hoặc
 
 - ~~Xác nhận model và định dạng ảnh với BFL thật.~~ Đã thử 2026-11-28 trên staging: `flux-3-image-klein` nhận ảnh base64 trong `images`, trả PNG 665×887 sau khoảng 10 giây. Lần đầu bước poll gặp 522 thoáng qua; Worker giờ chờ qua lỗi 5xx, 429 và lỗi mạng khi poll thay vì bỏ tranh đã trả tiền.
 - Lượt miễn phí cho thiết bị chưa mua (App Attest và DeviceCheck).
-- `POST /credit` cho gói sách (ghi nhận lượt trước khi app gọi `finish()`) và App Store Server Notifications (hoàn tiền).
+- App Store Server Notifications V2 cho hoàn tiền gói sách (`REFUND` đưa bộ đếm của giao dịch về 0). Gói sách không cần `POST /credit`: bộ đếm 30 lượt tạo ở lần `/generate` đầu tiên (docs/app-store-products.md).
 - Ngân sách tiền cho mỗi người và tầng dự phòng (FLUX 3 Large) khi tranh hỏng.
 
 ## Giới hạn của bộ test

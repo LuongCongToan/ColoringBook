@@ -1,6 +1,7 @@
 import {
   APPLE_ROOT_CA_G3,
-  BOOK,
+  BOOK_PACK,
+  BOOKS,
   BUNDLE_ID,
   DEFAULT_STYLE,
   LIMITS,
@@ -132,9 +133,10 @@ interface Plan {
 }
 
 async function planFor(tx: Transaction, now: Date): Promise<Plan> {
-  if (tx.productId === BOOK) {
+  if (BOOKS.has(tx.productId)) {
     const book = await sha256Hex(`book:${tx.transactionId}`);
-    return { counter: `book:${book}`, period: "book", limit: LIMITS.book, person: book, reason: "book" };
+    const limit = tx.productId === BOOK_PACK ? LIMITS.bookPack : LIMITS.book;
+    return { counter: `book:${book}`, period: "book", limit, person: book, reason: "book" };
   }
   const person = await sha256Hex(`sub:${tx.originalTransactionId}`);
   if (tx.offerType === 1) {
@@ -192,7 +194,7 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       {
         bundleId: BUNDLE_ID,
         subscriptions: SUBSCRIPTIONS,
-        consumables: new Set([BOOK]),
+        consumables: BOOKS,
         allowSandbox: sandboxCap > 0,
       },
       now,

@@ -16,6 +16,21 @@
       "productID": "pt.team.coloringbook.book.single",
       "referenceName": "Coloring Book Book",
       "type": "Consumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "C0B00CB00K3",
+      "localizations": [
+        {
+          "description": "Three books of up to 20 pages each",
+          "displayName": "Three Coloring Books",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "pt.team.coloringbook.book.pack3",
+      "referenceName": "Coloring Book Book Pack 3",
+      "type": "Consumable"
     }
   ],
   "settings": {

@@ -113,6 +113,13 @@ describe("a parent who bought One Coloring Book", () => {
     expect(await remainingOf(response)).toBe(LIMITS.book - 1);
   });
 
+  it("draws on a three-book pack's ninety pages", async () => {
+    const pack = bookPayload({ productId: "pt.team.coloringbook.book.pack3" });
+    const response = await post(request(await sign(chain, pack)), { env: testEnv(chain), model: fakeModel() });
+    expect(response.status).toBe(200);
+    expect(await remainingOf(response)).toBe(LIMITS.bookPack - 1);
+  });
+
   it("keeps two books apart", async () => {
     const env = testEnv(chain);
     const first = await sign(chain, bookPayload());

@@ -153,6 +153,11 @@ struct PlansPanel: View {
                          detail: "One-time purchase: one book of up to 20 pages, ready to print.",
                          badge: nil, selected: selected == book.id) { selected = book.id }
             }
+            if let pack = store.bookPack {
+                PlanCard(title: "Three Coloring Books", price: pack.displayPrice,
+                         detail: "One-time purchase: three books of up to 20 pages each, for siblings or gifts.",
+                         badge: packSavingBadge, selected: selected == pack.id) { selected = pack.id }
+            }
         }
     }
 
@@ -163,9 +168,17 @@ struct PlansPanel: View {
         return saving >= 5 ? "Save \(Int(saving))%" : nil
     }
 
+    /// How much less three books cost in the pack than one by one.
+    private var packSavingBadge: String? {
+        guard let p = store.bookPack?.price, let b = store.book?.price, b > 0 else { return nil }
+        let saving = (1 - (p as NSDecimalNumber).doubleValue / ((b as NSDecimalNumber).doubleValue * 3)) * 100
+        return saving >= 5 ? "Save \(Int(saving))%" : nil
+    }
+
     private var buyTitle: String {
         if selected == ProductID.yearly && store.trialEligible { return "Start free trial" }
         if selected == ProductID.book { return "Buy book" }
+        if selected == ProductID.bookPack { return "Buy 3 books" }
         return "Subscribe"
     }
 

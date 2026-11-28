@@ -799,7 +799,7 @@ User nhận xét UI và icon "nghiêm túc quá, không giống chibi, không gi
 
 ### Mua hàng, lưu tranh, khung từ PNG (làm ngày 2026-11-24)
 
-- **Mua hàng** (`Store/`): `StoreModel` (StoreKit 2: tải sản phẩm, mua, khôi phục, theo dõi `Transaction.updates`, lấy JWS cho Worker) và `PaywallView`. Màn mua có giá theo kỳ, dùng thử 3 ngày (chỉ hiện khi StoreKit xác nhận còn quyền), nhãn tiết kiệm tính từ giá thật, điều khoản gia hạn, Restore, Terms, Privacy (Guideline 3.1.2), và **khoá phụ huynh** (một phép nhân) trước khi mua. Màn tạo trang mở màn mua khi Worker báo chưa có quyền, mua xong thì tự vẽ tiếp. Đã thử mua gói năm bằng `Products.storekit` khi chạy app từ Xcode. Gói sách gọi `finish()` ngay; Worker tạo bộ đếm theo `transactionId` ở lần tạo tranh đầu. Khi có `/credit` thì đổi sang finish sau khi Worker ghi nhận. URL Privacy đang là chỗ giữ chỗ.
+- **Mua hàng** (`Store/`): `StoreModel` (StoreKit 2: tải sản phẩm, mua, khôi phục, theo dõi `Transaction.updates`, lấy JWS cho Worker) và `PaywallView`. Màn mua có giá theo kỳ, dùng thử 3 ngày (chỉ hiện khi StoreKit xác nhận còn quyền), nhãn tiết kiệm tính từ giá thật, điều khoản gia hạn, Restore, Terms, Privacy (Guideline 3.1.2). Màn tạo trang mở màn mua khi Worker báo chưa có quyền, mua xong thì tự vẽ tiếp. Đã thử mua gói năm bằng `Products.storekit` khi chạy app từ Xcode. Gói sách gọi `finish()` ngay; Worker tạo bộ đếm theo `transactionId` ở lần tạo tranh đầu. Không cần `/credit` (docs/app-store-products.md). Không còn khoá phụ huynh (bỏ 2026-11-26).
 - **Bản giả lập** cũng đòi phải mua khi StoreKit có sản phẩm (chạy từ Xcode). Chạy cách khác thì Simulator không có sản phẩm, và luồng vẫn đi tiếp để thử.
 - **Lưu tranh** (`PageStore`): mỗi trang một thư mục trong Application Support, gồm ảnh tranh gốc, `page.json` (khung, thao tác, sticker) và ảnh thu nhỏ. Tự lưu 1 giây sau mỗi thay đổi và khi rời màn tô. Màn chính có mục "My pages" (giữ ngón để xoá). Đã thử tắt và mở lại app: trang mở ra đúng như cũ. Lịch sử hoàn tác không được lưu.
 - **Khung từ PNG:** xem [frame-art-spec.md](frame-art-spec.md), mục 8.
@@ -869,9 +869,12 @@ User chọn **sticker có màu sẵn, không tô**: 20 sticker kawaii trong `raw
 Danh sách lỗi và việc làm đẹp sau lượt thử toàn bộ ngày 2026-11-26: [polish-plan.md](polish-plan.md).
 
 - [x] **Popup xin đánh giá** (làm 2026-11-28, `Store/ReviewPrompt.swift`): hộp thoại hệ thống `requestReview`, không có hộp hỏi riêng. Điểm vui: lưu sách, làm PDF, làm video mỗi lần 3 điểm, lưu trang 1 điểm; đủ 3 điểm thì hỏi khi mở sách vừa lưu hoặc khi đóng xem trước PDF / bảng chia sẻ video, không bao giờ trên màn tô màu. Mỗi phiên bản app hỏi tối đa một lần, cách nhau ít nhất 4 tháng; iOS còn giới hạn 3 lần/năm và không hiện trong TestFlight. App không vào Kids Category nên Guideline 1.3 không áp dụng.
-- [ ] Worker thật: deploy `coloring-api`, thay URL tạm trong `WorkerPageGenerator`, đặt key BFL mới bằng `wrangler secret`, endpoint `/credit`.
-  - [x] **Staging** `coloring-api-staging` đã deploy và đặt key BFL (user, 2026-11-28). Bản Debug gọi staging; staging bỏ qua chữ ký StoreKit để Simulator chạy với Products.storekit (5 trang/ngày tổng cộng). Tạm thời: xoá staging khi mua sandbox thật chạy được.
-  - [ ] **Production** `coloring-api` (bản Release, TestFlight, App Store): deploy, đặt key BFL, kiểm `/credit` và danh sách trong `docs/worker-security.md`.
+- [ ] Worker thật: deploy `coloring-api`, thay URL tạm trong `WorkerPageGenerator`, đặt key BFL mới bằng `wrangler secret`.
+  - [x] **Staging** đã dựng rồi gỡ (commit cdb9a44, 2026-11-28): app chỉ gọi production; scheme dùng StoreKit sandbox thật.
+  - [x] **Production** `coloring-api` đã deploy và đặt key BFL (user, 2026-11-28). Kiểm từ ngoài: chỉ nhận `POST /generate`; GET và đường khác trả 404; thiếu JWS hoặc JWS rác trả 401 `{"error":"unauthorized"}` (không phải 500).
+  - [x] Gói sách không cần `POST /credit` riêng: Worker đếm 30 lượt theo `transactionId` ngay ở lần `/generate` đầu tiên; app `finish()` ngay, và cài lại app vẫn thấy giao dịch nhờ `SKIncludeConsumableInAppPurchaseHistory` (iOS 18).
+  - [ ] App Store Server Notifications V2 (`REFUND` đưa lượt của sách về 0, gói Pro bị thu hồi thì Worker đã từ chối nhờ `revocationDate`): chưa làm. Rủi ro nhỏ (mua sách, dùng, xin hoàn tiền vẫn dùng tiếp lượt còn lại), có thể làm sau phát hành.
+  - [ ] Chạy hết danh sách trong `docs/worker-security.md` trên production; thử một lần vẽ thật bằng giao dịch sandbox từ iPhone.
 - [ ] Đăng Privacy Policy, thay URL tạm trong `AppLinks`, khai App Privacy (Photos).
 - [ ] Thay mọi nền sách có bản quyền; vẽ khung PNG thật theo `docs/frame-art-spec.md`; hình minh hoạ giao diện bản to.
 - [ ] Thử trên iPhone thật: tách nền của Sketch, tốc độ, mua hàng StoreKit.

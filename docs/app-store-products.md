@@ -24,6 +24,7 @@ Khi đổi gì ở đây thì sửa cả ba nơi: bảng này, `Products.storeki
 | **Pro năm** (gói chính) | Auto-renewable, dùng thử 3 ngày | $29.99 | $25.49 ($2.12/tháng) | Mọi tính năng, 60 tranh AI/tháng, sách không giới hạn |
 | Pro tháng | Auto-renewable | $7.99 | $6.79 | Như gói năm |
 | Một cuốn sách | Consumable | $4.99 | $4.24 | 30 lượt tạo tranh (đủ 20 trang và 10 lần tạo lại), xuất PDF và in cuốn đó |
+| Ba cuốn sách (thêm 2026-11-28) | Consumable | $9.99 | $8.49 | 90 lượt tạo tranh chung một bộ đếm (3 × 30), rẻ hơn mua lẻ 3 cuốn ($14.97, tiết kiệm 33%). Cho nhà nhiều con hoặc làm quà |
 
 Vẫn giữ các nguyên tắc của brief: không gói tuần, không xu, không gói trọn đời, chỉ bán ở US, UK, CA, AU.
 
@@ -95,23 +96,26 @@ Mỗi thành viên gia đình nhận một giao dịch riêng, với `originalTr
 | Description (en-US) | `One book of up to 20 pages, ready to print` |
 | Review Screenshot | Màn mua sách |
 
-Khác Haru: Haru chỉ có gói đăng ký, đọc quyền từ `Transaction.currentEntitlements`. Consumable đã `finish()` thì **không có** trong đó, nên luồng phải như sau:
+Khác Haru: Haru chỉ có gói đăng ký, đọc quyền từ `Transaction.currentEntitlements`. Consumable đã `finish()` thì **không có** trong đó. Luồng đang chạy (code `Store/StoreModel.swift` và `Worker/src/handler.ts`, kiểm 2026-11-28):
 
-1. App mua xong, nhận giao dịch đã xác minh. **Chưa gọi `finish()`.**
-2. App gửi JWS của giao dịch lên Worker (`POST /credit`, kèm App Attest).
-3. Worker xác minh JWS (bundle, `productId = <bundle>.book.single`, chưa bị thu hồi), tạo bản ghi 30 lượt theo `transactionId`. Gửi lại cùng JWS thì không cộng thêm.
-4. Worker trả về số lượt còn lại. **Lúc này app mới gọi `finish()`.**
-5. Nếu Worker không trả lời: không `finish()`. StoreKit giao lại giao dịch chưa finish ở lần mở app sau (`Transaction.unfinished` và `Transaction.updates`), và app thử lại bước 2.
+1. App mua xong, nhận giao dịch đã xác minh, **gọi `finish()` ngay**. Không có bước ghi nhận riêng (`POST /credit` trong bản thiết kế đầu đã bỏ).
+2. Mỗi lần tạo tranh, app gửi lên `POST /generate` JWS của một giao dịch: gói Pro còn hạn nếu có, nếu không thì **cuốn sách mua gần nhất** (lấy từ `Transaction.all`, bỏ giao dịch đã bị thu hồi).
+3. Worker xác minh JWS (bundle, `productId = <bundle>.book.single`, chưa bị thu hồi). Bộ đếm của cuốn sách có khoá là hash của `transactionId`; lần dùng đầu tiên tạo bộ đếm 30 lượt, các lần sau trừ dần. Gửi lại cùng giao dịch không bao giờ cộng thêm lượt.
+4. Worker trả tranh kèm số lượt còn lại; hết lượt thì trả 429 và không gọi BFL.
 
-Mỗi lần tạo tranh bằng lượt sách, app gửi JWS của cuốn đó và Worker trừ lượt của đúng giao dịch đó. Mua nhiều cuốn thì mỗi cuốn một bộ đếm; app hiện "Book 1: 12 pages left".
+Vì bộ đếm nằm trên Worker theo giao dịch, việc `finish()` sớm không làm mất lượt: app tắt giữa chừng sau khi mua thì giao dịch vẫn nằm trong lịch sử, lượt chưa dùng vẫn còn trên Worker.
 
-**Cài lại app:** với iOS 18 trở lên và `SKIncludeConsumableInAppPurchaseHistory = YES` trong Info.plist, `Transaction.all` có cả consumable đã finish. App gửi từng giao dịch lên Worker và nhận lại số lượt còn lại. Apple yêu cầu server phải đối chiếu được giao dịch consumable trước khi bật key này; Worker đã giữ bản ghi theo `transactionId` nên đáp ứng. Với iOS 17 không có cách này, vì vậy app yêu cầu iOS 18 trở lên.
+**Ba cuốn sách** (`<bundle>.book.pack3`, Consumable, $9.99, Display Name `Three Coloring Books`, Description `Three books of up to 20 pages each`): một giao dịch, một bộ đếm 90 lượt (`LIMITS.bookPack` trên Worker), cùng luồng như một cuốn.
+
+**Mua nhiều cuốn:** app gửi lần lượt (`StoreModel.purchaseJWSs()`): gói Pro còn hạn, rồi các cuốn và gói 3 cuốn từ mới tới cũ. Giao dịch nào hết lượt thì Worker trả 429 mà không gọi BFL, app thử giao dịch kế tiếp, nên không lượt nào bị bỏ phí. Chưa có màn "Book 1: 12 pages left"; app hiện số lượt còn lại của giao dịch vừa dùng.
+
+**Cài lại app:** với iOS 18 trở lên và `SKIncludeConsumableInAppPurchaseHistory = YES` trong Info.plist, `Transaction.all` có cả consumable đã finish, nên app vẫn tìm được giao dịch và Worker vẫn nhớ số lượt còn lại theo `transactionId`. Apple yêu cầu server phải đối chiếu được giao dịch consumable trước khi bật key này; Worker giữ bản ghi theo `transactionId` nên đáp ứng. Với iOS 17 không có cách này, vì vậy app yêu cầu iOS 18 trở lên.
 
 **Xuất PDF:** quyền xuất cuốn sách đã mua được kiểm trong app. Xuất PDF không tốn tiền API, nên kiểm ở client là chấp nhận được (khác với số lượt tạo tranh, thứ phải đếm trên Worker).
 
-**Hoàn tiền:** Worker nhận App Store Server Notifications V2.
-- `REFUND`: đưa lượt còn lại của giao dịch đó về 0.
-- `CONSUMPTION_REQUEST`: trả lời Apple đã dùng bao nhiêu lượt. Kiểm tài liệu Consumption API về điều kiện người dùng đồng ý trước khi làm.
+**Hoàn tiền:**
+- Gói Pro bị hoàn tiền: giao dịch có `revocationDate`, Worker từ chối ngay. Đã chạy.
+- Gói sách bị hoàn tiền: **chưa xử lý**. JWS người dùng đã có từ trước vẫn mang thông tin cũ, nên Worker không biết và lượt còn lại vẫn dùng được (tối đa khoảng $1 tiền API mỗi cuốn). Cách sửa, có thể làm sau phát hành: Worker nhận App Store Server Notifications V2 (khai URL trong App Store Connect), với `REFUND` thì đưa bộ đếm của giao dịch đó về 0; `CONSUMPTION_REQUEST` thì trả lời Apple đã dùng bao nhiêu lượt (kiểm tài liệu Consumption API về điều kiện người dùng đồng ý trước khi làm).
 
 ## Hạn mức và ngân sách trên Worker
 
@@ -145,6 +149,7 @@ Tính theo $0.02 mỗi tranh (mức thận trọng của phân tầng Klein tron
 | Pro năm, gia đình 6 người hết trần (160 tranh, chỉ Klein) | $1.60–2.56/tháng | $2.12/tháng | khoảng hoà vốn |
 | Pro tháng, hết trần 60 | $1.20/tháng | $6.79/tháng | 82% |
 | Một cuốn sách, hết 30 lượt | $0.60 | $4.24 | 86% |
+| Ba cuốn sách, hết 90 lượt | $1.80 (giá thật Klein $0.72) | $8.49 | 79% (91% theo giá thật) |
 | Miễn phí, 3 tranh | $0.06 mỗi lượt cài | | |
 | Dùng thử, 10 tranh | $0.20 mỗi lượt dùng thử | | |
 

@@ -28,15 +28,29 @@ struct WorkerPageGenerator: PageGenerating {
     }
 
     func generate(_ photo: PhotoPrep.Result, style: PageStyle) async throws -> GeneratedPage {
-        guard let jws = await StoreModel.shared.currentJWS() else { throw GenerationError.notEntitled }
+        let purchases = await StoreModel.shared.purchaseJWSs()
+        guard !purchases.isEmpty else { throw GenerationError.notEntitled }
+        let image = photo.jpeg.base64EncodedString()
+        // A used-up plan or book answers 429 without spending anything; the
+        // next purchase (an older book, a pack) pays instead.
+        var lastError = GenerationError.notEntitled
+        for jws in purchases {
+            do {
+                return try await generate(jws: jws, image: image, style: style)
+            } catch GenerationError.quotaExhausted(let resetAt) {
+                lastError = .quotaExhausted(resetAt: resetAt)
+            }
+        }
+        throw lastError
+    }
 
+    private func generate(jws: String, image: String, style: PageStyle) async throws -> GeneratedPage {
         var request = URLRequest(url: Self.endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         // The Worker gives BFL up to 40 s; allow for the upload and download.
         request.timeoutInterval = 60
-        request.httpBody = try JSONEncoder().encode(
-            Request(jws: jws, image: photo.jpeg.base64EncodedString(), style: style.rawValue))
+        request.httpBody = try JSONEncoder().encode(Request(jws: jws, image: image, style: style.rawValue))
 
         let data: Data
         let response: URLResponse

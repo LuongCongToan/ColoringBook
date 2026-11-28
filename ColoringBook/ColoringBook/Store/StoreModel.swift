@@ -8,7 +8,10 @@ enum ProductID {
     static let monthly = "pt.team.coloringbook.pro.monthly"
     static let yearly = "pt.team.coloringbook.pro.yearly"
     static let book = "pt.team.coloringbook.book.single"
-    static let all = [yearly, monthly, book]
+    /// Three books in one purchase, 90 pages on one counter (Worker LIMITS.bookPack).
+    static let bookPack = "pt.team.coloringbook.book.pack3"
+    static let books: Set<String> = [book, bookPack]
+    static let all = [yearly, monthly, book, bookPack]
 }
 
 /// Links every screen that sells something must show (Guideline 3.1.2).
@@ -45,6 +48,7 @@ final class StoreModel {
     var yearly: Product? { products.first { $0.id == ProductID.yearly } }
     var monthly: Product? { products.first { $0.id == ProductID.monthly } }
     var book: Product? { products.first { $0.id == ProductID.book } }
+    var bookPack: Product? { products.first { $0.id == ProductID.bookPack } }
     /// Products loaded: StoreKit (or the Xcode StoreKit file) is reachable.
     var isAvailable: Bool { !products.isEmpty }
 
@@ -140,17 +144,28 @@ final class StoreModel {
     /// The signed transaction the Worker verifies before it spends money: an
     /// active plan first, otherwise the newest book purchase.
     func currentJWS() async -> String? {
+        await purchaseJWSs().first
+    }
+
+    /// Every purchase that can pay for a page, in the order to try them: an
+    /// active plan, then books and book packs, newest first. Each book has its
+    /// own counter on the Worker, so when one is used up the next is tried
+    /// (an older book's pages were left unused, docs/app-store-products.md).
+    func purchaseJWSs() async -> [String] {
+        var out: [String] = []
         for await result in Transaction.currentEntitlements {
             guard case .verified(let t) = result, t.revocationDate == nil,
                   t.productID == ProductID.monthly || t.productID == ProductID.yearly else { continue }
             if let expiry = t.expirationDate, expiry <= Date() { continue }
-            return result.jwsRepresentation
+            out.append(result.jwsRepresentation)
+            break
         }
-        var newest: (Date, String)?
+        var books: [(Date, String)] = []
         for await result in Transaction.all {
-            guard case .verified(let t) = result, t.revocationDate == nil, t.productID == ProductID.book else { continue }
-            if newest == nil || t.purchaseDate > newest!.0 { newest = (t.purchaseDate, result.jwsRepresentation) }
+            guard case .verified(let t) = result, t.revocationDate == nil, ProductID.books.contains(t.productID) else { continue }
+            books.append((t.purchaseDate, result.jwsRepresentation))
         }
-        return newest?.1
+        out += books.sorted { $0.0 > $1.0 }.map(\.1)
+        return out
     }
 }

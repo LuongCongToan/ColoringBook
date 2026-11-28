@@ -6,8 +6,11 @@ export const BUNDLE_ID = "pt.team.coloringbook";
 export const PRO_MONTHLY = "pt.team.coloringbook.pro.monthly";
 export const PRO_YEARLY = "pt.team.coloringbook.pro.yearly";
 export const BOOK = "pt.team.coloringbook.book.single";
+/// Three books in one purchase: one counter of three books' pages.
+export const BOOK_PACK = "pt.team.coloringbook.book.pack3";
 export const SUBSCRIPTIONS: ReadonlySet<string> = new Set([PRO_MONTHLY, PRO_YEARLY]);
-export const PRODUCT_IDS: ReadonlySet<string> = new Set([...SUBSCRIPTIONS, BOOK]);
+export const BOOKS: ReadonlySet<string> = new Set([BOOK, BOOK_PACK]);
+export const PRODUCT_IDS: ReadonlySet<string> = new Set([...SUBSCRIPTIONS, ...BOOKS]);
 
 /// Pages per period, docs/app-store-products.md "Hạn mức và ngân sách".
 /// The app shows the number the Worker returns; this is the one that counts.
@@ -21,6 +24,8 @@ export const LIMITS = {
   trial: 10,
   /// One "One Coloring Book" purchase: 20 pages and 10 redraws.
   book: 30,
+  /// One "Three Coloring Books" purchase: three books' worth, one counter.
+  bookPack: 90,
   /// Any plan, per UTC day: a script cannot burn a month in an hour.
   daily: 20,
 } as const;
