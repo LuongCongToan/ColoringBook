@@ -84,7 +84,7 @@ Khi mua sandbox thật đã chạy được với production thì xoá staging: 
 
 ## Chưa làm
 
-- **Xác nhận model và định dạng ảnh với BFL thật.** `MODEL_ENDPOINT` đang là `flux-2-klein-9b`, trong khi brief ghi "FLUX 3 Klein". Tài liệu BFL không nói rõ `input_image` nhận base64 hay chỉ nhận URL; Worker đang gửi base64. Cần một lần gọi thật để kiểm.
+- ~~Xác nhận model và định dạng ảnh với BFL thật.~~ Đã thử 2026-11-28 trên staging: `flux-3-image-klein` nhận ảnh base64 trong `images`, trả PNG 665×887 sau khoảng 10 giây. Lần đầu bước poll gặp 522 thoáng qua; Worker giờ chờ qua lỗi 5xx, 429 và lỗi mạng khi poll thay vì bỏ tranh đã trả tiền.
 - Lượt miễn phí cho thiết bị chưa mua (App Attest và DeviceCheck).
 - `POST /credit` cho gói sách (ghi nhận lượt trước khi app gọi `finish()`) và App Store Server Notifications (hoàn tiền).
 - Ngân sách tiền cho mỗi người và tầng dự phòng (FLUX 3 Large) khi tranh hỏng.

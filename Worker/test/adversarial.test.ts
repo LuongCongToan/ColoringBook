@@ -687,7 +687,7 @@ describe("5B.5 operational failures", () => {
       { polls: [() => Response.json({ status: "Failed" })] },
       { polls: [() => Response.json({ status: "Task not found" })] },
       { polls: [() => Response.json({ status: "No Card Generated" })] },
-      { polls: [() => new Response("bad gateway", { status: 502 })] },
+      { polls: [() => new Response("forbidden", { status: 403 })] },
       { polls: [() => Response.json({ status: "Ready", result: {} })] },
       { download: () => new Response("gone", { status: 404 }) },
     ];
@@ -714,6 +714,36 @@ describe("5B.5 operational failures", () => {
     });
     expect(response.status).toBe(503);
     // Bounded: about 40 polls at one simulated second each, not forever.
+    expect(model.calls.length).toBeLessThan(60);
+
+    const after = await post(body(jws), { env, model: fakeModel(), now: new Date(t) });
+    expect(await remainingOf(after)).toBe(LIMITS.monthly - 1);
+  });
+
+  it("waits out a passing polling hiccup instead of discarding a paid task", async () => {
+    const jws = await sign(apple, payload());
+    const env = testEnv(apple);
+    const hiccups = [
+      () => new Response("origin timed out", { status: 522 }),
+      () => new Response("busy", { status: 429 }),
+      () => {
+        throw new TypeError("connection reset");
+      },
+    ];
+    for (const hiccup of hiccups) {
+      const response = await post(body(jws), { env, model: fakeModel({ polls: [pending, hiccup, pending, ready] }) });
+      expect(response.status).toBe(200);
+    }
+  });
+
+  it("gives up on a polling URL that keeps failing, within the deadline, and refunds", async () => {
+    let t = Date.parse("2030-10-02T12:00:00Z");
+    const dated = { signedDate: t - 3_600_000, expiresDate: t + 20 * DAY };
+    const jws = await sign(apple, payload(dated));
+    const env = testEnv(apple);
+    const model = fakeModel({ polls: [() => new Response("bad gateway", { status: 502 })] });
+    const response = await post(body(jws), { env, model, clock: () => new Date((t += 1_000)) });
+    expect(response.status).toBe(503);
     expect(model.calls.length).toBeLessThan(60);
 
     const after = await post(body(jws), { env, model: fakeModel(), now: new Date(t) });

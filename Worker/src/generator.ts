@@ -124,18 +124,28 @@ export async function generatePage(
   }
 
   const deadline = deps.now() + POLL_TIMEOUT_MS;
+  // The task is already paid for once submitted, so a passing hiccup while
+  // polling (a 522 from BFL's edge, a 429, a dropped connection) is waited
+  // out rather than thrown away. The host goes in the reason: it says which
+  // BFL region failed and carries nothing about the user.
+  let lastHiccup = "";
   for (;;) {
-    if (deps.now() > deadline) throw new UpstreamError("timeout");
+    if (deps.now() > deadline) throw new UpstreamError(lastHiccup ? `timeout after ${lastHiccup}` : "timeout");
     await deps.sleep(POLL_INTERVAL_MS);
 
     let poll: { status?: unknown; result?: { sample?: unknown } };
     try {
       const response = await deps.fetch(pollingUrl, { headers: { "x-key": apiKey, accept: "application/json" } });
-      if (!response.ok) throw new UpstreamError(`poll ${response.status}`);
+      if (response.status >= 500 || response.status === 429) {
+        lastHiccup = `poll ${response.status} ${pollingUrl.host}`;
+        continue;
+      }
+      if (!response.ok) throw new UpstreamError(`poll ${response.status} ${pollingUrl.host}`);
       poll = (await response.json()) as typeof poll;
     } catch (error) {
       if (error instanceof UpstreamError) throw error;
-      throw new UpstreamError("poll network");
+      lastHiccup = `poll network ${pollingUrl.host}`;
+      continue;
     }
 
     const status = typeof poll.status === "string" ? poll.status : "";
