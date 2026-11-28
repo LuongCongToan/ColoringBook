@@ -274,6 +274,31 @@ nonisolated enum PhotoPrep {
         // Only the quality: no properties dictionary from the source, so no metadata.
         CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: jpegQuality] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { throw Failure.encodeFailed }
-        return out as Data
+        return strippingMetadata(out as Data)
+    }
+
+    /// The JPEG without its APP1 (EXIF/XMP), APP3–APP15 (APP13 is IPTC) and
+    /// comment segments. ImageIO writes a small EXIF and a Photoshop segment
+    /// even with no properties given (seen on iOS 27), and the Worker refuses
+    /// any upload carrying them (Worker/src/image.ts, "image-metadata").
+    /// JFIF (APP0) and the colour profile (APP2) stay.
+    static func strippingMetadata(_ jpeg: Data) -> Data {
+        let b = [UInt8](jpeg)
+        guard b.count > 4, b[0] == 0xFF, b[1] == 0xD8 else { return jpeg }
+        var out: [UInt8] = [0xFF, 0xD8]
+        out.reserveCapacity(b.count)
+        var i = 2
+        while i + 4 <= b.count, b[i] == 0xFF {
+            let marker = b[i + 1]
+            // Start of scan: the rest is image data, copied as it is.
+            if marker == 0xDA { break }
+            let length = Int(b[i + 2]) << 8 | Int(b[i + 3])
+            guard length >= 2, i + 2 + length <= b.count else { return jpeg }
+            let drop = marker == 0xE1 || (marker >= 0xE3 && marker <= 0xEF) || marker == 0xFE
+            if !drop { out.append(contentsOf: b[i..<(i + 2 + length)]) }
+            i += 2 + length
+        }
+        out.append(contentsOf: b[i...])
+        return Data(out)
     }
 }
