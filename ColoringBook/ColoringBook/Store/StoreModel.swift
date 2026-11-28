@@ -18,7 +18,10 @@ enum ProductID {
 enum AppLinks {
     /// Apple's standard licence agreement.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    /// Placeholder until the policy in docs/privacy.md is published.
+    /// The Support URL on the App Store page; site/index.html is the source.
+    static let support = URL(string: "https://luongcongtoan.github.io/coloringbook/")!
+    /// The Privacy Policy URL on the App Store page; site/privacy.html is the
+    /// source (docs/privacy.md).
     static let privacy = URL(string: "https://luongcongtoan.github.io/coloringbook/privacy.html")!
 }
 

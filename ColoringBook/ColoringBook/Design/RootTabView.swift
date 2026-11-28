@@ -278,6 +278,8 @@ struct SettingsView: View {
                             Task { await store.restore() }
                         }
                         divider
+                        row("Help & contact", symbol: "questionmark.circle") { openURL(AppLinks.support) }
+                        divider
                         row("Privacy policy", symbol: "hand.raised") { openURL(AppLinks.privacy) }
                         divider
                         row("Terms of use", symbol: "doc.text") { openURL(AppLinks.terms) }

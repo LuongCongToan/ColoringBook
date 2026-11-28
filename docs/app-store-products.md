@@ -181,6 +181,10 @@ Privacy Policy: https://luongcongtoan.github.io/coloringbook/privacy.html
 Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 ```
 
+**Hai ô URL trên App Store Connect** (bản nguồn ở `site/`, đưa lên GitHub Pages repo `coloringbook`; trong app là `AppLinks.support` và `AppLinks.privacy`, mở từ màn Grown-ups):
+- Support URL (trang App Information của phiên bản): `https://luongcongtoan.github.io/coloringbook/`
+- Privacy Policy URL (App Privacy): `https://luongcongtoan.github.io/coloringbook/privacy.html`
+
 **Bố cục paywall (rút từ Haru):** các gói và nút mua đặt lên đầu, chọn sẵn gói năm. % tiết kiệm của gói năm tính từ giá StoreKit, không viết cứng. Dùng `LocalizedStringKey` cho chữ, và thử ở cỡ chữ accessibility.
 
 ## Trên App Store Connect
