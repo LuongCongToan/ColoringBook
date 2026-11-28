@@ -23,7 +23,7 @@ Khi đổi gì ở đây thì sửa cả ba nơi: bảng này, `Products.storeki
 | Một cuốn sách | Consumable | $4.99 | $4.24 | 30 lượt tạo tranh (đủ 20 trang và 10 lần tạo lại), xuất PDF và in cuốn đó |
 | Ba cuốn sách (thêm 2026-11-28) | Consumable | $9.99 | $8.49 | 90 lượt tạo tranh chung một bộ đếm (3 × 30), rẻ hơn mua lẻ 3 cuốn ($14.97, tiết kiệm 33%). Cho nhà nhiều con hoặc làm quà |
 
-Vẫn giữ các nguyên tắc của brief: không gói tuần, không xu, không gói trọn đời, chỉ bán ở US, UK, CA, AU.
+Vẫn giữ các nguyên tắc của brief: không gói tuần, không xu, không gói trọn đời. Bán toàn cầu trừ China mainland (chốt 2026-11-28).
 
 **Vì sao giữ giá cũ dù model rẻ hơn dự tính khoảng 3 lần:** giá đã thấp hơn đối thủ (Colorify $39.99/năm), và phần dư dùng để bù cho Family Sharing (mục dưới). Nếu cần kéo chuyển đổi, cách đầu tiên nên thử là tăng số tranh, không phải hạ giá.
 
@@ -32,7 +32,9 @@ Vẫn giữ các nguyên tắc của brief: không gói tuần, không xu, khôn
 | | Giá trị |
 |---|---|
 | Giá app | Free |
-| Availability | Chỉ United States, United Kingdom, Canada, Australia |
+| Availability | Mọi nước trừ **China mainland** (cần số ICP và giấy phép AI tạo nội dung của CAC). Chốt 2026-11-28 |
+| EU (DSA) | **Trader status** khai một lần cho cả tài khoản developer, không theo từng app. Tài khoản đã khai từ Haru (Haru đang bán ở EU); chỉ cần xem lại ở App Compliance hoặc Business. Không có thì app không hiện ở EU |
+| Nga | Apple đã ngừng thanh toán ở Nga; để trong danh sách cũng không mua được |
 | iPhone and iPad Apps on Apple Silicon Macs | Bỏ tick cho tới khi chạy thử trên Mac |
 | iPhone and iPad Apps on Apple Vision Pro | Bỏ tick cho tới khi chạy thử |
 | Kids Category | Không (brief mục 2) |
@@ -200,7 +202,7 @@ Colorkin Pro Yearly is $29.99 per year with a 3-day free trial (10 AI pages duri
 Photos are sent to our server and an AI provider only to draw the coloring page. Our server does not store them.
 ```
 
-**Đã tạo trên App Store Connect (2026-11-28)** và kiểm bằng sandbox thật trên Simulator và iPhone: đủ 4 sản phẩm, đúng giá, gói năm có dùng thử 3 ngày, cả hai gói đăng ký bật Family Sharing. Chỉ mở 4 nước (không có China mainland: cần ICP và giấy phép AI).
+**Đã tạo trên App Store Connect (2026-11-28)** và kiểm bằng sandbox thật trên Simulator và iPhone: đủ 4 sản phẩm, đúng giá, gói năm có dùng thử 3 ngày, cả hai gói đăng ký bật Family Sharing. Mở toàn cầu trừ China mainland (cần ICP và giấy phép AI).
 
 **Simulator giữ bản `.storekit` cũ:** chạy app từ Xcode với StoreKit Configuration một lần thì `storekitd` lưu một bản sao (`…/Shared/AppGroup/<id>/Documents/Persistence/Octane/pt.team.coloringbook/Configuration.storekit`) và dùng nó (log ghi `XcodeTest`) cả khi mở bằng `simctl` hay scheme đã bỏ file. Muốn gọi sandbox thật thì dời thư mục đó đi. Bản Debug in danh sách sản phẩm nhận được với tiền tố `[Store]`; cờ `-openSettings` mở thẳng màn có các gói.
 

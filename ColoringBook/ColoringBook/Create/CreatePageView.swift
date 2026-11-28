@@ -287,21 +287,27 @@ struct CreatePageView: View {
                 } else if case .preparing = phase {
                     ProgressView().controlSize(.large)
                 } else {
-                    VStack(spacing: 10) {
+                    // Short of room (iPhone SE): the picture beside the words,
+                    // so it keeps its size (it shrank to a stamp above them).
+                    let stack = tightPhotoCard ? AnyLayout(HStackLayout(spacing: 12))
+                                               : AnyLayout(VStackLayout(spacing: 10))
+                    stack {
                         Image("NewPagePhoto")
                             .resizable()
                             .scaledToFit()
-                            .frame(maxWidth: 250, maxHeight: wide ? 120 : 190)
-                        Text("Choose a family photo")
-                            .font(Kid.titleBold(tightPhotoCard ? 22 : 26))
-                            .foregroundStyle(Kid.ink)
-                            .multilineTextAlignment(.center)
-                        Text("People and pets, close up, work best.")
-                            .font(Kid.bodyBold(15))
-                            .foregroundStyle(Kid.ink.opacity(0.65))
-                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: tightPhotoCard ? 120 : 250, maxHeight: wide ? 120 : 190)
+                        VStack(spacing: 10) {
+                            Text("Choose a family photo")
+                                .font(Kid.titleBold(tightPhotoCard ? 22 : 26))
+                                .foregroundStyle(Kid.ink)
+                            Text("People and pets, close up, work best.")
+                                .font(Kid.bodyBold(15))
+                                .foregroundStyle(Kid.ink.opacity(0.65))
+                        }
+                        .multilineTextAlignment(tightPhotoCard ? .leading : .center)
+                        .frame(maxWidth: tightPhotoCard ? .infinity : nil, alignment: .leading)
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, tightPhotoCard ? 16 : 20)
                     .padding(.vertical, tightPhotoCard ? 10 : 22)
                 }
             }

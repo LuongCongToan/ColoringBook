@@ -40,7 +40,7 @@ Tài liệu bàn giao để mở một session riêng cho app này. Ảnh thử 
 | Engine | Không dùng Unity hay Godot. Các phần chính của app (chọn ảnh, PDF, AirPrint, StoreKit, Vision) đều là thứ Apple làm sẵn; engine game chỉ thêm plugin, làm app nặng hơn và mở chậm hơn. Chỉ xét lại Unity nếu app chuyển thành game cho bé chơi (nhiều màn, 3D, vật lý) hoặc cần ra iOS và Android cùng lúc. |
 | Hiệu ứng | Rive hoặc Lottie cho linh vật và animation, SpriteKit hoặc `CAEmitterLayer` cho particle, shader Metal trong SwiftUI cho hiệu ứng màu. Xem mục 7. |
 | ASO | Nhắm các cụm "personalized coloring book", "custom coloring book for kids", "coloring book gift". Không tranh cụm "AI coloring book". |
-| Ngôn ngữ bản đầu | Tiếng Anh; phát hành ở US, UK, CA, AU. |
+| Ngôn ngữ bản đầu | Tiếng Anh. Phát hành toàn cầu trừ China mainland (chốt 2026-11-28; trước đó chỉ US, UK, CA, AU). Trang store thêm en-GB, en-AU, en-CA để có từ khoá "colouring". |
 | Danh mục App Store | Không đăng vào Kids Category (vì ảnh được gửi cho bên thứ ba). Người dùng là phụ huynh. |
 | Tạo tranh | Kết hợp ba tầng, xem mục 4. OpenCV/Core Image không thay được AI cho phần tạo tranh chính. |
 | Logic nghiệp vụ | Đặt ở backend proxy để sau này port Android chỉ cần dựng lại giao diện. |
@@ -524,7 +524,7 @@ Hết ngân sách thì **hạ chất lượng chứ không chặn**: vẫn tạo
 | Phân tầng chạy mãi không dừng | Tối đa 2 lần gọi model mỗi tranh, đặt trên Worker chứ không đặt trong app |
 | Script tạo tranh hàng loạt | Tối đa khoảng 20 tranh mỗi user mỗi ngày |
 | Nhà cung cấp tăng giá, hoặc ngừng model và model thay thế đắt hơn | Ghi chi phí thật của mỗi lần gọi. Giá và tên model đặt trong cấu hình Worker |
-| Nước có giá bán thấp | Apple tự quy đổi giá, nên một số nước thu ít hơn nhiều mà chi phí API vẫn như nhau. Bản đầu chỉ mở bán ở US, UK, CA, AU |
+| Nước có giá bán thấp | Apple tự quy đổi giá, nên một số nước thu ít hơn nhiều mà chi phí API vẫn như nhau. Với Klein ($0.008/tranh) vẫn lãi ở nước giá còn một nửa: gói năm thu khoảng $1.06/tháng, hết trần 60 tranh tốn $0.48–0.96. Sau phát hành xem bảng giá từng nước, nước nào quá thấp thì đặt giá tay. Trần `GLOBAL_DAILY_CAP` giữ chi phí ngày |
 | Bản sandbox và TestFlight | Trần chung cho mọi giao dịch sandbox, như worker `haru-check` của Haru |
 
 **Cầu chì cuối cùng:**
@@ -755,7 +755,7 @@ Logic nghiệp vụ nằm trên Worker, nên bản Android chỉ cần dựng l�
 | 1. Lõi | Tuần 1 | Worker proxy, luồng ảnh → tranh, hậu xử lý, lưu tranh | Tạo được tranh thật trên máy |
 | 2. Giao diện | Tuần 2 | Home, tạo tranh, kết quả, in, paywall và subscription | Dùng được từ đầu đến cuối |
 | 3. Sách và hoàn thiện | Tuần 3 | Dựng sách, xuất PDF, sticker nét cơ bản (khoảng 40–60 cái, nút trang trí tự động), 3–4 theme sách, onboarding, lọc nội dung, privacy policy | Bản TestFlight |
-| 4. Phát hành | Tuần 4 | Screenshot, mô tả, keyword, nộp duyệt | Lên App Store ở US, UK, CA, AU |
+| 4. Phát hành | Tuần 4 | Screenshot, mô tả, keyword, nộp duyệt | Lên App Store toàn cầu trừ China mainland |
 | 5. Sau phát hành | Tháng 2 | Tô màu trong app bằng Apple Pencil (PencilKit) có sticker cho bé, bản địa hóa ES/DE/FR/JA, theme và gói sticker theo mùa, thử "Đưa vào theme" bằng AI | Tăng tỷ lệ giữ chân |
 | 6. Sách in (khi app đạt $200/tháng) | Chưa ước tính | Bán cuốn tô màu in sẵn mang tên bé, giá $15–25, qua dịch vụ in theo đơn. Hàng vật lý phải thanh toán ngoài IAP (Apple Pay qua Stripe). Cần thêm giao hàng và hỗ trợ khách. | Doanh thu mỗi user cao hơn nhiều so với gói đăng ký |
 

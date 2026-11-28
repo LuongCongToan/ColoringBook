@@ -75,7 +75,13 @@ struct ColoringView: View {
                             BottomPanel(session: session, tool: .brush)
                                 .hidden()
                                 .accessibilityHidden(true)
-                            BottomPanel(session: session)
+                            if session.tool != .frame { BottomPanel(session: session) }
+                        }
+                        // The frames fill that room as a grid (one row left
+                        // a third of an iPad empty under it, 2026-11-28): an
+                        // overlay is offered exactly the brush panel's size.
+                        .overlay(alignment: .top) {
+                            if session.tool == .frame { BottomPanel(session: session, fills: true) }
                         }
                     }
                 }
@@ -225,6 +231,8 @@ private struct BottomPanel: View {
     /// Lays the panel out for this tool instead of the chosen one (to
     /// measure the room the tallest panel needs).
     var tool: ColoringSession.Tool?
+    /// Takes all the height it is offered (the frames' grid).
+    var fills = false
 
     var body: some View {
         let tool = self.tool ?? session.tool
@@ -249,11 +257,11 @@ private struct BottomPanel: View {
                 StickerTray(session: session, axis: .horizontal)
             }
             if tool == .frame {
-                FrameTray(session: session, axis: .horizontal)
+                FrameTray(session: session, axis: .horizontal, grid: fills)
             }
         }
         .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: fills ? .infinity : nil, alignment: .top)
         .animation(.spring(duration: 0.3), value: session.tool)
     }
 }
@@ -986,9 +994,21 @@ private struct TextTray: View {
 private struct FrameTray: View {
     let session: ColoringSession
     let axis: Axis
+    /// Under the page: rows of frames scrolling down, as many across as fit,
+    /// filling the room the brush's tools keep.
+    var grid = false
 
     var body: some View {
-        if axis == .horizontal {
+        if grid {
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 10)], spacing: 12) { items() }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
+                .onAppear { proxy.scrollTo(session.art.frame.id, anchor: .center) }
+            }
+        } else if axis == .horizontal {
             // Opens on the frame in use, which can sit past the edge
             // (polish-plan 84).
             ScrollViewReader { proxy in
