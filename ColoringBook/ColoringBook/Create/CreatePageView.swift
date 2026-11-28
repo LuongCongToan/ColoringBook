@@ -226,9 +226,13 @@ struct CreatePageView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
-                    // Content scrolls under a soft fade, not through the button.
+                    // Content scrolls under a short fade, then solid from the
+                    // pages-left chip down (on an iPhone SE the style cards
+                    // showed through the chip, 2026-11-28).
                     .background(
-                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                        LinearGradient(stops: [.init(color: Kid.background.opacity(0), location: 0),
+                                               .init(color: Kid.background, location: 0.12),
+                                               .init(color: Kid.background, location: 1)],
                                        startPoint: .top, endPoint: .bottom))
             }
         }
@@ -284,6 +288,10 @@ struct CreatePageView: View {
                         .overlay(alignment: .bottomTrailing) {
                             Label("Change", systemImage: "arrow.triangle.2.circlepath")
                                 .font(Kid.body(15))
+                                // One line even over a narrow photo (iPhone
+                                // SE broke it into "Chang / e").
+                                .lineLimit(1)
+                                .fixedSize()
                                 .foregroundStyle(Kid.ink)
                                 .padding(.horizontal, 14).padding(.vertical, 8)
                                 .background(.thinMaterial, in: Capsule())
@@ -378,10 +386,17 @@ struct CreatePageView: View {
     /// free: nothing to count.
     @ViewBuilder private var pagesLeft: some View {
         if !style.onDevice, let left = PageAllowance.shared.current {
-            Label(left.leftText, systemImage: "sparkles")
-                .font(Kid.bodyBold(15))
-                .foregroundStyle(Kid.ink.opacity(0.7))
-                .frame(maxWidth: .infinity)
+            // A chip, not grey small print: it was hard to see (2026-11-28).
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles").foregroundStyle(Kid.grape)
+                Text(left.leftText).foregroundStyle(Kid.ink)
+            }
+            .font(Kid.bodyBold(16))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Kid.lavender.opacity(0.45)))
+            .overlay(Capsule().strokeBorder(Kid.grape.opacity(0.35), lineWidth: 1.5))
+            .frame(maxWidth: .infinity)
         }
     }
 

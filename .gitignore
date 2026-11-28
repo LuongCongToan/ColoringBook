@@ -44,3 +44,7 @@ Marketings/
 
 # R&D pages, test photos and test frames (family photos, never commit)
 tempdrawing_img/
+
+# Source art from the designers (large PNGs); the app ships packed copies
+# (e.g. Frames/*.heic via Tools/pack-frames.sh). Never committed.
+rawassets/
