@@ -13,6 +13,10 @@ struct CreatePageView: View {
     @State private var visibleHeight: CGFloat = 0
     @State private var resultHeaderHeight: CGFloat = 0
     @State private var resultDetailsHeight: CGFloat = 0
+    /// The style cards, measured: the photo card takes what is left of the
+    /// column, so they stay above "Draw my page" (iPhone SE; any phone with
+    /// a portrait photo chosen).
+    @State private var styleCardsHeight: CGFloat = 0
     /// The photo picker opened from "Draw my page" before a photo is chosen.
     @State private var choosingPhoto = false
     @State private var prepared: PhotoPrep.Result?
@@ -184,6 +188,7 @@ struct CreatePageView: View {
                 } else {
                     photoCard
                     styleCards
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { styleCardsHeight = $0 }
                     failure
                 }
             }
@@ -288,7 +293,7 @@ struct CreatePageView: View {
                             .scaledToFit()
                             .frame(maxWidth: 250, maxHeight: wide ? 120 : 190)
                         Text("Choose a family photo")
-                            .font(Kid.titleBold(26))
+                            .font(Kid.titleBold(tightPhotoCard ? 22 : 26))
                             .foregroundStyle(Kid.ink)
                             .multilineTextAlignment(.center)
                         Text("People and pets, close up, work best.")
@@ -297,10 +302,15 @@ struct CreatePageView: View {
                             .multilineTextAlignment(.center)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.vertical, 22)
+                    .padding(.vertical, tightPhotoCard ? 10 : 22)
                 }
             }
-            .frame(minHeight: wide ? 150 : 260)
+            // A scroll view proposes no height, so a chosen photo sized
+            // itself from the width (a portrait one ran over "Drawing
+            // style"); the ideal height gives it the room to fit in.
+            .frame(minHeight: min(wide ? 150 : 260, photoCardMaxHeight ?? .infinity),
+                   idealHeight: preview == nil ? nil : photoCardMaxHeight,
+                   maxHeight: photoCardMaxHeight)
         }
         .buttonStyle(SquishyStyle())
         .overlay(alignment: .bottom) {
@@ -316,6 +326,17 @@ struct CreatePageView: View {
         }
         .padding(.bottom, prepared?.faceTouchesEdge == true ? 30 : 0)
     }
+
+    /// The column's height less the style cards, the 22 pt gap and the
+    /// padding (20 + 12). Only in the one-column layout; never under 160.
+    private var photoCardMaxHeight: CGFloat? {
+        guard !wide, visibleHeight > 0, styleCardsHeight > 0 else { return nil }
+        return max(160, visibleHeight - styleCardsHeight - 22 - 32 - 4)
+    }
+
+    /// Little room for the empty photo card (iPhone SE): smaller words and
+    /// margins, so the picture keeps some size.
+    private var tightPhotoCard: Bool { (photoCardMaxHeight ?? .infinity) < 240 }
 
     private var styleCards: some View {
         VStack(alignment: .leading, spacing: 10) {

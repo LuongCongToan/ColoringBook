@@ -30,7 +30,9 @@ struct PuffyPill: View {
             case nil:
                 EmptyView()
             }
-            Text(title).font(Kid.titleBold(18)).lineLimit(1).minimumScaleFactor(0.7)
+            // 0.55: three pills on a 375 pt phone leave "Save PDF" about 51 pt,
+            // and at 0.7 it was cut to "Save P…".
+            Text(title).font(Kid.titleBold(18)).lineLimit(1).minimumScaleFactor(0.55)
         }
         // In a bar the toolbar offers too little width and the word shrank
         // away: a pill that hugs its words keeps them whole.
