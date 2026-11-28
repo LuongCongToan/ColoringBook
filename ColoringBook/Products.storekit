@@ -14,7 +14,7 @@
         }
       ],
       "productID": "pt.team.coloringbook.book.single",
-      "referenceName": "Coloring Book Book",
+      "referenceName": "One ColorKin Book",
       "type": "Consumable"
     },
     {
@@ -29,7 +29,7 @@
         }
       ],
       "productID": "pt.team.coloringbook.book.pack3",
-      "referenceName": "Coloring Book Book Pack 3",
+      "referenceName": "Colorkin Book Pack 3",
       "type": "Consumable"
     }
   ],
@@ -47,7 +47,7 @@
     {
       "id": "C0B00CPRO1",
       "localizations": [],
-      "name": "Coloring Book Pro",
+      "name": "Colorkin Pro",
       "subscriptions": [
         {
           "adHocOffers": [],
@@ -60,13 +60,13 @@
           "localizations": [
             {
               "description": "60 AI coloring pages a month and unlimited books",
-              "displayName": "Coloring Book Pro Monthly",
+              "displayName": "Colorkin Pro Monthly",
               "locale": "en_US"
             }
           ],
           "productID": "pt.team.coloringbook.pro.monthly",
           "recurringSubscriptionPeriod": "P1M",
-          "referenceName": "Coloring Book Pro Monthly",
+          "referenceName": "Colorkin Pro Monthly",
           "subscriptionGroupID": "C0B00CPRO1",
           "type": "RecurringSubscription"
         },
@@ -86,13 +86,13 @@
           "localizations": [
             {
               "description": "60 AI coloring pages a month and unlimited books",
-              "displayName": "Coloring Book Pro Yearly",
+              "displayName": "Colorkin Pro Yearly",
               "locale": "en_US"
             }
           ],
           "productID": "pt.team.coloringbook.pro.yearly",
           "recurringSubscriptionPeriod": "P1Y",
-          "referenceName": "Coloring Book Pro Yearly",
+          "referenceName": "Colorkin Pro Yearly",
           "subscriptionGroupID": "C0B00CPRO1",
           "type": "RecurringSubscription"
         }

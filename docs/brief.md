@@ -65,6 +65,16 @@ Tài liệu bàn giao để mở một session riêng cho app này. Ảnh thử 
 - Điểm bị chê trong review: "scammy", bắt trả tiền mới thử được, hệ thống xu, hay báo "server busy".
 - Số liệu doanh thu tự công bố, chưa kiểm chứng: ColorBliss (web) $2,000/tháng sau 213 ngày (2024); ColoringPage.live khoảng $30/ngày, chủ yếu từ phụ huynh Mỹ và châu Âu.
 
+### Từ khoá và tên app (tra 2026-11-28, App Store Mỹ)
+
+Gợi ý tìm kiếm của Apple (MZSearchHints) và 10 kết quả đầu (iTunes Search):
+- Có người gõ, ít đối thủ mạnh: "turn photo into coloring page" (10 app đầu cộng lại khoảng 21k lượt đánh giá, chủ yếu Colorify), "coloring book maker" (Colorify 9,3k, còn lại dưới 700), "photo to line art".
+- Có người gõ, đông app nhỏ: "photo to coloring page/book", "photo coloring book", "coloring pages from photos". Color Pop (778k) và Colorify đứng đầu, sau đó là hàng chục app vài trăm đánh giá đặt tên kiểu "X: Photo to Coloring".
+- Ít người gõ (không có gợi ý) nhưng không ai chiếm: "personalized coloring", "coloring book gift", "pet coloring". "custom coloring" chỉ có Colorin, Craybook. "family coloring" chỉ có Embra.
+- Không nhắm: "coloring book for kids/adults", "coloring app" (app tô màu sẵn, hàng trăm nghìn đánh giá).
+
+Đề xuất (chờ user chốt): tên `Colorkin: Photo Coloring Book` (29 ký tự), subtitle `Custom Kids Pages & Book Maker` (30), keywords `picture,family,pet,personalized,printable,line,art,sketch,drawing,turn,gift,name,outline,toddler` (96). Apple ghép chữ từ cả ba ô, nên không lặp chữ đã có trong tên và subtitle. "Colorkin" và "Doodlekin" chưa thấy app nào dùng; "Crayonly", "Kinbook", "Little Lines", "Pagekin" đã có. Kiểm nhãn hiệu trước khi chốt.
+
 ## 4. Cách tạo tranh
 
 ### 4.0 Kết quả R&D 2026-11-24 (tạm chốt, dùng mục này khi bắt đầu làm)

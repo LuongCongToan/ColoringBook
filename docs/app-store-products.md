@@ -11,10 +11,7 @@ Khi đổi gì ở đây thì sửa cả ba nơi: bảng này, `Products.storeki
 | Family Sharing cho gói đăng ký | **Bật**. Không tắt lại được sau khi lưu trên App Store Connect | 2026-11-24 |
 | Ảnh người dùng | Gửi lên Worker và nhà cung cấp AI để tạo tranh, **không lưu giữ**. Xem [privacy.md](privacy.md) | 2026-11-24 |
 | iOS tối thiểu | **18.0**, để dùng `SKIncludeConsumableInAppPurchaseHistory` | 2026-11-24 |
-
-## Chưa chốt
-
-1. **Tên app và bundle ID.** Mã sản phẩm phụ thuộc bundle ID và **không đổi được sau khi tạo** (xoá sản phẩm cũng không dùng lại được mã). Chốt tên trước khi tạo sản phẩm trên App Store Connect. Bên dưới dùng tạm `<bundle>` và `<App>`.
+| Tên app | **Colorkin: Photo Coloring Book** trên App Store, `Colorkin` dưới icon. Bundle ID `pt.team.coloringbook` | 2026-11-28 |
 
 ## Tổng quan các gói
 
@@ -44,8 +41,8 @@ Vẫn giữ các nguyên tắc của brief: không gói tuần, không xu, khôn
 
 | Ô trên App Store Connect | Giá trị |
 |---|---|
-| Reference Name | `<App> Pro` |
-| Subscription Group Display Name (en-US) | `<App> Pro` |
+| Reference Name | `Colorkin Pro` |
+| Subscription Group Display Name (en-US) | `Colorkin Pro` |
 | App Name Display Options | Use App Name |
 
 Hai gói chung một nhóm, cùng level 1. Người dùng chỉ có một gói tại một thời điểm, và dùng thử chỉ được một lần cho cả nhóm.
@@ -54,8 +51,8 @@ Hai gói chung một nhóm, cùng level 1. Người dùng chỉ có một gói t
 
 | Ô trên App Store Connect | Pro tháng | Pro năm |
 |---|---|---|
-| Reference Name | `<App> Pro Monthly` | `<App> Pro Yearly` |
-| Product ID | `<bundle>.pro.monthly` | `<bundle>.pro.yearly` |
+| Reference Name | `Colorkin Pro Monthly` | `Colorkin Pro Yearly` |
+| Product ID | `pt.team.coloringbook.pro.monthly` | `pt.team.coloringbook.pro.yearly` |
 | Duration | 1 tháng | 1 năm |
 | Giá (USD) | $7.99 | $29.99 |
 | Giá UK, CA, AU | Apple tự quy đổi | Apple tự quy đổi |
@@ -63,7 +60,7 @@ Hai gói chung một nhóm, cùng level 1. Người dùng chỉ có một gói t
 | **Family Sharing** | **Bật** | **Bật** |
 | Multiseat | No | No |
 | Nơi bán | Chỉ App Store | Chỉ App Store |
-| Display Name (en-US, tối đa 35 ký tự) | `<App> Pro Monthly` | `<App> Pro Yearly` |
+| Display Name (en-US, tối đa 35 ký tự) | `Colorkin Pro Monthly` | `Colorkin Pro Yearly` |
 | Description (en-US, tối đa 55 ký tự) | `60 AI coloring pages a month and unlimited books` | như gói tháng |
 | Review Screenshot | Paywall thấy cả hai gói | cùng ảnh |
 | Tax Category | Match to parent app | như gói tháng |
@@ -88,8 +85,8 @@ Mỗi thành viên gia đình nhận một giao dịch riêng, với `originalTr
 | Ô trên App Store Connect | Giá trị |
 |---|---|
 | Type | Consumable |
-| Reference Name | `<App> Book` |
-| Product ID | `<bundle>.book.single` |
+| Reference Name | `One ColorKin Book` (tên `Colorkin Book` ban đầu làm sản phẩm không hiện trong sandbox; đổi tên rồi lưu lại thì hiện) |
+| Product ID | `pt.team.coloringbook.book.single` |
 | Giá | $4.99 |
 | Family Sharing | Không áp dụng (Apple không cho chia sẻ consumable) |
 | Display Name (en-US) | `One Coloring Book` |
@@ -100,12 +97,12 @@ Khác Haru: Haru chỉ có gói đăng ký, đọc quyền từ `Transaction.cur
 
 1. App mua xong, nhận giao dịch đã xác minh, **gọi `finish()` ngay**. Không có bước ghi nhận riêng (`POST /credit` trong bản thiết kế đầu đã bỏ).
 2. Mỗi lần tạo tranh, app gửi lên `POST /generate` JWS của một giao dịch: gói Pro còn hạn nếu có, nếu không thì **cuốn sách mua gần nhất** (lấy từ `Transaction.all`, bỏ giao dịch đã bị thu hồi).
-3. Worker xác minh JWS (bundle, `productId = <bundle>.book.single`, chưa bị thu hồi). Bộ đếm của cuốn sách có khoá là hash của `transactionId`; lần dùng đầu tiên tạo bộ đếm 30 lượt, các lần sau trừ dần. Gửi lại cùng giao dịch không bao giờ cộng thêm lượt.
+3. Worker xác minh JWS (bundle, `productId = pt.team.coloringbook.book.single`, chưa bị thu hồi). Bộ đếm của cuốn sách có khoá là hash của `transactionId`; lần dùng đầu tiên tạo bộ đếm 30 lượt, các lần sau trừ dần. Gửi lại cùng giao dịch không bao giờ cộng thêm lượt.
 4. Worker trả tranh kèm số lượt còn lại; hết lượt thì trả 429 và không gọi BFL.
 
 Vì bộ đếm nằm trên Worker theo giao dịch, việc `finish()` sớm không làm mất lượt: app tắt giữa chừng sau khi mua thì giao dịch vẫn nằm trong lịch sử, lượt chưa dùng vẫn còn trên Worker.
 
-**Ba cuốn sách** (`<bundle>.book.pack3`, Consumable, $9.99, Display Name `Three Coloring Books`, Description `Three books of up to 20 pages each`): một giao dịch, một bộ đếm 90 lượt (`LIMITS.bookPack` trên Worker), cùng luồng như một cuốn.
+**Ba cuốn sách** (`pt.team.coloringbook.book.pack3`, Reference Name `Colorkin Book Pack 3`, Consumable, $9.99, Display Name `Three Coloring Books`, Description `Three books of up to 20 pages each`): một giao dịch, một bộ đếm 90 lượt (`LIMITS.bookPack` trên Worker), cùng luồng như một cuốn.
 
 **Mua nhiều cuốn:** app gửi lần lượt (`StoreModel.purchaseJWSs()`): gói Pro còn hạn, rồi các cuốn và gói 3 cuốn từ mới tới cũ. Giao dịch nào hết lượt thì Worker trả 429 mà không gọi BFL, app thử giao dịch kế tiếp, nên không lượt nào bị bỏ phí. Chưa có màn "Book 1: 12 pages left"; app hiện số lượt còn lại của giao dịch vừa dùng.
 
@@ -171,11 +168,11 @@ App #1 (TinnitusRelief) của nhóm bị từ chối hai lần vì Guideline 3.1
 
 ```
 SUBSCRIPTION TERMS
-<App> Pro Monthly is an auto-renewable subscription at USD 7.99 per month. <App> Pro Yearly is an auto-renewable subscription at USD 29.99 per year, with a 3-day free trial for new subscribers. Both plans can be shared with up to 5 family members through Family Sharing. Prices may vary by region. Payment is charged to your Apple Account when you confirm the purchase, or when the free trial ends. The subscription renews automatically unless auto-renew is turned off at least 24 hours before the current period ends, and the renewal is charged within 24 hours before that date. You can manage or cancel at any time in your Apple Account settings.
+Colorkin Pro Monthly is an auto-renewable subscription at USD 7.99 per month. Colorkin Pro Yearly is an auto-renewable subscription at USD 29.99 per year, with a 3-day free trial for new subscribers. Both plans can be shared with up to 5 family members through Family Sharing. Prices may vary by region. Payment is charged to your Apple Account when you confirm the purchase, or when the free trial ends. The subscription renews automatically unless auto-renew is turned off at least 24 hours before the current period ends, and the renewal is charged within 24 hours before that date. You can manage or cancel at any time in your Apple Account settings.
 
-One Coloring Book is a one-time purchase at USD 4.99 for one book of up to 20 pages.
+One Coloring Book is a one-time purchase at USD 4.99 for one book of up to 20 pages. Three Coloring Books is a one-time purchase at USD 9.99 for three books.
 
-Privacy Policy: <privacy URL>
+Privacy Policy: https://luongcongtoan.github.io/coloringbook/privacy.html
 Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
 ```
 
@@ -188,20 +185,24 @@ Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/st
 - App Privacy: xem [privacy.md](privacy.md).
 - Đăng ký Small Business Program trước khi phát hành (15% thay vì 30%).
 
-Review Notes (dùng chung cho cả ba sản phẩm, sửa đường dẫn khi có giao diện thật):
+Review Notes (dùng chung cho cả bốn sản phẩm):
 
 ```
 No account or sign-in is needed.
 
 Where to find the purchase screen:
-- Settings > "<App> Pro"
-- Create a book > "Export PDF" (book export needs Pro or One Coloring Book)
-- After the 3 free AI pages are used, the next "Create" shows the plans.
+- Home > the grown-ups button (top corner) > "Plans". "Restore purchases" is on the same screen.
+- Create > pick a photo > draw it: without a plan or a book, the plans appear.
+- Open a book > "Save PDF": exporting a book needs Pro or a book purchase.
 
-<App> Pro Yearly is $29.99 per year with a 3-day free trial (10 AI pages during the trial). <App> Pro Monthly is $7.99 per month. Both include 60 AI coloring pages a month and unlimited books, and can be shared through Family Sharing. One Coloring Book is a $4.99 one-time purchase for one book of up to 20 pages. "Restore Purchases" is in Settings.
+Colorkin Pro Yearly is $29.99 per year with a 3-day free trial (10 AI pages during the trial). Colorkin Pro Monthly is $7.99 per month. Both include 60 AI coloring pages a month and unlimited books, and can be shared through Family Sharing. One Coloring Book is a $4.99 one-time purchase (30 AI pages, one printable book). Three Coloring Books is a $9.99 one-time purchase (90 AI pages, three books).
 
 Photos are sent to our server and an AI provider only to draw the coloring page. Our server does not store them.
 ```
+
+**Đã tạo trên App Store Connect (2026-11-28)** và kiểm bằng sandbox thật trên Simulator và iPhone: đủ 4 sản phẩm, đúng giá, gói năm có dùng thử 3 ngày, cả hai gói đăng ký bật Family Sharing. Chỉ mở 4 nước (không có China mainland: cần ICP và giấy phép AI).
+
+**Simulator giữ bản `.storekit` cũ:** chạy app từ Xcode với StoreKit Configuration một lần thì `storekitd` lưu một bản sao (`…/Shared/AppGroup/<id>/Documents/Persistence/Octane/pt.team.coloringbook/Configuration.storekit`) và dùng nó (log ghi `XcodeTest`) cả khi mở bằng `simctl` hay scheme đã bỏ file. Muốn gọi sandbox thật thì dời thư mục đó đi. Bản Debug in danh sách sản phẩm nhận được với tiền tố `[Store]`; cờ `-openSettings` mở thẳng màn có các gói.
 
 ## Test trên Simulator
 

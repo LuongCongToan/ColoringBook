@@ -75,9 +75,19 @@ final class StoreModel {
         do {
             let loaded = try await Product.products(for: ProductID.all)
             products = ProductID.all.compactMap { id in loaded.first { $0.id == id } }
-            if let subscription = yearly?.subscription {
+            // Only when the yearly plan really has the free trial on App
+            // Store Connect: eligibility alone is true even without an offer,
+            // and promising a trial that isn't there breaks Guideline 3.1.2.
+            if let subscription = yearly?.subscription, subscription.introductoryOffer?.paymentMode == .freeTrial {
                 trialEligible = await subscription.isEligibleForIntroOffer
             }
+            #if DEBUG
+            for p in products {
+                let offer = p.subscription?.introductoryOffer.map { "\($0.paymentMode.rawValue) \($0.period.value) \($0.period.unit)" } ?? "-"
+                print("[Store] \(p.id) | \(p.displayName) | \(p.displayPrice) | family \(p.isFamilyShareable) | intro \(offer)")
+            }
+            print("[Store] missing: \(ProductID.all.filter { id in !products.contains { $0.id == id } }) trialEligible \(trialEligible)")
+            #endif
         } catch {
             message = "The App Store could not be reached. Check the connection and try again."
         }

@@ -71,6 +71,11 @@ struct PageLibraryView: View {
                 ColoringView(art: page.art, pageID: page.pageID, saved: page.saved)
             }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            #if DEBUG
+            // `-openSettings`: the Grown-ups screen with the plans, to check
+            // the products the App Store returns.
+            .onAppear { if ProcessInfo.processInfo.arguments.contains("-openSettings") { showSettings = true } }
+            #endif
             .confirmationDialog(bookToDelete.map { "Delete \u{201C}\($0.title)\u{201D}?" } ?? "",
                                 isPresented: Binding(get: { bookToDelete != nil }, set: { if !$0 { bookToDelete = nil } }),
                                 titleVisibility: .visible,
