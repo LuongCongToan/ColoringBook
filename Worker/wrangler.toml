@@ -4,10 +4,11 @@
 # secret is set out of band:
 #
 #   npx wrangler secret put BFL_API_KEY
-#   npx wrangler secret put BFL_API_KEY --env staging
 #
-# Deploy with `npm run deploy` / `npm run deploy:staging`, which refuse to
-# ship if a test fails.
+# Deploy with `npm run deploy`, which refuses to ship if a test fails.
+# Production only: Xcode and TestFlight purchases are sandbox ones and share
+# SANDBOX_DAILY_CAP with App Review. Xcode's local StoreKit testing
+# (Products.storekit) is refused on purpose: Apple did not sign it.
 
 name = "coloring-api"
 main = "src/index.ts"
@@ -31,27 +32,5 @@ name = "QUOTA"
 class_name = "QuotaCounter"
 
 [[migrations]]
-tag = "v1"
-new_sqlite_classes = ["QuotaCounter"]
-
-# TEMPORARY. Debug builds in the Simulator, with Products.storekit. It skips
-# the StoreKit signature check, so anyone with the URL can spend its cap:
-# keep GLOBAL_DAILY_CAP tiny. Once real sandbox purchases work against
-# production, delete it: `npx wrangler delete --env staging`, then remove
-# this block and point Debug builds at production.
-[env.staging]
-name = "coloring-api-staging"
-
-[env.staging.vars]
-ENVIRONMENT = "staging"
-STAGING_SKIP_SIGNATURE = "true"
-GLOBAL_DAILY_CAP = "5"
-SANDBOX_DAILY_CAP = "5"
-
-[[env.staging.durable_objects.bindings]]
-name = "QUOTA"
-class_name = "QuotaCounter"
-
-[[env.staging.migrations]]
 tag = "v1"
 new_sqlite_classes = ["QuotaCounter"]

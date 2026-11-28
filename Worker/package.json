@@ -5,8 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "deploy": "npm run typecheck && vitest run && wrangler deploy --env=\"\"",
-    "deploy:staging": "npm run typecheck && vitest run && wrangler deploy --env staging"
+    "deploy": "npm run typecheck && vitest run && wrangler deploy"
   },
   "dependencies": {
     "@peculiar/x509": "^3.1.0",
