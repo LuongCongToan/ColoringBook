@@ -828,3 +828,64 @@ describe("5B.6 privacy", () => {
     expectClean(logs, jws, id, image);
   });
 });
+
+describe("staging Simulator switch (STAGING_SKIP_SIGNATURE)", () => {
+  const xcode = () => payload({ environment: "Xcode" });
+
+  it("is ignored in production and under test: a forged chain is still refused", async () => {
+    for (const ENVIRONMENT of ["production", "test"] as const) {
+      const env = testEnv(apple, { ENVIRONMENT, STAGING_SKIP_SIGNATURE: "true" });
+      await refused(401, body(await sign(attacker, payload())), { env });
+      await refused(401, body("not-a-jws"), { env });
+    }
+  });
+
+  it("does not open the Xcode environment outside staging, even with a trusted signature", async () => {
+    const env = testEnv(apple, { STAGING_SKIP_SIGNATURE: "true" });
+    await refused(403, body(await sign(apple, xcode())), { env });
+  });
+
+  it("is off on staging unless set to exactly \"true\"", async () => {
+    for (const STAGING_SKIP_SIGNATURE of [undefined, "", "1", "TRUE", "yes"]) {
+      const env = testEnv(apple, { ENVIRONMENT: "staging", STAGING_SKIP_SIGNATURE });
+      await refused(401, body(await sign(attacker, xcode())), { env });
+    }
+  });
+
+  it("on staging, accepts an Xcode transaction signed by any root", async () => {
+    const env = testEnv(apple, { ENVIRONMENT: "staging", STAGING_SKIP_SIGNATURE: "true" });
+    const model = fakeModel();
+    const response = await post(body(await sign(attacker, xcode())), { env, model });
+    expect(response.status).toBe(200);
+    expect(model.submits()).toHaveLength(1);
+  });
+
+  it("on staging, still checks bundle, product, expiry and refunds", async () => {
+    const env = testEnv(apple, { ENVIRONMENT: "staging", STAGING_SKIP_SIGNATURE: "true" });
+    await refused(403, body(await sign(attacker, payload({ environment: "Xcode", bundleId: "com.other.app" }))), { env });
+    await refused(403, body(await sign(attacker, payload({ environment: "Xcode", productId: "com.other.pro" }))), { env });
+    await refused(403, body(await sign(attacker, payload({ environment: "Xcode", expiresDate: Date.now() - 60_000 }))), { env });
+    await refused(403, body(await sign(attacker, payload({ environment: "Xcode", revocationDate: Date.now() - DAY }))), { env });
+    await refused(401, body("not-a-jws"), { env });
+  });
+
+  it("on staging, the global cap still bounds the day", async () => {
+    const env = testEnv(apple, {
+      ENVIRONMENT: "staging",
+      STAGING_SKIP_SIGNATURE: "true",
+      GLOBAL_DAILY_CAP: "1",
+      SANDBOX_DAILY_CAP: "100",
+    });
+    const now = new Date("2031-01-05T12:00:00Z"); // a day no other test counts on
+    const first = await post(body(await sign(attacker, payload({ environment: "Xcode", expiresDate: now.getTime() + DAY }))), {
+      env,
+      model: fakeModel(),
+      now,
+    });
+    expect(first.status).toBe(200);
+    await refused(503, body(await sign(attacker, payload({ environment: "Xcode", expiresDate: now.getTime() + DAY }))), {
+      env,
+      now,
+    });
+  });
+});

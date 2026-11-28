@@ -173,6 +173,28 @@ async function verify(
     throw unauthorized("expired-chain");
   }
 
+  return readTransaction(payload, signedDate);
+}
+
+/// STAGING ONLY. Reads a transaction without checking who signed it, so the
+/// app can be tried in the Simulator with Products.storekit, whose
+/// transactions Xcode signs with a root made on the Mac. Anyone can forge
+/// what this accepts; the handler calls it only when ENVIRONMENT is
+/// "staging", and that Worker's GLOBAL_DAILY_CAP is the whole defence.
+export function decodeUnverified(jws: string): Transaction {
+  try {
+    const parts = jws.split(".");
+    if (parts.length !== 3) throw unauthorized("malformed");
+    const payload = parseJson(base64UrlToBytes(parts[1]!));
+    const signedDate = typeof payload.signedDate === "number" ? payload.signedDate : undefined;
+    return readTransaction(payload, signedDate);
+  } catch (error) {
+    if (error instanceof EntitlementError) throw error;
+    throw unauthorized("malformed");
+  }
+}
+
+function readTransaction(payload: Record<string, unknown>, signedDate: number | undefined): Transaction {
   const text = (name: string) =>
     typeof payload[name] === "string" ? (payload[name] as string) : "";
   const number = (name: string) =>
@@ -206,6 +228,8 @@ export interface EntitlementPolicy {
   consumables: ReadonlySet<string>;
   /// Whether an Apple-signed sandbox transaction is entertained at all.
   allowSandbox: boolean;
+  /// STAGING ONLY: also accept Xcode's local StoreKit testing environment.
+  allowLocal?: boolean;
 }
 
 /// Decides whether a verified transaction buys a coloring page right now.
@@ -233,5 +257,6 @@ export function authorize(tx: Transaction, policy: EntitlementPolicy, now: Date)
   }
   if (tx.environment === "Production") return;
   if (tx.environment === "Sandbox" && policy.allowSandbox) return;
+  if ((tx.environment === "Xcode" || tx.environment === "LocalTesting") && policy.allowLocal) return;
   throw forbidden("environment");
 }

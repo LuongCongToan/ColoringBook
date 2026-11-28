@@ -9,6 +9,9 @@ export interface Env {
   GLOBAL_DAILY_CAP: string;
   /// Pages per UTC day shared by ALL sandbox transactions. "0" refuses them.
   SANDBOX_DAILY_CAP: string;
+  /// "true" skips the StoreKit signature check, so the Simulator works with
+  /// Products.storekit. Read only when ENVIRONMENT is "staging".
+  STAGING_SKIP_SIGNATURE?: string;
   /// Base64 DER of a stand-in root. Read only when ENVIRONMENT is "test".
   TEST_TRUST_ROOT?: string;
 }

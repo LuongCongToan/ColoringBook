@@ -12,7 +12,7 @@ import {
 import type { Env } from "./env";
 import { Moderated, UpstreamError, generatePage } from "./generator";
 import { InputError, checkPhoto, pickStyle } from "./image";
-import { EntitlementError, type Transaction, authorize, base64ToBytes, verifyTransaction } from "./jws";
+import { EntitlementError, type Transaction, authorize, base64ToBytes, decodeUnverified, verifyTransaction } from "./jws";
 import type { Reservation } from "./quota";
 
 /// The counters, behind an interface so a test can make them fail.
@@ -113,6 +113,14 @@ function trustedRoot(env: Env): Uint8Array<ArrayBuffer> {
   return base64ToBytes(APPLE_ROOT_CA_G3);
 }
 
+/// The Simulator switch: skip the signature check, accept Xcode transactions.
+/// Honoured only on the staging Worker, never in production or under test,
+/// so the same variable left on the production Worker changes nothing (a
+/// test asserts it). Delete the staging Worker once real sandbox purchases work.
+function skipsSignature(env: Env): boolean {
+  return env.ENVIRONMENT === "staging" && env.STAGING_SKIP_SIGNATURE === "true";
+}
+
 const cap = (value: string | undefined) => {
   const number = Number.parseInt(value ?? "", 10);
   return Number.isFinite(number) && number > 0 ? number : 0;
@@ -186,7 +194,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
     if (typeof body.jws !== "string" || body.jws.length === 0) {
       throw new EntitlementError(401, "missing");
     }
-    transaction = await verifyTransaction(body.jws, trustedRoot(env), now);
+    const unsigned = skipsSignature(env);
+    transaction = unsigned ? decodeUnverified(body.jws) : await verifyTransaction(body.jws, trustedRoot(env), now);
     authorize(
       transaction,
       {
@@ -194,6 +203,7 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
         subscriptions: SUBSCRIPTIONS,
         consumables: new Set([BOOK]),
         allowSandbox: sandboxCap > 0,
+        allowLocal: unsigned,
       },
       now,
     );
@@ -254,7 +264,8 @@ export async function handle(request: Request, env: Env, deps: Deps): Promise<Re
       }
       charged.push([dailyCounter, day]);
 
-      if (transaction.environment === "Sandbox") {
+      // Sandbox, and on staging Xcode transactions too.
+      if (transaction.environment !== "Production") {
         const sandbox = await quota.reserve(SANDBOX_COUNTER, day, sandboxCap, now.getTime());
         if (!sandbox.ok) {
           await refundAll();

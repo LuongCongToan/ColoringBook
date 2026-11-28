@@ -69,6 +69,14 @@ Hạn mức lấy từ [docs/app-store-products.md](../docs/app-store-products.m
 
 Chạy thử ở máy với key thật: tạo `Worker/.dev.vars` có dòng `BFL_API_KEY=...` (file này nằm trong `.gitignore`), rồi `npx wrangler dev`.
 
+## Staging tạm thời (thử trên Simulator)
+
+`coloring-api-staging` **bỏ qua bước kiểm chữ ký StoreKit** (`STAGING_SKIP_SIGNATURE = "true"`), để bản Debug chạy trên Simulator với `Products.storekit` gọi được Worker. Các bước kiểm bundle, sản phẩm, hạn dùng và hoàn tiền vẫn chạy. Cờ này chỉ có tác dụng khi `ENVIRONMENT = "staging"`, và có test khẳng định production bỏ qua nó. Ai có URL cũng tiêu được trần của staging, nên `GLOBAL_DAILY_CAP` đặt 5 tranh/ngày.
+
+App: bản Debug gọi staging, bản Release (TestFlight, App Store) gọi production (`WorkerPageGenerator.swift`).
+
+Khi mua sandbox thật đã chạy được với production thì xoá staging: `npx wrangler delete --env staging`, bỏ khối `[env.staging]` trong `wrangler.toml` cùng lệnh `deploy:staging`, rồi cho bản Debug trỏ sang production.
+
 ## Công tắc trong `wrangler.toml`
 
 - `GLOBAL_DAILY_CAP`: trần tổng số tranh mỗi ngày (production 500, khoảng $10/ngày). Tăng dần khi có người dùng.

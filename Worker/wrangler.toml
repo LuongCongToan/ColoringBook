@@ -6,12 +6,15 @@
 #   npx wrangler secret put BFL_API_KEY
 #   npx wrangler secret put BFL_API_KEY --env staging
 #
-# Deploy with `npm run deploy`, which refuses to ship if a test fails.
+# Deploy with `npm run deploy` / `npm run deploy:staging`, which refuse to
+# ship if a test fails.
 
 name = "coloring-api"
 main = "src/index.ts"
 compatibility_date = "2026-11-01"
 workers_dev = true
+# No per-version preview URLs: one public address per Worker.
+preview_urls = false
 
 [vars]
 ENVIRONMENT = "production"
@@ -31,14 +34,19 @@ class_name = "QuotaCounter"
 tag = "v1"
 new_sqlite_classes = ["QuotaCounter"]
 
-# TestFlight and development builds. Their purchases are all sandbox ones.
+# TEMPORARY. Debug builds in the Simulator, with Products.storekit. It skips
+# the StoreKit signature check, so anyone with the URL can spend its cap:
+# keep GLOBAL_DAILY_CAP tiny. Once real sandbox purchases work against
+# production, delete it: `npx wrangler delete --env staging`, then remove
+# this block and point Debug builds at production.
 [env.staging]
 name = "coloring-api-staging"
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
-GLOBAL_DAILY_CAP = "200"
-SANDBOX_DAILY_CAP = "200"
+STAGING_SKIP_SIGNATURE = "true"
+GLOBAL_DAILY_CAP = "5"
+SANDBOX_DAILY_CAP = "5"
 
 [[env.staging.durable_objects.bindings]]
 name = "QUOTA"

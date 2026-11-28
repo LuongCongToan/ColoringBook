@@ -7,8 +7,16 @@ import Foundation
 /// into the app. The photo goes up once and is not kept anywhere
 /// (docs/privacy.md); nothing here logs it.
 struct WorkerPageGenerator: PageGenerating {
-    /// Set after `npm run deploy:staging` / `npm run deploy` prints the URL.
+    #if DEBUG
+    /// TEMPORARY: the staging Worker skips the StoreKit signature check so the
+    /// Simulator works with Products.storekit (5 pages a day in total). Point
+    /// this at production and delete the staging Worker once real sandbox
+    /// purchases work (Worker/wrangler.toml).
     static let endpoint = URL(string: "https://coloring-api-staging.pt-team2011.workers.dev/generate")!
+    #else
+    /// TestFlight and the App Store. Sandbox purchases share SANDBOX_DAILY_CAP.
+    static let endpoint = URL(string: "https://coloring-api.pt-team2011.workers.dev/generate")!
+    #endif
 
     private struct Request: Encodable {
         let jws: String
