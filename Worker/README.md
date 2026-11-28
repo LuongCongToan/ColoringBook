@@ -9,7 +9,7 @@ Viết lại từ Worker `haru-check` của Haru ngày 2026-11-24. Phần xác t
 ```bash
 cd Worker
 npm install
-npm test            # 75 test, không cần mạng, không cần key
+npm test            # 84 test, không cần mạng, không cần key
 npm run typecheck
 ```
 
@@ -25,7 +25,7 @@ Test dùng `fetch` giả, nên không bao giờ gọi BFL thật hay tốn tiề
 | `image` | JPEG base64, đúng 768×1024 hoặc 1024×768, tối đa 300 KB, không có EXIF/IPTC |
 | `style` | `cartoon` (mặc định) hoặc `chibi`. Mã lạ thì dùng `cartoon` |
 
-Trả về `200 { image, remaining, style, promptVersion }`, trong đó `image` là PNG base64. Các lỗi:
+Trả về `200 { image, remaining, limit, kind, resetAt?, style, promptVersion }`, trong đó `image` là PNG base64 và các trường lượt giống `POST /quota` bên dưới. Các lỗi:
 
 | Mã | Body | App nên làm |
 |---|---|---|
@@ -34,6 +34,19 @@ Trả về `200 { image, remaining, style, promptVersion }`, trong đó `image` 
 | 413 / 422 | `too_large` / `rejected` | Ảnh không hợp lệ, hoặc BFL từ chối vẽ (kiểm duyệt) |
 | 429 | `quota`, có `resetAt` nếu hết hạn mức tháng hoặc ngày | Hết lượt. Không có `resetAt` nghĩa là hết lượt dùng thử hoặc hết sách: mời mua |
 | 503 | `unavailable` | Thử lại sau; lượt không bị trừ |
+
+`POST /quota`, body JSON `{ "jws": ... }`: giao dịch đó còn bao nhiêu lượt. Worker xác thực JWS như `/generate`, rồi chỉ **đọc** bộ đếm (`QuotaCounter.peek`): không trừ lượt, không gọi BFL, không cần ảnh. App gọi cho từng giao dịch để hiện số lượt còn lại (`Store/PageAllowance.swift`).
+
+Trả về `200 { remaining, limit, kind, resetAt? }`:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `remaining` | Lượt còn lại trong kỳ hiện tại, không âm |
+| `limit` | Hạn mức của kỳ: 60, 20, 10, 30 hoặc 90 |
+| `kind` | `monthly` (Pro, người mua), `family` (Pro qua Family Sharing), `trial` (dùng thử), `book` (một cuốn hoặc gói 3 cuốn) |
+| `resetAt` | Chỉ có với gói tháng: thời điểm hạn mức mới bắt đầu (ISO 8601, đầu tháng UTC) |
+
+Lỗi: 400, 401/403 như `/generate`; 503 `unavailable` khi không đọc được bộ đếm. Con số chỉ tính hạn mức của gói, không tính trần 20 tranh/ngày hay trần tổng.
 
 ## Thứ tự xử lý một request
 
@@ -52,6 +65,7 @@ Hạn mức lấy từ [docs/app-store-products.md](../docs/app-store-products.m
 | Pro, thành viên `FAMILY_SHARED` | `originalTransactionId` của họ, tháng UTC | 20 |
 | Dùng thử (`offerType = 1`) | `originalTransactionId` | 10, không reset |
 | Một cuốn sách | `transactionId` | 30, không reset |
+| Gói 3 cuốn | `transactionId` | 90, không reset |
 | Mọi gói | người dùng, ngày UTC | 20 |
 
 ## Triển khai
@@ -65,7 +79,7 @@ Hạn mức lấy từ [docs/app-store-products.md](../docs/app-store-products.m
    npx wrangler secret put BFL_API_KEY
    ```
 5. `npm run deploy:staging`, rồi `npm run deploy`. Lệnh deploy chạy typecheck và test trước; đừng gọi thẳng `wrangler deploy` để bỏ qua bước này.
-6. Kiểm Worker đang chạy: `curl -i -X POST https://coloring-api.<subdomain>.workers.dev/generate -d '{}'` phải trả 401, không tốn tiền.
+6. Kiểm Worker đang chạy: `curl -i -X POST https://coloring-api.<subdomain>.workers.dev/generate -d '{}'` và `.../quota -d '{}'` đều phải trả 401, không tốn tiền. `GET` vào bất kỳ đường dẫn nào trả 404.
 
 Chạy thử ở máy với key thật: tạo `Worker/.dev.vars` có dòng `BFL_API_KEY=...` (file này nằm trong `.gitignore`), rồi `npx wrangler dev`.
 

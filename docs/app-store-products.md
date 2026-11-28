@@ -100,13 +100,16 @@ Khác Haru: Haru chỉ có gói đăng ký, đọc quyền từ `Transaction.cur
 1. App mua xong, nhận giao dịch đã xác minh, **gọi `finish()` ngay**. Không có bước ghi nhận riêng (`POST /credit` trong bản thiết kế đầu đã bỏ).
 2. Mỗi lần tạo tranh, app gửi lên `POST /generate` JWS của một giao dịch: gói Pro còn hạn nếu có, nếu không thì **cuốn sách mua gần nhất** (lấy từ `Transaction.all`, bỏ giao dịch đã bị thu hồi).
 3. Worker xác minh JWS (bundle, `productId = pt.team.coloringbook.book.single`, chưa bị thu hồi). Bộ đếm của cuốn sách có khoá là hash của `transactionId`; lần dùng đầu tiên tạo bộ đếm 30 lượt, các lần sau trừ dần. Gửi lại cùng giao dịch không bao giờ cộng thêm lượt.
-4. Worker trả tranh kèm số lượt còn lại; hết lượt thì trả 429 và không gọi BFL.
+4. Worker trả tranh kèm số lượt còn lại (`remaining`, `limit`, `kind`); hết lượt thì trả 429 và không gọi BFL.
+5. Để hiện số lượt trước khi tạo tranh, app gọi `POST /quota` với cùng JWS. Worker chỉ đọc bộ đếm, không trừ lượt, không gọi BFL.
 
 Vì bộ đếm nằm trên Worker theo giao dịch, việc `finish()` sớm không làm mất lượt: app tắt giữa chừng sau khi mua thì giao dịch vẫn nằm trong lịch sử, lượt chưa dùng vẫn còn trên Worker.
 
 **Ba cuốn sách** (`pt.team.coloringbook.book.pack3`, Reference Name `Colorkin Book Pack 3`, Consumable, $9.99, Display Name `Three Coloring Books`, Description `Three books of up to 20 pages each`): một giao dịch, một bộ đếm 90 lượt (`LIMITS.bookPack` trên Worker), cùng luồng như một cuốn.
 
-**Mua nhiều cuốn:** app gửi lần lượt (`StoreModel.purchaseJWSs()`): gói Pro còn hạn, rồi các cuốn và gói 3 cuốn từ mới tới cũ. Giao dịch nào hết lượt thì Worker trả 429 mà không gọi BFL, app thử giao dịch kế tiếp, nên không lượt nào bị bỏ phí. Chưa có màn "Book 1: 12 pages left"; app hiện số lượt còn lại của giao dịch vừa dùng.
+**Mua nhiều cuốn:** app gửi lần lượt (`StoreModel.purchaseJWSs()`): gói Pro còn hạn, rồi các cuốn và gói 3 cuốn từ mới tới cũ. Giao dịch nào hết lượt thì Worker trả 429 mà không gọi BFL, app thử giao dịch kế tiếp, nên không lượt nào bị bỏ phí.
+
+**Hiện số lượt còn lại** (`Store/PageAllowance.swift`, từ build 2): app gọi `POST /quota` cho từng giao dịch trong `purchaseJWSs()`, lúc mở app, sau khi mua và sau Restore. Gói Pro còn lượt thì hiện số của gói ("42 AI pages left this month"). Gói hết lượt, hoặc không có gói, thì hiện **tổng lượt của mọi cuốn sách** ("25 AI pages left in your books"). Số này hiện ở màn Create (chip trên nút Draw my page), màn kết quả và màn Grown-ups ("18 of 60 AI pages used this month"). App lưu số cuối cùng vào UserDefaults để hiện ngay lần mở sau; mất mạng thì giữ số cũ. Không có màn chia theo từng cuốn ("Book 1: 12 pages left"). App chỉ hiện số, không tự chặn: Worker vẫn là bên đếm.
 
 **Cài lại app:** với iOS 18 trở lên và `SKIncludeConsumableInAppPurchaseHistory = YES` trong Info.plist, `Transaction.all` có cả consumable đã finish, nên app vẫn tìm được giao dịch và Worker vẫn nhớ số lượt còn lại theo `transactionId`. Apple yêu cầu server phải đối chiếu được giao dịch consumable trước khi bật key này; Worker giữ bản ghi theo `transactionId` nên đáp ứng. Với iOS 17 không có cách này, vì vậy app yêu cầu iOS 18 trở lên.
 
