@@ -58,6 +58,8 @@ struct BookReaderView: View {
         /// The photo facing its picture ("Photo + page").
         case photo(UUID)
         case picture(UUID)
+        /// "The End", after the last picture.
+        case end
 
         var pageID: UUID? {
             switch self {
@@ -73,6 +75,7 @@ struct BookReaderView: View {
             if layout(for: id) == .photoFacing { out.append(.photo(id)) }
             out.append(.picture(id))
         }
+        if !pageIDs.isEmpty { out.append(.end) }
         return out
     }
 
@@ -174,7 +177,7 @@ struct BookReaderView: View {
             // A book just saved opens here: a good moment to ask (ReviewPrompt).
             ReviewPrompt.askIfDue(requestReview)
             pages.refresh()
-            if index == 0 && startPage > 0 { index = startPage }
+            if index == 0 && startPage > 0 { index = min(startPage, sheets.count - 1) }
             #if DEBUG && targetEnvironment(simulator)
             // `-arrangePage`: open Arrange on the start page, once pages load.
             if ProcessInfo.processInfo.arguments.contains("-arrangePage"), arranging == nil {
@@ -268,6 +271,7 @@ struct BookReaderView: View {
         case .cover?: return "Cover"
         case .photo(let id)?: return "Photo for page \(number(of: id))"
         case .picture(let id)?: return "Page \(number(of: id)) of \(pageIDs.count)"
+        case .end?: return "The End"
         case nil: return ""
         }
     }
@@ -435,6 +439,8 @@ struct BookReaderView: View {
                                              art: book?.coverArt, background: background)
         case .photo(let id):
             result = loadPhoto(id).map { BookRenderer.photoPageImage($0, background: pageBackground) }
+        case .end:
+            result = BookRenderer.endImage()
         case .picture(let id):
             let colored = await session(for: id)?.renderImage()
             let corner = layout(for: id) == .photoCorner ? loadPhoto(id) : nil

@@ -106,6 +106,8 @@ nonisolated enum BookRenderer {
     /// What each PDF page is, in order, for the review screen.
     enum PageKind: Hashable, Sendable {
         case cover, photo(Int), picture(Int), blank
+        /// "The End", the last page (user, 2026-11-28).
+        case end
     }
 
     static func makePDF(pages: [BookPageSource], options: BookOptions,
@@ -150,6 +152,11 @@ nonisolated enum BookRenderer {
                 sheetDone()
                 progress(Double(index + 1) / Double(max(pages.count, 1)))
             }
+
+            // The last page: nothing follows it, so no blank back.
+            pdf.beginPage()
+            kinds.append(.end)
+            drawEnd(in: pdf.cgContext, options: options)
         }
         return (data, kinds)
     }
@@ -165,6 +172,11 @@ nonisolated enum BookRenderer {
             options.background = background
             drawCover(in: ctx, name: name, first: first, options: options)
         }
+    }
+
+    /// "The End" as a picture, for the in-app book (same design as the PDF).
+    static func endImage(scale: CGFloat = 2) -> UIImage {
+        sheetImage(scale: scale) { drawEnd(in: $0, options: BookOptions()) }
     }
 
     /// The photo page of "Photo + page", for the in-app book.
@@ -408,6 +420,21 @@ nonisolated enum BookRenderer {
             }
         }
     }
+
+    /// The last page: the colored "The End" artwork (Covers/end-page.png,
+    /// Letter-shaped like the covers) over the whole sheet. It has its own
+    /// border, so the book's frame and background are not drawn on it.
+    private static func drawEnd(in ctx: CGContext, options: BookOptions) {
+        if let art = endArt {
+            art.draw(in: sheet)
+        } else {
+            drawFrame(options.coverFrame, in: ctx)
+            drawOutlineText(["The End"], in: CGRect(x: 90, y: 300, width: sheet.width - 180, height: 150), ctx: ctx)
+        }
+    }
+
+    private static let endArt: UIImage? = Bundle.main.url(forResource: "end-page", withExtension: "png")
+        .flatMap { UIImage(contentsOfFile: $0.path) }
 
     /// A built-in frame around the whole sheet, as line art to color.
     private static func drawFrame(_ frame: PageFrame, in ctx: CGContext) {

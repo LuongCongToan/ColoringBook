@@ -150,6 +150,7 @@ struct PDFPreviewView: View {
         case .photo(let n): return "Photo \(n)"
         case .picture(let n): return "Picture \(n)"
         case .blank: return "Blank back"
+        case .end: return "The End"
         }
     }
 

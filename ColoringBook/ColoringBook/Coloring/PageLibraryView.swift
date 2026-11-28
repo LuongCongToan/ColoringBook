@@ -39,13 +39,14 @@ struct PageLibraryView: View {
                         // Narrow cards (a phone on its side): smaller pictures,
                         // so the words keep whole lines.
                         let small = contentWidth < 1000
+                        let card = (cardsWidth - 14) / 2
                         HStack(spacing: 14) {
-                            makePageCard(small: small)
-                            makeBookCard(small: small)
+                            makePageCard(small: small, cardWidth: card)
+                            makeBookCard(small: small, cardWidth: card)
                         }
                     } else {
-                        makePageCard(small: false)
-                        makeBookCard(small: false)
+                        makePageCard(small: false, cardWidth: cardsWidth)
+                        makeBookCard(small: false, cardWidth: cardsWidth)
                     }
 
                     if !bookStore.books.isEmpty { booksSection }
@@ -108,7 +109,11 @@ struct PageLibraryView: View {
     // MARK: - Cards
 
     /// Opens the Create tab, so the tab bar shows where you are.
-    private func makePageCard(small: Bool) -> some View {
+    /// The width the cards share: the column (at most 1100) less its 13 pt
+    /// margins.
+    private var cardsWidth: CGFloat { min(contentWidth, 1100) - 26 }
+
+    private func makePageCard(small: Bool, cardWidth: CGFloat) -> some View {
         Button {
             SoundFX.shared.play(.tap)
             AppTabs.shared.freshCreate += 1
@@ -120,18 +125,19 @@ struct PageLibraryView: View {
                      color: Kid.yellow, art: "HomeCamera",
                      artSize: small ? CGSize(width: 146, height: 95) : CGSize(width: 208, height: 136),
                      artSlot: small ? 165 : 236,
-                     artOffset: CGSize(width: -3, height: -1.5))
+                     artOffset: CGSize(width: -3, height: -1.5), cardWidth: cardWidth)
         }
         .buttonStyle(SquishyStyle())
     }
 
-    private func makeBookCard(small: Bool) -> some View {
+    private func makeBookCard(small: Bool, cardWidth: CGFloat) -> some View {
         NavigationLink {
             BookBuilderView()
         } label: {
             homeCard(title: "Make a coloring book", subtitle: "Create, read & print",
                      color: Kid.lavender, art: "HomeBook",
-                     artSize: small ? CGSize(width: 150, height: 79) : CGSize(width: 212, height: 112))
+                     artSize: small ? CGSize(width: 150, height: 79) : CGSize(width: 212, height: 112),
+                     cardWidth: cardWidth)
         }
         .buttonStyle(SquishyStyle())
     }
@@ -195,18 +201,27 @@ struct PageLibraryView: View {
     /// right, the lavender arrow button.
     private func homeCard(title: String, subtitle: String, color: Color, art: String,
                           artSize: CGSize = CGSize(width: 212, height: 112), artSlot: CGFloat? = nil,
-                          artOffset: CGSize = .zero) -> some View {
+                          artOffset: CGSize = .zero, cardWidth: CGFloat = 0) -> some View {
         // Measured against the design (2026-11-25): card 414 × 124 pt, the
         // illustration about 212 × 112 pt on the left half.
-        HStack(spacing: 6) {
+        //
+        // On a narrower card (iPhone 12/13/14, 390 pt screen) the art shrinks
+        // so the words keep at least 100 pt: "coloring" and "Create, read &"
+        // are 94 pt wide, and with less room UILabel broke them mid-word.
+        // 76 pt is the arrow (46), the paddings (18) and the spacing (12).
+        let slot = artSlot ?? artSize.width
+        let fit = cardWidth > 0 ? (cardWidth - 76 - 100) / slot : 1
+        let k = min(1, max(0.5, fit))
+        let size = CGSize(width: artSize.width * k, height: artSize.height * k)
+        return HStack(spacing: 6) {
             Image(art)
                 .resizable()
                 .scaledToFit()
-                .frame(width: artSize.width, height: artSize.height)
-                .offset(artOffset)
+                .frame(width: size.width, height: size.height)
+                .offset(x: artOffset.width * k, y: artOffset.height * k)
                 // The art may be taller than the card; it overhangs a little
                 // instead of making the card taller (card 124 pt as designed).
-                .frame(width: artSlot ?? artSize.width, height: min(artSize.height, 112), alignment: .leading)
+                .frame(width: slot * k, height: min(size.height, 112), alignment: .leading)
             VStack(alignment: .leading, spacing: 0) {
                 ExactText.cardTitle(title)
                 ExactText.cardSubtitle(subtitle)
