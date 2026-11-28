@@ -77,43 +77,46 @@ struct BookReaderView: View {
     private var current: Sheet? { sheets[safe: index] }
 
     var body: some View {
-        let sheets = self.sheets
-        VStack(spacing: 14) {
-            if let book { actions(book) }
-            CurlPager(count: sheets.count, index: $index, reloadToken: reload,
-                      image: { await image(at: $0) },
-                      placeholder: { placeholder(at: $0) },
-                      onTap: { i in
-                          if case .picture(let id)? = self.sheets[safe: i] { Task { await open(id) } }
-                      },
-                      sounds: book?.pageSounds ?? true)
-                // Exactly one sheet: nothing around the paper to curl.
-                .aspectRatio(CurlPageController.sheetRatio, contentMode: .fit)
-                .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            HStack(spacing: 12) {
-                arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
-                VStack(spacing: 6) {
-                    Text(pageLabel)
-                        .font(Kid.titleBold(22))
-                        .foregroundStyle(Kid.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    if case .picture? = current {
-                        Text("Tap the page to color it")
-                            .font(Kid.body(15))
-                            .foregroundStyle(Self.hint)
+        GeometryReader { geo in
+            if geo.size.width > geo.size.height {
+                // On its side: the page as tall as the screen allows with the
+                // arrows on either side; the buttons, where we are and the
+                // layouts in a column on the right (the page was 100 pt wide
+                // under them, polish-plan 27, 71).
+                HStack(spacing: 12) {
+                    arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
+                    pager
+                    arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                    VStack(spacing: 14) {
+                        if let book { actions(book, vertical: true) }
+                        Spacer(minLength: 0)
+                        pageInfo
+                        Spacer(minLength: 0)
                     }
-                    layoutMenu
+                    .frame(width: 260)
+                    .padding(.vertical, 8)
                 }
-                .frame(maxWidth: .infinity)
-                arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+            } else {
+                VStack(spacing: 14) {
+                    if let book { actions(book, vertical: false) }
+                    pager
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                    HStack(spacing: 10) {
+                        arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
+                        pageInfo
+                            // The same height on every sheet, so the arrows
+                            // stay put (they jumped between the cover and a
+                            // page, polish-plan 27, 83).
+                            .frame(maxWidth: .infinity, minHeight: 112, alignment: .top)
+                        arrow(back: false, label: "Next page", enabled: index < sheets.count - 1) { index += 1 }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 12)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
         }
         .kidTabBarClearance()
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
@@ -184,12 +187,47 @@ struct BookReaderView: View {
         }
     }
 
+    /// The book, one sheet at a time, turning like paper.
+    private var pager: some View {
+        CurlPager(count: sheets.count, index: $index, reloadToken: reload,
+                  image: { await image(at: $0) },
+                  placeholder: { placeholder(at: $0) },
+                  onTap: { i in
+                      if case .picture(let id)? = self.sheets[safe: i] { Task { await open(id) } }
+                  },
+                  sounds: book?.pageSounds ?? true)
+            // Exactly one sheet: nothing around the paper to curl.
+            .aspectRatio(CurlPageController.sheetRatio, contentMode: .fit)
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Where we are, the hint, and the layouts of this page.
+    private var pageInfo: some View {
+        VStack(spacing: 6) {
+            Text(pageLabel)
+                .font(Kid.titleBold(22))
+                .foregroundStyle(Kid.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if case .picture? = current {
+                Text("Tap the page to color it")
+                    .font(Kid.body(15))
+                    .foregroundStyle(Self.hint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            layoutMenu
+        }
+    }
+
     private var busy: Bool { exporting || makingVideo }
 
     /// Edit, Save video, Save PDF: one row of pills under the bar, all the
     /// same height (44 pt) and always in the same place.
-    private func actions(_ book: StoredBook) -> some View {
-        HStack(spacing: 10) {
+    private func actions(_ book: StoredBook, vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             NavigationLink {
                 BookBuilderView(book: book)
             } label: {
@@ -213,7 +251,7 @@ struct BookReaderView: View {
             .disabled(pageIDs.isEmpty)
         }
         .disabled(busy)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, vertical ? 0 : 16)
         .padding(.top, 6)
     }
 
@@ -286,12 +324,12 @@ struct BookReaderView: View {
 
     /// A small rounded tile with the layout's picture: lemon when it is this
     /// page's, white with a lilac edge otherwise.
-    private func layoutTile(_ art: String, on: Bool, artSize: CGSize = CGSize(width: 54, height: 42)) -> some View {
+    private func layoutTile(_ art: String, on: Bool, artSize: CGSize = CGSize(width: 50, height: 40)) -> some View {
         Image(art)
             .resizable()
             .scaledToFit()
             .frame(width: artSize.width, height: artSize.height)
-            .frame(width: 60, height: 52)
+            .frame(width: 56, height: 50)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(on ? Self.lemon : .white))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(on ? Self.lemonLine : Self.lilacLine, lineWidth: 2.5))
@@ -316,7 +354,7 @@ struct BookReaderView: View {
             Image(back ? "ReaderPrev" : "ReaderNext")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 68, height: 68)
+                .frame(width: 60, height: 60)
                 .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
         }
         .opacity(enabled ? 1 : 0.3)

@@ -16,7 +16,9 @@ struct MyPagesView: View {
     /// Pulses the page just saved.
     @State private var glow = false
 
-    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+    /// Two columns on a phone held upright, more as the screen widens
+    /// (polish-plan 31, 62).
+    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 320), spacing: 16)]
 
     var body: some View {
         ScrollView {
@@ -82,7 +84,7 @@ struct MyPagesView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: tabs.highlightPage)
-        .navigationTitle(selecting ? selectionTitle : "My pages")
+        .navigationTitle(selecting ? "Select pages" : "My pages")
         .kidBackButton(hidden: selecting)
         .toolbar {
             if !store.pages.isEmpty {

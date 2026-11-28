@@ -13,6 +13,9 @@ struct PageArrangeView: View {
     @State private var books = BookStore.shared
     @State private var pages = PageStore.shared
     @State private var picture: UIImage?
+    /// The part of `picture` that is drawn (not its white margin), as a
+    /// share of it: the selection hugs this (polish-plan 86).
+    @State private var pictureContent = CGRect(x: 0, y: 0, width: 1, height: 1)
     @State private var photo: UIImage?
     @State private var placement = PagePlacement()
 
@@ -42,49 +45,31 @@ struct PageArrangeView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 14) {
-                GeometryReader { g in
-                    canvas(k: g.size.width / sheet.width)
-                }
-                .aspectRatio(sheet.width / sheet.height, contentMode: .fit)
-                .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
-                .padding(.horizontal, 16)
-                .frame(maxHeight: .infinity)
-
-                VStack(spacing: 4) {
-                    Text("Tap to select · Drag to move")
-                    if showsPhoto {
-                        Text("Drag a handle to resize · Use \(Image(systemName: "arrow.clockwise")) to rotate")
-                    } else {
-                        Text("Drag a handle to resize")
-                    }
-                }
-                .font(Kid.body(16))
-                .foregroundStyle(Self.hint)
-                .multilineTextAlignment(.center)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.horizontal, 20)
-
-                HStack(spacing: 12) {
-                    if hasPhoto && !showsPhoto {
-                        Button { addPhoto() } label: {
-                            PuffyPill(title: "Add the photo", icon: .symbol("photo"))
+            GeometryReader { screen in
+                // Sideways the hints and buttons stand beside the page, so the
+                // page keeps its size (it was 160 pt wide under them).
+                if screen.size.width > screen.size.height {
+                    HStack(spacing: 16) {
+                        page
+                        VStack(spacing: 18) {
+                            hints
+                            buttons(vertical: true)
                         }
-                        .buttonStyle(SquishyStyle())
+                        .frame(width: 250)
                     }
-                    Button {
-                        SoundFX.shared.play(.tap)
-                        withAnimation { placement = PagePlacement() }
-                    } label: {
-                        PuffyPill(title: "Reset", icon: .symbol("arrow.counterclockwise"), fill: Color(hex: 0xFCD5C0))
+                    .padding(.trailing, 16)
+                } else {
+                    VStack(spacing: 14) {
+                        page
+                        hints
+                        buttons(vertical: false)
+                            .padding(.bottom, 8)
                     }
-                    .buttonStyle(SquishyStyle())
-                    .disabled(placement == PagePlacement())
-                    .opacity(placement == PagePlacement() ? 0.5 : 1)
                 }
-                .padding(.bottom, 8)
             }
+            // Cream edge to edge (it covered only the middle column,
+            // polish-plan 73).
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.top, 8)
             .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
             .navigationTitle("Arrange page")
@@ -111,6 +96,56 @@ struct PageArrangeView: View {
                 .kidPlainBackground()
             }
             .task { await load() }
+        }
+    }
+
+    private var page: some View {
+        GeometryReader { g in
+            canvas(k: g.size.width / sheet.width)
+        }
+        .aspectRatio(sheet.width / sheet.height, contentMode: .fit)
+        .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var hints: some View {
+        VStack(spacing: 4) {
+            Text("Tap to select · Drag to move")
+            if showsPhoto {
+                Text("Drag a handle to resize · Use \(Image(systemName: "arrow.clockwise")) to rotate")
+            } else {
+                Text("Drag a handle to resize")
+            }
+        }
+        .font(Kid.body(16))
+        .foregroundStyle(Self.hint)
+        .multilineTextAlignment(.center)
+        .lineLimit(2)
+        .minimumScaleFactor(0.75)
+        .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder private func buttons(vertical: Bool) -> some View {
+        let layout = vertical ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+        layout {
+            if hasPhoto && !showsPhoto {
+                Button { addPhoto() } label: {
+                    PuffyPill(title: "Add the photo", icon: .symbol("photo"))
+                }
+                .buttonStyle(SquishyStyle())
+            }
+            Button {
+                SoundFX.shared.play(.tap)
+                withAnimation { placement = PagePlacement() }
+            } label: {
+                // Lilac like Cancel: the peach pill turned a muddy beige when
+                // it was off (polish-plan 86).
+                PuffyPill(title: "Reset", icon: .symbol("arrow.counterclockwise"))
+            }
+            .buttonStyle(SquishyStyle())
+            .disabled(placement == PagePlacement())
+            .opacity(placement == PagePlacement() ? 0.5 : 1)
         }
     }
 
@@ -226,7 +261,10 @@ struct PageArrangeView: View {
     // MARK: - Selection handles
 
     private func pictureHandles(_ image: UIImage, k: CGFloat) -> some View {
-        let rect = livePictureRect(image.size, k: k)
+        let whole = livePictureRect(image.size, k: k)
+        let c = pictureContent
+        let rect = CGRect(x: whole.minX + whole.width * c.minX, y: whole.minY + whole.height * c.minY,
+                          width: whole.width * c.width, height: whole.height * c.height)
         let center = CGPoint(x: rect.midX * k, y: rect.midY * k)
         return SelectionBox(size: CGSize(width: rect.width * k, height: rect.height * k), turns: false,
                             resize: resizeGesture(center: center) { factor in
@@ -308,8 +346,39 @@ struct PageArrangeView: View {
             photo = UIImage(contentsOfFile: url.path)
         }
         if let (art, saved) = try? await pages.load(pageID) {
-            picture = ColoringSession(art: art, pageID: pageID, restoring: saved).renderImage()
+            let image = ColoringSession(art: art, pageID: pageID, restoring: saved).renderImage()
+            picture = image
+            pictureContent = Self.drawnPart(of: image)
         }
+    }
+
+    /// The box around everything that is not white paper, from a small copy
+    /// of the image; the whole image when it is blank.
+    private static func drawnPart(of image: UIImage) -> CGRect {
+        guard let cg = image.cgImage else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+        let w = 200, h = max(1, Int((200 * Double(cg.height) / Double(cg.width)).rounded()))
+        var px = [UInt8](repeating: 255, count: w * h * 4)
+        px.withUnsafeMutableBytes { raw in
+            guard let ctx = CGContext(data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return }
+            ctx.setFillColor(gray: 1, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        var minX = w, minY = h, maxX = -1, maxY = -1
+        for y in 0..<h {
+            for x in 0..<w {
+                let i = (y * w + x) * 4
+                if Int(px[i]) + Int(px[i + 1]) + Int(px[i + 2]) < 720 {
+                    minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+                }
+            }
+        }
+        guard maxX > minX, maxY > minY else { return CGRect(x: 0, y: 0, width: 1, height: 1) }
+        // Memory rows run top to bottom, as the view's y does.
+        return CGRect(x: CGFloat(minX) / CGFloat(w), y: CGFloat(minY) / CGFloat(h),
+                      width: CGFloat(maxX - minX + 1) / CGFloat(w), height: CGFloat(maxY - minY + 1) / CGFloat(h))
     }
 
     /// Lays the photo on this page ("Small photo" for this page only).
@@ -385,8 +454,9 @@ private struct SelectionBox: View {
     private var handle: some View {
         Circle()
             .fill(.white)
-            .overlay(Circle().strokeBorder(Self.grape, lineWidth: 2.5))
-            .frame(width: 18, height: 18)
+            .overlay(Circle().strokeBorder(Self.grape, lineWidth: 3))
+            // Big enough to see (16 pt was hard to spot, polish-plan 28).
+            .frame(width: 22, height: 22)
             .shadow(color: .black.opacity(0.2), radius: 1.5)
             .frame(width: 36, height: 36)  // easier to catch than it looks
             .contentShape(Rectangle())

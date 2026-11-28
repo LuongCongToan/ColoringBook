@@ -20,13 +20,20 @@ struct PDFPreviewView: View {
                 if geo.size.width > geo.size.height {
                     HStack(spacing: 16) {
                         pageArea
-                        ScrollView {
-                            VStack(spacing: 14) {
-                                summary
-                                if let document { thumbnails(document) }
-                                buttons
+                        // The buttons stay at the foot of the column; the
+                        // rest scrolls above them (they were cut off at the
+                        // bottom, polish-plan 80).
+                        VStack(spacing: 10) {
+                            ScrollView {
+                                VStack(spacing: 14) {
+                                    summary
+                                    if let document { thumbnails(document) }
+                                }
+                                .padding(.vertical, 12)
                             }
-                            .padding(.vertical, 12)
+                            .scrollBounceBehavior(.basedOnSize)
+                            buttons
+                                .padding(.bottom, 6)
                         }
                         .frame(width: min(420, geo.size.width * 0.46))
                     }

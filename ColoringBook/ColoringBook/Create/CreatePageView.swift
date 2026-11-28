@@ -51,6 +51,7 @@ struct CreatePageView: View {
     private let generator = PageGenerators.make()
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// A phone on its side: little height, lay things side by side.
     private var wide: Bool { verticalSizeClass == .compact }
 
@@ -76,8 +77,17 @@ struct CreatePageView: View {
     }
 
     var body: some View {
-        Group {
-            if wide && !isDone { sideBySide } else { column }
+        GeometryReader { geo in
+            if case .done(let page, let image) = phase, geo.size.width > geo.size.height {
+                // On its side (phone or iPad): the page on the left, the
+                // choices and buttons on the right (the pinned buttons
+                // covered the page, polish-plan 69, 74).
+                resultSideBySide(page, image)
+            } else if wide && !isDone {
+                sideBySide
+            } else {
+                column
+            }
         }
         .kidTabBarClearance()
         .background(KidBackground())
@@ -86,16 +96,11 @@ struct CreatePageView: View {
             if isDone {
                 ToolbarItem(placement: .topBarTrailing) {
                     // A finished page stayed on this tab with no way to make
-                    // another (full-flow test, 2026-11-26).
-                    Button {
-                        startOver()
-                    } label: {
-                        Label("New page", systemImage: "plus")
-                            .font(Kid.body(16))
-                            .labelStyle(.titleAndIcon)
-                    }
-                    .tint(Kid.ink)
+                    // another (full-flow test, 2026-11-26). The app's round
+                    // plus, not the system's grey one (polish-plan 66).
+                    KidCircleButton(image: "BtnPlus", size: 52, label: "New page") { startOver() }
                 }
+                .kidPlainBackground()
             }
         }
         .onChange(of: AppTabs.shared.freshCreate) { _, _ in
@@ -118,7 +123,9 @@ struct CreatePageView: View {
             } decline: {
                 askConsent = false
             }
-            .presentationDetents([.medium, .large])
+            // On an iPad just its own height (the half-screen detent left a
+            // 320 pt gap, polish-plan 85).
+            .presentationDetents(horizontalSizeClass == .regular ? [.height(470)] : [.medium, .large])
         }
         .sheet(isPresented: $showPlans) {
             PaywallView {
@@ -169,12 +176,16 @@ struct CreatePageView: View {
             .padding(.horizontal, 20)
             .padding(.top, wide ? 8 : 20)
             .padding(.bottom, 12)
+            // A readable column on an iPad, not the whole width.
+            .frame(maxWidth: 720)
+            .frame(maxWidth: .infinity)
         }
         // "Draw my page" stays in sight above the tab bar, whatever the
         // screen's height (it was pushed under the bar in landscape).
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .done(let page, _) = phase {
                 resultButtons(page)
+                    .frame(maxWidth: 600)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
@@ -183,6 +194,7 @@ struct CreatePageView: View {
                                        startPoint: .top, endPoint: .bottom))
             } else {
                 drawButton
+                    .frame(maxWidth: 600)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 6)
@@ -208,6 +220,11 @@ struct CreatePageView: View {
                         styleCards
                         failure
                     }
+                    // Room for the FREE tag and the ticks that stick out of
+                    // the cards, and the cards' shadow (they were clipped).
+                    .padding(.horizontal, 8)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
                 }
                 .scrollBounceBehavior(.basedOnSize)
                 drawButton
@@ -288,7 +305,7 @@ struct CreatePageView: View {
                 .foregroundStyle(Kid.ink)
             HStack(spacing: 10) {
                 ForEach(PageStyle.allCases) { s in
-                    StyleCard(style: s, selected: style == s) {
+                    StyleCard(style: s, selected: style == s, compact: wide) {
                         SoundFX.shared.play(.tap)
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { style = s }
                     }
@@ -324,15 +341,47 @@ struct CreatePageView: View {
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
         VStack(spacing: 18) {
+            resultHeader(size: 34)
+            resultImage(image)
+            resultDetails(page)
+        }
+    }
+
+    /// The result on its side: the page as big as the height allows on the
+    /// left; the cheer, line color, notes and buttons in a column on the
+    /// right.
+    private func resultSideBySide(_ page: GeneratedPage, _ image: UIImage) -> some View {
+        HStack(alignment: .center, spacing: 20) {
+            resultImage(image)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 12) {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        resultHeader(size: wide ? 26 : 34)
+                        resultDetails(page)
+                    }
+                    .padding(.vertical, 8)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                resultButtons(page)
+            }
+            .frame(maxWidth: wide ? 360 : 440)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
+    private func resultHeader(size: CGFloat) -> some View {
             // The crayon cheering: the page worked.
             HStack(spacing: 6) {
                 Image("EditorCelebration")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 118, height: 118)
+                    .frame(width: size * 3.5, height: size * 3.5)
                     .rotationEffect(.degrees(-6))
                 Text("Your page\nis ready!")
-                    .font(Kid.titleBold(34))
+                    .font(Kid.titleBold(size))
                     .foregroundStyle(Kid.ink)
                     .lineSpacing(-4)
                     .minimumScaleFactor(0.8)
@@ -344,7 +393,9 @@ struct CreatePageView: View {
                     }
             }
             .frame(maxWidth: .infinity)
+    }
 
+    private func resultImage(_ image: UIImage) -> some View {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFit()
@@ -353,7 +404,10 @@ struct CreatePageView: View {
                 .overlay(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
                     .strokeBorder(Kid.yellow.opacity(0.8), lineWidth: 3))
                 .shadow(color: Kid.yellow.opacity(0.35), radius: 8, y: 4)
+    }
 
+    private func resultDetails(_ page: GeneratedPage) -> some View {
+        VStack(spacing: 18) {
             inkPicker(for: page.style) { recolor($0) }
             if let remaining = page.remaining {
                 Text("\(remaining) pages left this month")
@@ -651,6 +705,9 @@ struct CreatePageView: View {
 private struct StyleCard: View {
     let style: PageStyle
     let selected: Bool
+    /// A phone on its side: a smaller picture, so the three cards and "Draw
+    /// my page" fit the short screen (polish-plan 76).
+    var compact = false
     let action: () -> Void
 
     private var art: String {
@@ -693,7 +750,7 @@ private struct StyleCard: View {
                 Image(art)
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 92)
+                    .frame(height: compact ? 58 : 92)
                 Text(title)
                     .font(Kid.titleBold(20))
                     .foregroundStyle(Kid.ink)
@@ -767,63 +824,84 @@ private struct ConsentSheet: View {
 
     var body: some View {
         // In the app's look: cream paper, Fredoka and Nunito, the big yellow
-        // button (it was system fonts and a coral rectangle).
-        VStack(spacing: 16) {
-            Image(systemName: "lock.shield.fill")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(Kid.ink)
-                .frame(width: 84, height: 84)
-                .background(Circle().fill(Kid.lavender))
-                .overlay(Circle().strokeBorder(.white, lineWidth: 4))
-                .shadow(color: Kid.grape.opacity(0.3), radius: 6, y: 3)
-                .accessibilityHidden(true)
-            Text("Before we draw")
-                .font(Kid.titleBold(28))
-                .foregroundStyle(Kid.ink)
-            VStack(spacing: 10) {
-                Text("To turn your photo into a coloring page, it is sent to our server and to our AI drawing service. Our server does not keep it.")
-                    .font(Kid.body(17))
-                    .foregroundStyle(Kid.ink)
-                Text("Please only use photos you have permission to use.")
-                    .font(Kid.bodyBold(16))
-                    .foregroundStyle(Color(hex: 0x796790))
+        // button (it was system fonts and a coral rectangle). Scrolls when
+        // the screen is too short (a phone on its side cut the icon off),
+        // and the sheet fits its content on an iPad (it had a 320 pt gap,
+        // polish-plan 85).
+        ViewThatFits(in: .vertical) {
+            VStack(spacing: 16) {
+                message
+                Spacer(minLength: 0)
+                buttons
             }
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Button(action: accept) {
-                HStack(spacing: 10) {
-                    Image(systemName: "wand.and.stars").font(.system(size: 22, weight: .bold))
-                    Text("OK, draw my page").font(Kid.titleBold(24)).lineLimit(1).minimumScaleFactor(0.7)
+            .padding(.horizontal, 24)
+            .padding(.top, 28)
+            .padding(.bottom, 16)
+            ScrollView {
+                VStack(spacing: 16) {
+                    message
+                    buttons
                 }
-                .foregroundStyle(Kid.ink)
-                .frame(maxWidth: .infinity, minHeight: 60)
-                .background(Capsule().fill(Kid.yellow))
-                .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
-                .background(Capsule().fill(Kid.yellow.darker(0.15)).offset(y: 5))
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
-            .buttonStyle(SquishyStyle())
-            // The second choice: the lavender button, smaller, as "Try chibi
-            // style" under "Color it!".
-            Button(action: decline) {
-                Text("Not now")
-                    .font(Kid.titleBold(20))
-                    .foregroundStyle(Kid.ink)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .background(Capsule().fill(Kid.lavender))
-                    .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
-                    .background(Capsule().fill(Kid.lavender.darker(0.15)).offset(y: 4))
-                    .padding(.horizontal, 16)
-            }
-            .buttonStyle(SquishyStyle())
-            .padding(.top, 4)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 28)
-        .padding(.bottom, 16)
         .frame(maxWidth: 520)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Kid.background.ignoresSafeArea())
+    }
+
+    @ViewBuilder private var message: some View {
+        Image(systemName: "lock.shield.fill")
+            .font(.system(size: 40, weight: .semibold))
+            .foregroundStyle(Kid.ink)
+            .frame(width: 84, height: 84)
+            .background(Circle().fill(Kid.lavender))
+            .overlay(Circle().strokeBorder(.white, lineWidth: 4))
+            .shadow(color: Kid.grape.opacity(0.3), radius: 6, y: 3)
+            .accessibilityHidden(true)
+        Text("Before we draw")
+            .font(Kid.titleBold(28))
+            .foregroundStyle(Kid.ink)
+        VStack(spacing: 10) {
+            Text("To turn your photo into a coloring page, it is sent to our server and to our AI drawing service. Our server does not keep it.")
+                .font(Kid.body(17))
+                .foregroundStyle(Kid.ink)
+            Text("Please only use photos you have permission to use.")
+                .font(Kid.bodyBold(16))
+                .foregroundStyle(Color(hex: 0x796790))
+        }
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var buttons: some View {
+        Button(action: accept) {
+            HStack(spacing: 10) {
+                Image(systemName: "wand.and.stars").font(.system(size: 22, weight: .bold))
+                Text("OK, draw my page").font(Kid.titleBold(24)).lineLimit(1).minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(Kid.ink)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            .background(Capsule().fill(Kid.yellow))
+            .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+            .background(Capsule().fill(Kid.yellow.darker(0.15)).offset(y: 5))
+        }
+        .buttonStyle(SquishyStyle())
+        // The second choice: the lavender button, smaller, as "Try chibi
+        // style" under "Color it!".
+        Button(action: decline) {
+            Text("Not now")
+                .font(Kid.titleBold(20))
+                .foregroundStyle(Kid.ink)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(Capsule().fill(Kid.lavender))
+                .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+                .background(Capsule().fill(Kid.lavender.darker(0.15)).offset(y: 4))
+                .padding(.horizontal, 16)
+        }
+        .buttonStyle(SquishyStyle())
+        .padding(.top, 4)
     }
 }
 

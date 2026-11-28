@@ -20,7 +20,12 @@ struct BookListView: View {
                 NavigationLink {
                     BookBuilderView()
                 } label: {
-                    newBookTile
+                    // A hidden line where books have their page count, so the
+                    // tile stands on the same line as the books.
+                    VStack(spacing: 6) {
+                        newBookTile
+                        Text("0 pages").font(Kid.bodyBold(15)).hidden()
+                    }
                 }
                 .buttonStyle(.plain)
                 .disabled(selecting)
@@ -34,7 +39,9 @@ struct BookListView: View {
                             } label: {
                                 BookShelfCover(book: book, pages: pages, tint: Kid.coverTint(books.books.firstIndex(of: book) ?? 0))
                                     .overlay(alignment: .topTrailing) {
-                                        SelectCheck(on: selection.contains(book.id)).padding(8)
+                                        // On the corner, clear of the title on the
+                                        // cover (polish-plan 21).
+                                        SelectCheck(on: selection.contains(book.id)).offset(x: 8, y: -8)
                                     }
                                     .modifier(SelectedRing(on: selection.contains(book.id), radius: 10))
                             }
@@ -52,8 +59,8 @@ struct BookListView: View {
                             }
                         }
                         Text(pageCountLabel(book))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(Kid.bodyBold(15))
+                            .foregroundStyle(Color(hex: 0x796790))
                     }
                 }
             }
@@ -61,13 +68,16 @@ struct BookListView: View {
 
             if books.books.isEmpty {
                 Text("No books yet. Make one from the pages you colored.")
-                    .foregroundStyle(.secondary)
+                    .font(Kid.bodyBold(16))
+                    .foregroundStyle(Color(hex: 0x796790))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
         }
         .background(Color(red: 0.99, green: 0.96, blue: 0.90).ignoresSafeArea())
-        .navigationTitle(selecting ? selectionTitle : "My books")
+        // The count is in the bar below; here only what the screen is
+        // (it said "3 books selected" twice, polish-plan 82).
+        .navigationTitle(selecting ? "Select books" : "My books")
         .kidBackButton(hidden: selecting)
         .navigationBarTitleDisplayMode(selecting ? .inline : .large)
         .toolbar {
@@ -150,15 +160,17 @@ struct BookListView: View {
             }
     }
 
+    /// The same size as a book on the shelf, standing on the same line
+    /// (polish-plan 63, 65).
     private var newBookTile: some View {
         VStack(spacing: 10) {
             Image(systemName: "plus")
                 .font(.system(size: 40, weight: .heavy))
             Text("New book")
-                .font(.headline.weight(.heavy))
+                .font(Kid.titleBold(19))
         }
         .foregroundStyle(Color(red: 0.55, green: 0.36, blue: 0.86))
-        .frame(width: 130, height: 170)
+        .frame(width: 148, height: 152)
         .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.7)))
         .overlay(RoundedRectangle(cornerRadius: 10)
             .strokeBorder(Color(red: 0.55, green: 0.36, blue: 0.86), style: StrokeStyle(lineWidth: 3, dash: [8, 6])))

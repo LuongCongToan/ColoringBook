@@ -4,6 +4,7 @@ Danh sách từ các lượt thử trên Simulator. Việc đã xong được g�
 
 - 2026-11-26 (sáng): lượt thử toàn bộ trên iPhone, mục 1–40.
 - 2026-11-26 (tối): hai agent thử song song trên iPhone 18 Pro Max và iPad Air 13", cả dọc lẫn ngang, mục 41–72. Ảnh chụp: `scratchpad/ux-review/` (iPhone) và `scratchpad/shots/` (iPad).
+- 2026-11-28: hai agent thử lại bằng cờ debug và ảnh chụp (không bấm được: công cụ Xcode không nạp), mục 73–87. iPhone cả dọc lẫn ngang; iPad chỉ dọc (`-landscape` không xoay được iPad vì app hỗ trợ đa nhiệm). Ảnh: `scratchpad/ux-iphone/`, `scratchpad/ux-ipad/`.
 
 Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight · **P2** nhỏ, gây khó hiểu · **P3** làm đẹp.
 
@@ -52,28 +53,28 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
 18. **Màn kết quả (dọc):** dòng "59 pages left this month" và ghi chú bị nút ghim che. Đưa lên gần ảnh, hoặc vào khối nút ghim.
 19. ~~Bấm "Color it!" chờ 1–2 giây không phản hồi~~ — Hiện popup "Opening the page…", chặn bấm hai lần. (2026-11-27)
 20. ~~Khay khung ở màn tô màu~~ — Ô "Simple" vẽ nguyên khung vừa ô kèm mặt cười, vùng chạm đúng bằng ô; xoay ngang thì Save và −/+ lên thanh trên; nút − khi khoá có nền đặc. (2026-11-28)
-21. **Bìa sách khi đang chọn:** vòng chọn che cuối tên sách. Dời ra mép ngoài bìa.
+21. ~~Bìa sách khi đang chọn: vòng chọn che cuối tên sách~~ — Dấu tick dời ra góc ô. (2026-11-28)
 22. **Trợ năng:** ảnh trang ở My pages chưa có nhãn; ô màu đều đọc là "Color" (chỉ White và Any color có tên). Đặt tên màu ("Red", "Orange"…). Ngôi sao trang trí ở Home bị VoiceOver đọc là "Favorite": ẩn khỏi trợ năng. *Thử lại: vẫn còn.*
 23. **Sách, sau khi đổi layout hoặc Arrange:** trang thành trắng kèm vòng xoay vài giây. Giữ ảnh cũ tới khi ảnh mới sẵn sàng. Xem thêm mục 47.
 24. **Bảng chia sẻ** ở màn tô màu hiện icon chung chung. Gửi kèm ảnh thu nhỏ và tên trang (`LPLinkMetadata` hoặc `ShareLink`).
 25. **Hiệu ứng xoá trang:** thẻ trượt chéo đè nhau khi lưới dồn lại. Dùng mờ dần hoặc thu nhỏ.
-26. ~~Màn tô màu (dọc): khoảng trống giữa hàng Save/zoom và hàng dụng cụ~~ — Tranh lấy hết chỗ còn lại sau khi chừa chỗ cho bảng công cụ cao nhất (Brush), nên không nhảy cỡ khi đổi công cụ; phần dư chia trên và dưới. (2026-11-28)
+26. ~~Màn tô màu (dọc): khoảng trống giữa hàng Save/zoom và hàng dụng cụ~~ — Tranh lấy hết chỗ còn lại sau khi chừa chỗ cho bảng công cụ cao nhất (Brush), nên không nhảy cỡ khi đổi công cụ. Với Fill, Sticker, Frame phần dư (145–200 pt) nằm dưới khay. (2026-11-28)
 27. **Màn đọc sách:** ~~icon layout và dòng "Tap the page to color it" quá nhỏ~~ (ô 60×52 pt, chữ 15 pt màu tím, 2026-11-27). Còn: khi xoay ngang, trang chỉ khoảng 115×151 pt trên iPhone: xếp trang bên trái, nút bên phải. Mũi tên trước/sau nhảy chỗ giữa trang bìa và trang tô.
-28. **Arrange page:** chấm kéo đổi cỡ (16 pt) khó thấy; vẽ to hơn.
+28. ~~Arrange page: chấm kéo đổi cỡ khó thấy~~ — Tay cầm 22 pt, viền 3 pt. (2026-11-28)
 29. ~~Chữ chờ: thống nhất dùng "…"~~ — Đã kiểm: không còn "..." trong app. (2026-11-27)
-30. **Màn chính khi xoay ngang:** linh vật chạm mép trên. *Thử lại: vẫn còn.*
+30. ~~Màn chính khi xoay ngang: linh vật chạm mép trên~~ — Thêm lề trên khi ngang. (2026-11-28)
 55. ~~Fill đổ được vào lề trắng ngoài viền trang~~ — Ngoài đường viền khung nét là tường. (2026-11-28)
-56. **Hàng dụng cụ (dọc):** các thẻ chạm sát mép màn (Fill bắt đầu ở x = 3) và sát nhau; "Brush size" chỉ cách thẻ khoảng 6 pt. Lề 16 pt, cách nhau 6–8 pt.
+56. ~~Hàng dụng cụ (dọc): sát mép và sát nhau~~ — Lề 16 pt, cách nhau 7 pt. (2026-11-28)
 57. ~~Ảnh sách trong My library khác bìa thật~~ — Ô sách vẽ từ bìa thật (cùng code với trình đọc sách), lưu đệm trong Caches tới khi sách hoặc trang đầu đổi. (2026-11-27)
 58. ~~Xem trước PDF có hai nút Print~~ — Bỏ nút góc trên. (2026-11-27)
-59. **New page: thẻ kiểu vẽ đang chọn to ra** (132 so với 126 pt), làm khoảng cách hai bên lệch (4 và 10 pt). Dùng `scaleEffect` không đổi bố cục. Nhãn "FREE" chỉ khoảng 11 pt.
+59. ~~New page: thẻ kiểu vẽ đang chọn to ra~~ (kiểm lại 2026-11-28: không còn) — (132 so với 126 pt), làm khoảng cách hai bên lệch (4 và 10 pt). Dùng `scaleEffect` không đổi bố cục. Nhãn "FREE" chỉ khoảng 11 pt.
 60. **Thanh tab hiện lại chậm** khoảng 1 giây sau khi rời màn tô màu hoặc chế độ chọn. Cho hiện cùng hiệu ứng quay lại.
 61. **Home:** khi cuộn, nội dung chạy dưới thanh trạng thái, không có nền. Ô "Try these" dọc nằm trong ô ngang có viền xám. Ảnh trang hiện trễ khoảng 1 giây (ô trắng); ô "Import a page" cao 150 pt, các ô khác 160 pt.
-62. **Lưới 2 cột khi xoay ngang (iPhone):** ô rộng khoảng 390 pt, ảnh có viền thừa. Hai thẻ lớn ở Home chiếm hết chiều cao. Dùng 3–4 cột khi xoay ngang, hai thẻ lớn đặt cạnh nhau.
-63. **Vùng chạm nhỏ:** "See all" cao 22 pt; Select, Cancel, Done 37 pt; nút Home ở Make a book 42 pt; số trang dưới sách ("4 pages") khoảng 12 pt xám. Nâng lên ít nhất 44 pt.
+62. ~~Lưới 2 cột khi xoay ngang (iPhone)~~ — Lưới tự thêm cột (`adaptive(minimum: 180)`) ở Home và My pages; hai thẻ lớn cạnh nhau khi rộng hơn 760 pt, hình nhỏ lại trên iPhone ngang. (2026-11-28)
+63. **Vùng chạm nhỏ:** "See all" cao 22 pt; Select, Cancel, Done 37 pt; nút Home ở Make a book 42 pt. ~~Số trang dưới sách 12 pt xám~~ (Nunito 15 pt tím, 2026-11-28).
 64. ~~Tiêu đề "Let's color!" lệch tâm~~ — Giữa màn hình khi đủ chỗ (ngang, iPad); iPhone dọc không đủ chỗ nên canh giữa khoảng giữa hai cụm nút. (2026-11-28)
-65. **My books: ô "New book"** (130×170 pt) và bìa sách (153×152 pt) khác cỡ và khác đường đáy. Dùng chung một khung.
-66. **Màn kết quả: nút "+" (New page)** góc trên phải là vòng tròn xám hệ thống, trông như bị khoá. Dùng nút BtnPlus của app.
+65. ~~My books: ô "New book" khác cỡ bìa~~ — Cùng khung 148×152 pt, cùng đường đáy, chữ Fredoka. (2026-11-28)
+66. ~~Màn kết quả: nút "+" hệ thống~~ — Nút tròn BtnPlus của app. (2026-11-28)
 67. **Make a book: cỡ hình ô layout** khác nhau (99, 121, 106 pt) và icon As colored 47 pt, Fresh to color 35 pt. Đây là cố ý để khớp hình thiết kế; nếu nhìn lệch thì chuẩn hoá lại.
 
 ## iPad
@@ -85,11 +86,31 @@ Mức độ: **P0** chặn người dùng · **P1** sửa trước TestFlight ·
     - Chữ và hình minh hoạ to hơn khoảng 1,2–1,3 lần khi `horizontalSizeClass == .regular`.
 32. **New page:** thẻ ảnh rộng 984 pt (dọc) và 1326 pt (ngang); thẻ kiểu vẽ khoảng 327 và 440 pt; khi dọc có khoảng trống khoảng 510 pt giữa thẻ kiểu vẽ và nút "Draw my page". Dùng bố cục 2 cột như iPhone ngang, hoặc giới hạn bề rộng. *Thử lại: vẫn còn.*
 33. **Màn tô màu:** ~~xoay ngang~~ đã dùng 3 cột và trông ổn. Khi dọc vẫn là bố cục iPhone: hàng dụng cụ canh trái chỉ dùng 470/1024 pt, hàng màu bị cắt ở mép phải (ô Any color khuất một nửa) dù 17 ô vừa đủ nếu canh giữa. Dùng 3 cột cả khi dọc (tranh rộng khoảng 736 pt), hoặc đặt dụng cụ dưới tranh, canh giữa.
-68. **Make a book: lưới chọn trang** luôn 2 hàng ô 102×80 pt trong thẻ rộng 972 pt (dọc) và 1314 pt (ngang): 5 trang chiếm 3 cột, bên phải trống khoảng 750 pt; 20 trang trở lên phải cuộn nhiều trong khung nhỏ. Dùng `GridItem(.adaptive(minimum: 120))` (7–10 cột), ô khoảng 140×110 pt, lưới tự cao lên thay vì cuộn trong khung cố định.
-69. **Màn kết quả xoay ngang:** ảnh 1306×980 pt tràn quá đáy màn, nút ghim "Color it!" và "Try cartoon style" che phần dưới, hàng chọn màu nét nằm ngoài màn. Khi dọc, các ô màu nét 36 pt cách nhau 140 pt. Giới hạn chiều cao ảnh, 2 cột khi xoay ngang, bề rộng tối đa khoảng 760 pt.
-70. **Màn tô màu xoay ngang:** thẻ dụng cụ vẫn 72 pt, ô màu 44 pt, cột màu trống khoảng 530 pt bên dưới. Trên iPad: thẻ 88–96 pt, ô màu 56 pt, 3–4 ô một hàng.
-71. **Màn đọc sách xoay ngang:** trang 530×686 pt, mỗi bên trống khoảng 420 pt; mũi tên và icon layout dồn dưới trang. Mở từ Home thì có thanh tab, mở ngay sau khi lưu sách thì không. Ẩn thanh tab trong sách; đặt mũi tên hai bên trang khi xoay ngang.
+68. ~~Make a book: lưới chọn trang trên iPad~~ — Lưới dọc tự thêm cột, tự cao lên; ô bìa 58×75 pt; nội dung rộng tối đa 760 pt. (2026-11-28)
+69. ~~Màn kết quả xoay ngang (iPad)~~ — Xem 74; dọc trên iPad rộng tối đa 720 pt. (2026-11-28)
+70. **Màn tô màu xoay ngang (iPad):** thẻ dụng cụ giờ 90 pt trên iPad, chấm cỡ dưới cột dụng cụ (2026-11-28). Chưa kiểm được trên iPad ngang (cờ `-landscape` không xoay iPad).
+71. **Màn đọc sách xoay ngang:** bố cục ngang mới: trang cao hết màn, mũi tên hai bên, cột phải có nút, tên trang, ô layout (2026-11-28; kiểm trên iPhone, chưa kiểm iPad ngang).
 72. **Màn Grown-ups:** tờ 580×660 pt trông ổn. Thẻ báo lỗi gói (468 pt) hẹp hơn danh sách Help (548 pt): cho rộng bằng nhau. Danh sách gói chưa thử trên iPad (mở bằng simctl không có StoreKit); thử lại khi chạy từ Xcode.
+
+## Lượt thử 2026-11-28
+
+73. ~~P1 · Arrange: nền kem chỉ phủ một cột giữa~~ — Nền kem phủ kín màn; xoay ngang thì chữ hướng dẫn và nút sang cột phải, trang to hơn. (2026-11-28)
+74. ~~P1 · Màn kết quả xoay ngang (cả iPhone)~~ — Bố cục ngang riêng: tranh bên trái, lời chúc, màu nét, ghi chú và nút bên phải (cả iPad, mục 69). (2026-11-28)
+75. ~~P1 · Paywall~~ — Nút mua và hàng Restore · Terms · Privacy ghim ở đáy, các gói cuộn phía trên; ẩn linh vật khi ngang. Chưa chụp được bản ngang (cờ -noPro không ép được paywall khi ngang). (2026-11-28)
+76. ~~P2 · New page xoay ngang (iPhone)~~ — Thẻ kiểu vẽ thấp hơn khi ngang; khung cuộn chừa chỗ cho nhãn FREE, dấu tick và bóng. (2026-11-28)
+77. ~~P2 · Màn tô màu xoay ngang, Brush (iPhone)~~ — Chấm cỡ cọ dời sang dưới cột dụng cụ (không tiêu đề), cột phải chỉ còn kiểu bút và màu. (2026-11-28)
+78. ~~P2 · Màn tô màu xoay ngang (iPhone)~~ — Tranh khi ngang to hơn (khoảng 430×300 pt) nhờ cột phải gọn hơn; nút của sticker vẫn cỡ cũ. (2026-11-28)
+79. ~~P2 · Make a book xoay ngang (iPhone)~~ — Hai cột khi ngang (bìa, bố cục, tuỳ chọn | Pages); nút Save book thấp hơn khi ngang, rộng tối đa 600 pt. (2026-11-28)
+80. ~~P2 · Xem trước PDF xoay ngang (iPhone)~~ — Nút ghim ở chân cột phải, phần trên cuộn. (2026-11-28)
+81. ~~P2 · Màn tô màu dọc trên iPad~~ — Hàng dụng cụ canh giữa, thẻ 90 pt trên iPad; hàng màu canh giữa, thu khe trước khi cuộn. (2026-11-28)
+82. ~~P3 · My books, chế độ chọn~~ — Thanh trên ghi "Select books/pages", số lượng chỉ ở thanh dưới; vòng chọn vàng có viền mực. (2026-11-28)
+83. ~~P3 · Màn đọc sách~~ — Hàng dưới vừa màn iPhone (ô 56×50, mũi tên 60 pt), phần giữa cao cố định nên mũi tên không nhảy. (2026-11-28)
+84. ~~P3 · Khay khung~~ — Khay khung cuộn tới ô đang chọn khi mở. (2026-11-28)
+85. ~~P3 · Hộp hỏi đồng ý~~ — Cuộn được khi màn thấp; trên iPad cao 470 pt vừa nội dung. (2026-11-28)
+86. ~~P3 · Arrange dọc~~ — Khung chọn ôm phần có nét của tranh; Reset màu tím nhạt như Cancel. (2026-11-28)
+87. ~~P3 · Xem trước PDF~~ — Cố ý: tranh ngang xoay để dùng hết khổ giấy dọc (BookRenderer). (2026-11-28)
+
+Kiểm lại các mục cũ (2026-11-28): còn 21, 27 (iPhone ngang trang 100×129 pt), 28 (tay cầm 16–17 pt), 30, 31, 32, 56 (lề 12 pt, cách 5 pt), 62 (thanh tab che tiêu đề "My pages" khi ngang), 63, 65, 66 (iPad: nút "+" giờ là nút glass hệ thống, vẫn khác BtnPlus), 69 (dọc). Khác đi: 33 (xem 81), 68 (lưới 3 hàng cuộn ngang, ô 102×78 pt, cột cuối bị cắt; bìa 47×59 pt cách nhau 120 pt). Hết: 59. Không tái hiện: 18. Chưa kiểm được: 70, 71, 72 (cần xoay iPad hoặc bấm).
 
 ## Đổi giao diện bằng code (không cần hình mới)
 

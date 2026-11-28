@@ -27,10 +27,24 @@ struct ColoringView: View {
                         // covered its corners (polish-plan 20).
                         header(wide: true)
                         HStack(spacing: 0) {
-                            ToolRail(session: session, axis: .vertical)
+                            // The size dots sit under the tools on the left, so
+                            // the right column starts with what the child picks
+                            // most: kinds, then colors (on a phone on its side
+                            // the colors were below the fold, polish-plan 77).
+                            VStack(spacing: 4) {
+                                ToolRail(session: session, axis: .vertical, fills: false)
+                                if session.tool.usesSize {
+                                    // No title here: five growing dots say
+                                    // what they are, and the room is short.
+                                    SizePicker(session: session, axis: .vertical, cell: 48)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .fixedSize(horizontal: true, vertical: false)
+                            .animation(.spring(duration: 0.3), value: session.tool)
                             canvas
-                            SidePanel(session: session)
-                                .frame(width: 200)
+                            SidePanel(session: session, showsSize: false)
+                                .frame(width: 196)
                         }
                     }
                 } else {
@@ -236,6 +250,8 @@ private struct BottomPanel: View {
 
 private struct SidePanel: View {
     let session: ColoringSession
+    /// Off when the size dots are shown elsewhere (under the tool rail).
+    var showsSize = true
 
     var body: some View {
         // One scrolling column: sizes, colors, stickers or frames, all
@@ -246,7 +262,7 @@ private struct SidePanel: View {
                     PanelTitle(text: session.tool.kindsTitle)
                     KindPicker(session: session, axis: .vertical)
                 }
-                if session.tool.usesSize {
+                if showsSize && session.tool.usesSize {
                     PanelTitle(text: session.tool.sizeTitle)
                     SizePicker(session: session, axis: .vertical)
                         .frame(maxWidth: .infinity)
@@ -274,24 +290,36 @@ private struct SidePanel: View {
 private struct ToolRail: View {
     let session: ColoringSession
     let axis: Axis
+    /// Takes the whole height (its column holds nothing else).
+    var fills = true
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// An iPad: bigger cards (they were phone-sized, polish-plan 70).
+    private var cardWidth: CGFloat { horizontalSizeClass == .regular ? 90 : 72 }
 
     var body: some View {
         if axis == .horizontal {
-            HStack(spacing: 5) { buttons() }
-                .padding(.horizontal, 11)
+            // Centered, like the rows under it (it hugged the left edge on
+            // an iPad, polish-plan 81).
+            // 16 pt from the edges, 7 between cards (they touched the edge
+            // and each other, polish-plan 56).
+            HStack(spacing: horizontalSizeClass == .regular ? 10 : 7) {
+                buttons(width: horizontalSizeClass == .regular ? cardWidth : nil)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
         } else {
             // One column when six cards fit (iPad); a phone on its side has
             // room for three rows only, so two columns of smaller cards, all
             // six in sight (Sticker and Frame were hidden below the fold,
             // polish-plan 44). Scrolls only if even that does not fit.
             ViewThatFits(in: .vertical) {
-                VStack(spacing: 10) { buttons(width: 72) }
+                VStack(spacing: 10) { buttons(width: cardWidth) }
                     .padding(.vertical, 10)
                     .padding(.horizontal, 10)
                 twoColumns
                 ScrollView(.vertical, showsIndicators: false) { twoColumns }
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            .frame(maxHeight: fills ? .infinity : nil, alignment: .top)
         }
     }
 
@@ -299,7 +327,7 @@ private struct ToolRail: View {
         LazyVGrid(columns: [GridItem(.fixed(66), spacing: 8), GridItem(.fixed(66))], spacing: 8) {
             buttons(width: 66, compact: true)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, fills ? 10 : 4)
         .padding(.horizontal, 8)
     }
 
@@ -443,6 +471,8 @@ private extension ColoringSession.Tool {
 private struct SizePicker: View {
     let session: ColoringSession
     let axis: Axis
+    /// The square each dot sits in, in the two-row grid.
+    var cell: CGFloat = 56
 
     private static let dots: [CGFloat] = [12, 18, 28, 39, 50]
 
@@ -455,7 +485,7 @@ private struct SizePicker: View {
             } else {
                 // Two short rows: five dots in a column pushed the colors off
                 // a landscape phone (polish-plan 44).
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(56), spacing: 4), count: 3), spacing: 4) {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(cell), spacing: 4), count: 3), spacing: 4) {
                     options(tool: tool, current: current)
                 }
             }
@@ -469,13 +499,13 @@ private struct SizePicker: View {
                     SoundFX.shared.play(.tap)
                     withAnimation(.spring(response: 0.25, dampingFraction: 0.6)) { session.sizeIndex[tool] = i }
                 } label: {
-                    dot(diameter: Self.dots[i])
-                        .frame(width: 47, height: 47)
+                    dot(diameter: Self.dots[i] * min(1, cell / 56))
+                        .frame(width: cell - 9, height: cell - 9)
                         .background(
                             Circle()
                                 .fill(i == current ? .white : .clear)
                                 .overlay(Circle().strokeBorder(i == current ? Kid.ink : .clear, lineWidth: 3)))
-                        .frame(width: 52, height: 52)
+                        .frame(width: cell - 4, height: cell - 4)
                         // The whole 52 pt square takes the tap, not only the
                         // dot (12 pt for the smallest, polish-plan 45).
                         .contentShape(Rectangle())
@@ -705,13 +735,12 @@ private struct ColorStrip: View {
 
     var body: some View {
         if axis == .horizontal {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    swatches
-                    customColor
-                }
-                .padding(.horizontal, 13)
-                .padding(.vertical, 4)
+            // Centered when every color fits (an iPad); a row that scrolls
+            // when not (it ran into the right edge, polish-plan 81).
+            ViewThatFits(in: .horizontal) {
+                row(spacing: 8).frame(maxWidth: .infinity)
+                row(spacing: 4).frame(maxWidth: .infinity)
+                ScrollView(.horizontal, showsIndicators: false) { row(spacing: 8) }
             }
         } else {
             // The side panel scrolls; no scroll view of its own here.
@@ -722,6 +751,15 @@ private struct ColorStrip: View {
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    private func row(spacing: CGFloat) -> some View {
+        HStack(spacing: spacing) {
+            swatches
+            customColor
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder private var swatches: some View {
@@ -829,14 +867,19 @@ private struct FrameTray: View {
 
     var body: some View {
         if axis == .horizontal {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) { items() }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
+            // Opens on the frame in use, which can sit past the edge
+            // (polish-plan 84).
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) { items() }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                }
+                .onAppear { proxy.scrollTo(session.art.frame.id, anchor: .center) }
             }
         } else {
             // Two columns in the side panel (one column scrolled a long way,
-            // polish-plan 53).
+            // polish-plan 53). The side panel scrolls; this does not.
             LazyVGrid(columns: [GridItem(.fixed(88), spacing: 8), GridItem(.fixed(88))], spacing: 8) {
                 items(small: true)
             }
@@ -869,6 +912,7 @@ private struct FrameTray: View {
             .buttonStyle(BounceButtonStyle())
             .accessibilityLabel(frame == .default ? "No frame" : frame.title)
             .accessibilityAddTraits(selected ? .isSelected : [])
+            .id(frame.id)
         }
     }
 }

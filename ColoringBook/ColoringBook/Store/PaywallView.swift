@@ -11,19 +11,20 @@ struct PaywallView: View {
     var onPurchased: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    header
-                    PlansPanel(showLinks: true) {
-                        onPurchased()
-                        dismiss()
-                    }
-                }
-                .padding(20)
+            // The buy button and Restore · Terms · Privacy are pinned to the
+            // bottom, always in sight; the plans and terms scroll above them
+            // (the links sat below the fold, and in landscape the buy button
+            // too, polish-plan 75).
+            PlansPanel(showLinks: true, pinned: true, header: AnyView(header)) {
+                onPurchased()
+                dismiss()
             }
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
             .background(Kid.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -36,8 +37,11 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image("HomeMascot").resizable().scaledToFit().frame(height: 110)
-                .accessibilityHidden(true)
+            // A phone on its side has no height to spare for the mascot.
+            if verticalSizeClass != .compact {
+                Image("HomeMascot").resizable().scaledToFit().frame(height: 110)
+                    .accessibilityHidden(true)
+            }
             Text("Make more coloring pages")
                 .font(Kid.titleBold(26))
                 .foregroundStyle(Kid.ink)
@@ -58,6 +62,11 @@ struct PlansPanel: View {
     /// Restore, Terms and Privacy under the terms (the Grown-ups screen has
     /// its own rows for them).
     var showLinks = true
+    /// The paywall: scrolls on its own, with the buy button and the links
+    /// pinned to the bottom. Off on the Grown-ups screen, which scrolls it.
+    var pinned = false
+    /// Shown above the plans when pinned.
+    var header: AnyView?
     var onPurchased: () -> Void = {}
 
     @Environment(\.openURL) private var openURL
@@ -67,6 +76,36 @@ struct PlansPanel: View {
     static let hint = Color(hex: 0x796790)
 
     var body: some View {
+        if pinned {
+            ScrollView {
+                VStack(spacing: 14) {
+                    header
+                    content(buy: false)
+                }
+                .padding(20)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if store.isAvailable {
+                    VStack(spacing: 2) {
+                        buyButton
+                        if showLinks { links }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+                    .background(
+                        LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],
+                                       startPoint: .top, endPoint: .init(x: 0.5, y: 0.25))
+                            .ignoresSafeArea())
+                }
+            }
+            .task { await store.load() }
+        } else {
+            content(buy: true)
+                .task { await store.load() }
+        }
+    }
+
+    @ViewBuilder private func content(buy: Bool) -> some View {
         VStack(spacing: 14) {
             if store.isLoading && !store.isAvailable {
                 ProgressView().tint(Kid.ink).padding(30)
@@ -85,14 +124,14 @@ struct PlansPanel: View {
                 .buttonStyle(SquishyStyle())
             } else {
                 plans
-                buyButton
+                if buy { buyButton }
                 terms
+                if buy && showLinks { links }
             }
             if let message = store.message {
                 Text(message).font(Kid.bodyBold(14)).foregroundStyle(Kid.coral).multilineTextAlignment(.center)
             }
         }
-        .task { await store.load() }
     }
 
     private var plans: some View {
@@ -156,23 +195,24 @@ struct PlansPanel: View {
     }
 
     private var terms: some View {
-        VStack(spacing: 6) {
-            Text("Pro plans renew automatically unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple Account at confirmation, or when the free trial ends. Manage or cancel anytime in your Apple Account settings. Pro can be shared with your family through Family Sharing.")
-                .font(Kid.bodyBold(12))
-                .foregroundStyle(Self.hint)
-                .multilineTextAlignment(.center)
-            if showLinks {
-                HStack(spacing: 18) {
-                    Button("Restore Purchases") { Task { await store.restore() } }
-                    Button("Terms of Use") { openURL(AppLinks.terms) }
-                    Button("Privacy Policy") { openURL(AppLinks.privacy) }
-                }
-                .font(Kid.bodyBold(13))
-                .foregroundStyle(Kid.ink)
-                // 44 pt targets: small type, not small to tap.
-                .frame(minHeight: 44)
-            }
+        Text("Pro plans renew automatically unless cancelled at least 24 hours before the end of the current period. Payment is charged to your Apple Account at confirmation, or when the free trial ends. Manage or cancel anytime in your Apple Account settings. Pro can be shared with your family through Family Sharing.")
+            .font(Kid.bodyBold(12))
+            .foregroundStyle(Self.hint)
+            .multilineTextAlignment(.center)
+    }
+
+    private var links: some View {
+        HStack(spacing: 18) {
+            Button("Restore Purchases") { Task { await store.restore() } }
+            Button("Terms of Use") { openURL(AppLinks.terms) }
+            Button("Privacy Policy") { openURL(AppLinks.privacy) }
         }
+        .font(Kid.bodyBold(13))
+        .foregroundStyle(Kid.ink)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        // 44 pt targets: small type, not small to tap.
+        .frame(minHeight: 44)
     }
 
     private func buy() async {

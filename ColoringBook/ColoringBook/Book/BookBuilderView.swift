@@ -26,6 +26,13 @@ struct BookBuilderView: View {
     @Environment(\.dismiss) private var dismiss
 
     private let rows = Array(repeating: GridItem(.fixed(82), spacing: 12), count: 3)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// An iPad: room for a page grid that grows instead of scrolling
+    /// sideways, and bigger cover tiles (polish-plan 68).
+    private var roomy: Bool { horizontalSizeClass == .regular }
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// A phone on its side: a lower pinned button, to leave the cards room.
+    private var short: Bool { verticalSizeClass == .compact }
 
     init(book: StoredBook? = nil) {
         editing = book
@@ -43,14 +50,34 @@ struct BookBuilderView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                coverCard
-                pagesCard
-                layoutCard
-                appOptions
+        GeometryReader { geo in
+            ScrollView {
+                if geo.size.width > geo.size.height {
+                    // On its side: the cover and options on the left, the
+                    // pages on the right (the pages were below the fold on a
+                    // phone, polish-plan 79).
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(spacing: 16) {
+                            coverCard
+                            layoutCard
+                            appOptions
+                        }
+                        pagesCard
+                    }
+                    .padding(16)
+                } else {
+                    VStack(spacing: 16) {
+                        coverCard
+                        pagesCard
+                        layoutCard
+                        appOptions
+                    }
+                    .padding(16)
+                    // A readable column on an iPad, not the whole width.
+                    .frame(maxWidth: 760)
+                    .frame(maxWidth: .infinity)
+                }
             }
-            .padding(16)
         }
         .background(Kid.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) { mainButton }
@@ -188,7 +215,7 @@ struct BookBuilderView: View {
                     Image(uiImage: image).resizable().scaledToFit()
                 }
             }
-            .frame(width: 41, height: 53)
+            .frame(width: roomy ? 58 : 41, height: roomy ? 75 : 53)
             .padding(3)
             .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(.white))
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -245,16 +272,24 @@ struct BookBuilderView: View {
                     .font(Kid.bodyBold(15))
                     .foregroundStyle(Self.hint)
             } else {
-                // Three rows that scroll sideways: many pages, short screen.
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHGrid(rows: rows, spacing: 12) {
+                if roomy {
+                    // An iPad: as many columns as fit, growing downward.
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 12)], spacing: 12) {
                         ForEach(store.pages) { page in pageCell(page) }
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 6)
+                    .padding(.vertical, 8)
+                } else {
+                    // Three rows that scroll sideways: many pages, short screen.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHGrid(rows: rows, spacing: 12) {
+                            ForEach(store.pages) { page in pageCell(page) }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 6)
+                    }
+                    .frame(height: 3 * 82 + 2 * 12 + 24)
+                    .padding(.horizontal, -6)
                 }
-                .frame(height: 3 * 82 + 2 * 12 + 24)
-                .padding(.horizontal, -6)
                 HStack(spacing: 8) {
                     pill("Select all", fill: Self.lilacPill) { selected = store.pages.map(\.id) }
                     // Same size as the notes below (user, 2026-11-26): two
@@ -452,15 +487,15 @@ struct BookBuilderView: View {
                     ProgressView(value: progress).tint(Kid.ink).frame(width: 140)
                 } else {
                     Image("TabLibrary").resizable().scaledToFit()
-                        .frame(width: 58, height: 58)
+                        .frame(width: short ? 40 : 58, height: short ? 40 : 58)
                         .opacity(off ? 0.55 : 1)
                     Text(editing == nil ? "Save book" : "Update book")
-                        .font(Kid.titleBold(26))
+                        .font(Kid.titleBold(short ? 22 : 26))
                         .foregroundStyle(Kid.ink.opacity(off ? 0.4 : 1))
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 64)
+            .frame(height: short ? 48 : 64)
             .background(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous)
                 .fill(off ? Color(hex: 0xFEE8A1) : Kid.yellow))
             .overlay(RoundedRectangle(cornerRadius: Kid.radius, style: .continuous).strokeBorder(.white, lineWidth: 3))
@@ -469,8 +504,9 @@ struct BookBuilderView: View {
         .buttonStyle(SquishyStyle())
         .disabled(off || working)
         .accessibilityLabel(editing == nil ? "Save book" : "Update book")
+        .frame(maxWidth: 600)
         .padding(.horizontal, 16)
-        .padding(.top, 14)
+        .padding(.top, short ? 8 : 14)
         .padding(.bottom, 8)
         .background(
             LinearGradient(colors: [Kid.background.opacity(0), Kid.background.opacity(0.96), Kid.background],

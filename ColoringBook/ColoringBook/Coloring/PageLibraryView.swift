@@ -14,7 +14,13 @@ struct PageLibraryView: View {
     @State private var pageToDelete: UUID?
     @State private var opening = false
 
-    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+    /// Two columns on a phone held upright, more as the screen widens (a
+    /// phone on its side, an iPad: polish-plan 31, 62).
+    private let columns = [GridItem(.adaptive(minimum: 180, maximum: 320), spacing: 16)]
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// How wide the screen's content is: the two big cards go side by side
+    /// past 760 pt.
+    @State private var contentWidth: CGFloat = 0
 
     @State private var showSettings = false
 
@@ -23,27 +29,24 @@ struct PageLibraryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
-                    // Opens the Create tab, so the tab bar shows where you are.
-                    Button {
-                        SoundFX.shared.play(.tap)
-                        AppTabs.shared.freshCreate += 1
-                        AppTabs.shared.selected = .create
-                    } label: {
-                        // The camera art is taller than the book's: sized so the
-                        // camera body is ~80 pt wide, as in the design.
-                        homeCard(title: "Make a coloring page", subtitle: "From your favorite photo",
-                                 color: Kid.yellow, art: "HomeCamera", artSize: CGSize(width: 208, height: 136), artSlot: 236,
-                                 artOffset: CGSize(width: -3, height: -1.5))
+                        // Clear of the top edge on a phone on its side
+                        // (polish-plan 30).
+                        .padding(.top, verticalSizeClass == .compact ? 12 : 0)
+                    // Side by side when the screen is wide enough, one above
+                    // the other on a phone held upright (they filled the
+                    // whole height in landscape, polish-plan 62).
+                    if contentWidth > 760 {
+                        // Narrow cards (a phone on its side): smaller pictures,
+                        // so the words keep whole lines.
+                        let small = contentWidth < 1000
+                        HStack(spacing: 14) {
+                            makePageCard(small: small)
+                            makeBookCard(small: small)
+                        }
+                    } else {
+                        makePageCard(small: false)
+                        makeBookCard(small: false)
                     }
-                    .buttonStyle(SquishyStyle())
-
-                    NavigationLink {
-                        BookBuilderView()
-                    } label: {
-                        homeCard(title: "Make a coloring book", subtitle: "Create, read & print",
-                                 color: Kid.lavender, art: "HomeBook")
-                    }
-                    .buttonStyle(SquishyStyle())
 
                     if !bookStore.books.isEmpty { booksSection }
                     if !store.pages.isEmpty { pagesSection }
@@ -55,7 +58,11 @@ struct PageLibraryView: View {
                 }
                 .padding(.horizontal, 13)
                 .padding(.bottom, 24)
+                // A comfortable width on a big iPad held sideways.
+                .frame(maxWidth: 1100)
+                .frame(maxWidth: .infinity)
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
         .kidTabBarClearance()
             .background(KidBackground())
             .toolbar(.hidden, for: .navigationBar)
@@ -91,6 +98,37 @@ struct PageLibraryView: View {
                 pick = nil
             }
         }
+    }
+
+    // MARK: - Cards
+
+    /// Opens the Create tab, so the tab bar shows where you are.
+    private func makePageCard(small: Bool) -> some View {
+        Button {
+            SoundFX.shared.play(.tap)
+            AppTabs.shared.freshCreate += 1
+            AppTabs.shared.selected = .create
+        } label: {
+            // The camera art is taller than the book's: sized so the
+            // camera body is ~80 pt wide, as in the design.
+            homeCard(title: "Make a coloring page", subtitle: "From your favorite photo",
+                     color: Kid.yellow, art: "HomeCamera",
+                     artSize: small ? CGSize(width: 146, height: 95) : CGSize(width: 208, height: 136),
+                     artSlot: small ? 165 : 236,
+                     artOffset: CGSize(width: -3, height: -1.5))
+        }
+        .buttonStyle(SquishyStyle())
+    }
+
+    private func makeBookCard(small: Bool) -> some View {
+        NavigationLink {
+            BookBuilderView()
+        } label: {
+            homeCard(title: "Make a coloring book", subtitle: "Create, read & print",
+                     color: Kid.lavender, art: "HomeBook",
+                     artSize: small ? CGSize(width: 150, height: 79) : CGSize(width: 212, height: 112))
+        }
+        .buttonStyle(SquishyStyle())
     }
 
     // MARK: - Header

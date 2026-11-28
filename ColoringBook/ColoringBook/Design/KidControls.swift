@@ -175,7 +175,8 @@ struct KidSelectionBar: View {
     }
 }
 
-/// A chosen tile in Select mode: a yellow ring around it.
+/// A chosen tile in Select mode: a yellow ring around it, edged in ink so it
+/// shows on a yellow cover too (polish-plan 82).
 struct SelectedRing: ViewModifier {
     let on: Bool
     var radius: CGFloat = Kid.radius
@@ -186,6 +187,9 @@ struct SelectedRing: ViewModifier {
                 RoundedRectangle(cornerRadius: radius + 4, style: .continuous)
                     .strokeBorder(Kid.yellow, lineWidth: 5)
                     .padding(-5)
+                RoundedRectangle(cornerRadius: radius + 6, style: .continuous)
+                    .strokeBorder(Kid.ink, lineWidth: 2)
+                    .padding(-7)
             }
         }
     }
