@@ -131,6 +131,8 @@ struct CreatePageView: View {
             ColoringView(art: item.art, photo: item.photo)
         }
         #if DEBUG && targetEnvironment(simulator)
+        // `-showConsent`: open the photo consent sheet, to see it.
+        .onAppear { if ProcessInfo.processInfo.arguments.contains("-showConsent") { askConsent = true } }
         .task {
             // `-sketchTest`: draw a page from the test photo at once.
             guard ProcessInfo.processInfo.arguments.contains("-sketchTest"), prepared == nil,
@@ -764,27 +766,62 @@ private struct ConsentSheet: View {
     let decline: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        // In the app's look: cream paper, Fredoka and Nunito, the big yellow
+        // button (it was system fonts and a coral rectangle).
+        VStack(spacing: 16) {
             Image(systemName: "lock.shield.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(Theme.accent)
+                .font(.system(size: 40, weight: .semibold))
+                .foregroundStyle(Kid.ink)
+                .frame(width: 84, height: 84)
+                .background(Circle().fill(Kid.lavender))
+                .overlay(Circle().strokeBorder(.white, lineWidth: 4))
+                .shadow(color: Kid.grape.opacity(0.3), radius: 6, y: 3)
+                .accessibilityHidden(true)
             Text("Before we draw")
-                .font(.title2.weight(.heavy))
-            Text("To turn your photo into a coloring page, it is sent to our server and to our AI drawing service. Our server does not keep it.")
-            Text("Please only use photos you have permission to use.")
-                .foregroundStyle(.secondary)
+                .font(Kid.titleBold(28))
+                .foregroundStyle(Kid.ink)
+            VStack(spacing: 10) {
+                Text("To turn your photo into a coloring page, it is sent to our server and to our AI drawing service. Our server does not keep it.")
+                    .font(Kid.body(17))
+                    .foregroundStyle(Kid.ink)
+                Text("Please only use photos you have permission to use.")
+                    .font(Kid.bodyBold(16))
+                    .foregroundStyle(Color(hex: 0x796790))
+            }
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
             Button(action: accept) {
-                Text("OK, draw my page")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 56)
-                    .foregroundStyle(.white)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 18))
+                HStack(spacing: 10) {
+                    Image(systemName: "wand.and.stars").font(.system(size: 22, weight: .bold))
+                    Text("OK, draw my page").font(Kid.titleBold(24)).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                .foregroundStyle(Kid.ink)
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .background(Capsule().fill(Kid.yellow))
+                .overlay(Capsule().strokeBorder(.white, lineWidth: 3))
+                .background(Capsule().fill(Kid.yellow.darker(0.15)).offset(y: 5))
             }
-            Button("Not now", action: decline)
-                .frame(maxWidth: .infinity)
+            .buttonStyle(SquishyStyle())
+            Button(action: decline) {
+                Text("Not now")
+                    .font(Kid.bodyBold(17))
+                    .foregroundStyle(Color(hex: 0x796790))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
         }
-        .padding(24)
+        .padding(.horizontal, 24)
+        .padding(.top, 28)
+        .padding(.bottom, 16)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Kid.background.ignoresSafeArea())
+    }
+}
+
+#Preview("Consent") {
+    Color.gray.sheet(isPresented: .constant(true)) {
+        ConsentSheet(accept: {}, decline: {}).presentationDetents([.medium, .large])
     }
 }
 

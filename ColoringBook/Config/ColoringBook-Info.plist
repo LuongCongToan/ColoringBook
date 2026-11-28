@@ -19,5 +19,14 @@
 	     Mode system text turned white on cream (polish-plan 41). -->
 	<key>UIUserInterfaceStyle</key>
 	<string>Light</string>
+	<!-- The launch screen: the crayon mascot on the app's cream (it was
+	     plain white, polish-plan 39). -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchMascot</string>
+	</dict>
 </dict>
 </plist>

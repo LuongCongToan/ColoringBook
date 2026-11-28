@@ -142,6 +142,23 @@ nonisolated struct LineArt: @unchecked Sendable {
                 }
             }
         }
+        if case .builtIn(let style) = frame {
+            // A line frame: the margin outside its line is not for paint
+            // either (the bucket filled the white border around the page,
+            // polish-plan 55).
+            var inside = [UInt8](repeating: 0, count: width * height)
+            inside.withUnsafeMutableBytes { raw in
+                guard let ctx = CGContext(data: raw.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                                          bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                                          bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return }
+                ctx.translateBy(x: 0, y: CGFloat(height))
+                ctx.scaleBy(x: 1, y: -1)
+                ctx.addPath(style.path(in: size))
+                ctx.setFillColor(gray: 1, alpha: 1)
+                ctx.fillPath()
+            }
+            for i in 0..<mask.count where inside[i] < 128 { mask[i] = 1 }
+        }
         return LineArt(width: width, height: height, lines: lines, barrier: mask, frame: frame,
                        colorFrame: colorFrame, drawing: art, source: image, sourceData: data)
     }

@@ -560,14 +560,16 @@ private final class StickerView: UIView {
         layer.addSublayer(outline)
 
         selection.fillColor = nil
-        selection.strokeColor = UIColor.systemBlue.cgColor
+        // Lilac, coral and lavender as in the app (it was system blue and
+        // red, polish-plan 37); the same dashed lilac as Arrange.
+        selection.strokeColor = UIColor(Color(hex: 0xA65FE0)).cgColor
         selection.lineDashPattern = [10, 7]
         layer.addSublayer(selection)
 
         let symbols = UIImage.SymbolConfiguration(pointSize: 22, weight: .heavy)
         deleteButton.setImage(UIImage(systemName: "xmark", withConfiguration: symbols), for: .normal)
         deleteButton.tintColor = .white
-        deleteButton.backgroundColor = .systemRed
+        deleteButton.backgroundColor = UIColor(Kid.coral)
         deleteButton.layer.cornerRadius = Self.control / 2
         deleteButton.layer.borderColor = UIColor.white.cgColor
         deleteButton.layer.borderWidth = 3
@@ -575,7 +577,7 @@ private final class StickerView: UIView {
         deleteButton.addAction(UIAction { [weak self] _ in self?.onDelete?() }, for: .touchUpInside)
         addSubview(deleteButton)
 
-        handle.backgroundColor = .systemBlue
+        handle.backgroundColor = UIColor(Kid.grape)
         handle.layer.cornerRadius = Self.control / 2
         handle.layer.borderColor = UIColor.white.cgColor
         handle.layer.borderWidth = 3

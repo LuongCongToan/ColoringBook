@@ -23,29 +23,30 @@ struct ColoringView: View {
             Group {
                 if wide {
                     VStack(spacing: 0) {
-                        header
+                        // Save and zoom ride in the bar: on the page they
+                        // covered its corners (polish-plan 20).
+                        header(wide: true)
                         HStack(spacing: 0) {
                             ToolRail(session: session, axis: .vertical)
                             canvas
-                                .overlay(alignment: .bottomTrailing) {
-                                    ZoomButtons(session: session).padding(14)
-                                }
-                                .overlay(alignment: .bottomLeading) {
-                                    SaveButton(action: saveAndShow).padding(14)
-                                }
                             SidePanel(session: session)
                                 .frame(width: 200)
                         }
                     }
                 } else {
                     // As in the design: the page under the bar, zoom right
-                    // below it, the tools at the bottom.
+                    // below it, the tools at the bottom. The page takes all
+                    // the room the tools leave (it was held to half the
+                    // screen, with a big empty band above the tools,
+                    // polish-plan 26); room it cannot use (a wide page on a
+                    // tall screen) is shared above and below.
                     let aspect = CGFloat(session.art.width) / CGFloat(max(session.art.height, 1))
-                    let pageHeight = min(geo.size.width / aspect + 12, geo.size.height * 0.52)
                     VStack(spacing: 0) {
-                        header
+                        header(wide: false)
+                        Spacer(minLength: 0)
                         canvas
-                            .frame(height: pageHeight)
+                            .frame(maxHeight: geo.size.width / aspect + 12)
+                            .layoutPriority(1)
                         HStack {
                             SaveButton(action: saveAndShow)
                             Spacer()
@@ -54,7 +55,14 @@ struct ColoringView: View {
                         .padding(.horizontal, 14)
                         .padding(.top, 6)
                         Spacer(minLength: 0)
-                        BottomPanel(session: session)
+                        // Room for the tallest tools (the brush's), so the
+                        // page keeps its size when another tool is chosen.
+                        ZStack(alignment: .top) {
+                            BottomPanel(session: session, tool: .brush)
+                                .hidden()
+                                .accessibilityHidden(true)
+                            BottomPanel(session: session)
+                        }
                     }
                 }
             }
@@ -84,6 +92,8 @@ struct ColoringView: View {
             #if DEBUG && targetEnvironment(simulator)
             // `-brushTool`: open with the brush, to see the size row.
             if ProcessInfo.processInfo.arguments.contains("-brushTool") { session.tool = .brush }
+            // `-frameTool`: open with the frame tray.
+            if ProcessInfo.processInfo.arguments.contains("-frameTool") { session.tool = .frame }
             // `-frame <name>`: start with that picture frame (FrameLibrary).
             let args = ProcessInfo.processInfo.arguments
             if let i = args.firstIndex(of: "-frame"), i + 1 < args.count { Task { await session.setFrame(.image(args[i + 1])) } }
@@ -150,31 +160,35 @@ struct ColoringView: View {
 
     /// The design's top bar: Back on the left, the title in the middle,
     /// undo, redo and share (a grown-up action, in the corner) on the right.
-    private var header: some View {
-        // The title sits in the middle of the room between Back and the
-        // buttons on the right, as in the design.
-        HStack(spacing: 8) {
-            KidCircleButton(image: "BtnBack", size: 58, label: "Back") { dismiss() }
-            Spacer(minLength: 4)
+    private func header(wide: Bool) -> some View {
+        // The title sits in the middle of the screen when there is room, else
+        // in the middle of the room between the buttons (polish-plan 64).
+        TitleBarLayout {
+            HStack(spacing: 8) {
+                KidCircleButton(image: "BtnBack", size: 58, label: "Back") { dismiss() }
+                if wide { SaveButton(action: saveAndShow) }
+            }
             Text("Let\u{2019}s color!")
                 .font(Kid.titleBold(26))
                 .foregroundStyle(Kid.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Spacer(minLength: 4)
-            HStack(spacing: 0) {
-                KidCircleButton(image: "BtnUndo", size: 58, label: "Undo") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.undo() }
-                }
-                .opacity(session.canUndo ? 1 : 0.45)
-                .disabled(!session.canUndo)
-                KidCircleButton(image: "BtnRedo", size: 58, label: "Redo") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.redo() }
-                }
-                .opacity(session.canRedo ? 1 : 0.45)
-                .disabled(!session.canRedo)
-                KidCircleButton(image: "BtnShare", size: 58, label: "Share") {
-                    exported = ExportedPage(image: session.renderImage())
+            HStack(spacing: 8) {
+                if wide { ZoomButtons(session: session) }
+                HStack(spacing: 0) {
+                    KidCircleButton(image: "BtnUndo", size: 58, label: "Undo") {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.undo() }
+                    }
+                    .opacity(session.canUndo ? 1 : 0.45)
+                    .disabled(!session.canUndo)
+                    KidCircleButton(image: "BtnRedo", size: 58, label: "Redo") {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { session.redo() }
+                    }
+                    .opacity(session.canRedo ? 1 : 0.45)
+                    .disabled(!session.canRedo)
+                    KidCircleButton(image: "BtnShare", size: 58, label: "Share") {
+                        exported = ExportedPage(image: session.renderImage())
+                    }
                 }
             }
         }
@@ -187,26 +201,30 @@ struct ColoringView: View {
 
 private struct BottomPanel: View {
     let session: ColoringSession
+    /// Lays the panel out for this tool instead of the chosen one (to
+    /// measure the room the tallest panel needs).
+    var tool: ColoringSession.Tool?
 
     var body: some View {
+        let tool = self.tool ?? session.tool
         VStack(alignment: .leading, spacing: 8) {
             ToolRail(session: session, axis: .horizontal)
-            if session.tool.hasKinds {
+            if tool.hasKinds {
                 KindPicker(session: session, axis: .horizontal)
             }
-            if session.tool.usesSize {
-                PanelTitle(text: session.tool.sizeTitle)
+            if tool.usesSize {
+                PanelTitle(text: tool.sizeTitle)
                 SizePicker(session: session, axis: .horizontal)
                     .frame(maxWidth: .infinity)
             }
-            if session.tool.usesColor {
+            if tool.usesColor {
                 PanelTitle(text: "Colors")
                 ColorStrip(session: session, axis: .horizontal)
             }
-            if session.tool == .sticker {
+            if tool == .sticker {
                 StickerTray(session: session, axis: .horizontal)
             }
-            if session.tool == .frame {
+            if tool == .frame {
                 FrameTray(session: session, axis: .horizontal)
             }
         }
@@ -845,6 +863,7 @@ private struct FrameTray: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .strokeBorder(selected ? Theme.accent : .clear, lineWidth: 4))
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .scaleEffect(selected ? 1.05 : 1)
             }
             .buttonStyle(BounceButtonStyle())
@@ -854,8 +873,8 @@ private struct FrameTray: View {
     }
 }
 
-/// A frame for the tray: its top-left corner shown three times as big, so a
-/// child can tell stars from hearts at button size.
+/// A frame for the tray: a colored frame whole; a line frame (the plain
+/// one, "no frame") as a small white page with its line and a smile.
 struct FramePreview: View {
     let frame: FrameChoice
 
@@ -872,17 +891,15 @@ struct FramePreview: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             case .builtIn:
-                // Line frames: the top-left corner three times as big.
-                let big = CGSize(width: geo.size.width * 3, height: geo.size.height * 3)
+                // The whole line frame at tile size. (It was its corner drawn
+                // three times as big and clipped, and the clipped part still
+                // took taps over the next tile, polish-plan 20.)
                 ZStack {
                     RoundedRectangle(cornerRadius: 4).fill(.white)
-                    Color.clear
-                        .overlay(alignment: .topLeading) { artwork(size: big).frame(width: big.width, height: big.height) }
-                        .clipped()
+                    artwork(size: geo.size)
                     Image(systemName: "face.smiling")
-                        .font(.system(size: geo.size.height * 0.34))
-                        .foregroundStyle(.black.opacity(0.22))
-                        .position(x: geo.size.width * 0.72, y: geo.size.height * 0.68)
+                        .font(.system(size: geo.size.height * 0.4, weight: .medium))
+                        .foregroundStyle(Kid.ink.opacity(0.3))
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 4))
             }
@@ -1002,11 +1019,14 @@ private struct ZoomButtons: View {
                         .background(Circle().fill(Kid.lavender))
                 }
             }
+            .opacity(enabled ? 1 : 0.4)
+            // Pale when off, but on a solid disc, so it does not melt into
+            // a colored frame behind it (polish-plan 20).
+            .background(Circle().fill(Color(hex: 0xFDF6EA)).padding(5).opacity(enabled ? 0 : 1))
             .frame(width: 52, height: 52)
-            .shadow(color: Kid.grape.opacity(0.3), radius: 3, y: 2)
+            .shadow(color: Kid.grape.opacity(enabled ? 0.3 : 0.12), radius: 3, y: 2)
         }
         .buttonStyle(BounceButtonStyle())
-        .opacity(enabled ? 1 : 0.35)
         .disabled(!enabled)
         .accessibilityLabel(label)
     }
@@ -1101,3 +1121,34 @@ private struct ShareSheet: UIViewControllerRepresentable {
     }
 }
 #endif
+
+/// A bar of three views: leading, title, trailing. The title is centered on
+/// the bar when it fits between the other two, else centered in the gap
+/// between them (and shrinks if even the gap is too narrow).
+private struct TitleBarLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let height = sizes.map(\.height).max() ?? 0
+        let width = proposal.width ?? sizes.map(\.width).reduce(2 * spacing, +)
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 3 else { return }
+        let leading = subviews[0].sizeThatFits(.unspecified)
+        let trailing = subviews[2].sizeThatFits(.unspecified)
+        subviews[0].place(at: CGPoint(x: bounds.minX, y: bounds.midY), anchor: .leading, proposal: .unspecified)
+        subviews[2].place(at: CGPoint(x: bounds.maxX, y: bounds.midY), anchor: .trailing, proposal: .unspecified)
+        let gapStart = bounds.minX + leading.width + spacing
+        let gapEnd = bounds.maxX - trailing.width - spacing
+        let gap = max(0, gapEnd - gapStart)
+        let title = subviews[1].sizeThatFits(ProposedViewSize(width: gap, height: nil))
+        let centered = bounds.midX - title.width / 2
+        let fits = centered >= gapStart && centered + title.width <= gapEnd
+        let x = fits ? centered : gapStart + (gap - title.width) / 2
+        subviews[1].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                          proposal: ProposedViewSize(width: gap, height: nil))
+    }
+}

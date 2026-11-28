@@ -27,6 +27,12 @@ struct ColoringBookApp: App {
                 .task {
                     StoreModel.shared.start()
                     #if DEBUG && targetEnvironment(simulator)
+                    // `-landscape`: turn the app sideways (the simulators run
+                    // without a window to rotate from here).
+                    if ProcessInfo.processInfo.arguments.contains("-landscape"),
+                       let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+                        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+                    }
                     await DebugBook.runIfRequested()
                     #endif
                 }
