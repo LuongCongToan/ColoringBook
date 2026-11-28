@@ -6,6 +6,13 @@ import SwiftUI
 /// buttons still work for a child sitting alongside.
 struct CreatePageView: View {
     @State private var pick: PhotosPickerItem?
+    /// The column's height above the pinned buttons, and the result's
+    /// header and details, measured: the result's picture takes what is
+    /// left, so "Line color" is never hidden under "Color it!" (iPhone 12
+    /// with a portrait cartoon, TestFlight 2026-11-28).
+    @State private var visibleHeight: CGFloat = 0
+    @State private var resultHeaderHeight: CGFloat = 0
+    @State private var resultDetailsHeight: CGFloat = 0
     /// The photo picker opened from "Draw my page" before a photo is chosen.
     @State private var choosingPhoto = false
     @State private var prepared: PhotoPrep.Result?
@@ -143,7 +150,14 @@ struct CreatePageView: View {
         .task {
             // `-sketchTest`: draw a page from the test photo at once.
             guard ProcessInfo.processInfo.arguments.contains("-sketchTest"), prepared == nil,
-                  let data = DebugBook.testPhotoJPEG(), let result = try? await prepare(data) else { return }
+                  var data = DebugBook.testPhotoJPEG() else { return }
+            // `-portrait`: the test photo cut to 3:4 upright, for the tall result.
+            if ProcessInfo.processInfo.arguments.contains("-portrait"), let cg = UIImage(data: data)?.cgImage {
+                let w = min(cg.width, cg.height * 3 / 4)
+                if let cut = cg.cropping(to: CGRect(x: (cg.width - w) / 2, y: 0, width: w, height: cg.height)),
+                   let jpeg = UIImage(cgImage: cut).jpegData(compressionQuality: 0.9) { data = jpeg }
+            }
+            guard let result = try? await prepare(data) else { return }
             prepared = result
             colorPhoto = data
             preview = UIImage(data: data)
@@ -179,6 +193,11 @@ struct CreatePageView: View {
             // A readable column on an iPad, not the whole width.
             .frame(maxWidth: 720)
             .frame(maxWidth: .infinity)
+        }
+        // The container is already the part between the bar and the pinned
+        // buttons (557 pt on an iPhone 12, with 101 + 186 pt of insets).
+        .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
+            visibleHeight = height
         }
         // "Draw my page" stays in sight above the tab bar, whatever the
         // screen's height (it was pushed under the bar in landscape).
@@ -341,10 +360,22 @@ struct CreatePageView: View {
 
     private func result(_ page: GeneratedPage, _ image: UIImage) -> some View {
         VStack(spacing: 18) {
-            resultHeader(size: 34)
+            // Smaller on a short screen (iPhone SE: about 400 pt of column).
+            resultHeader(size: visibleHeight > 0 && visibleHeight < 500 ? 26 : 34)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { resultHeaderHeight = $0 }
             resultImage(image)
+                .frame(maxHeight: resultImageMaxHeight)
             resultDetails(page)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { resultDetailsHeight = $0 }
         }
+    }
+
+    /// What the column has left for the picture: its visible height less
+    /// the header, the details, the two 18 pt gaps and the column's
+    /// padding (20 + 12). Never under 150 pt; a very short screen scrolls.
+    private var resultImageMaxHeight: CGFloat? {
+        guard visibleHeight > 0, resultHeaderHeight > 0, resultDetailsHeight > 0 else { return nil }
+        return max(150, visibleHeight - resultHeaderHeight - resultDetailsHeight - 36 - 32 - 4)
     }
 
     /// The result on its side: the page as big as the height allows on the
@@ -420,6 +451,7 @@ struct CreatePageView: View {
                  : "Trying another style uses one more page.")
                 .font(Kid.bodyBold(14))
                 .foregroundStyle(Kid.ink.opacity(0.65))
+                .multilineTextAlignment(.center)
         }
     }
 

@@ -95,7 +95,7 @@ struct BookReaderView: View {
                     VStack(spacing: 14) {
                         if let book { actions(book, vertical: true) }
                         Spacer(minLength: 0)
-                        pageInfo
+                        pageInfo()
                         Spacer(minLength: 0)
                     }
                     .frame(width: 260)
@@ -111,7 +111,12 @@ struct BookReaderView: View {
                         .padding(.top, 10)
                     HStack(spacing: 10) {
                         arrow(back: true, label: "Previous page", enabled: index > 0) { index -= 1 }
-                        pageInfo
+                        // Room between the arrows: the screen less the
+                        // margins (32), the arrows (120) and the spacing
+                        // (20). Four 56 pt tiles need 248 pt; a 390 pt
+                        // iPhone 12 has 218, and the row pushed the whole
+                        // screen off to the right (TestFlight, 2026-11-28).
+                        pageInfo(tile: min(56, (geo.size.width - 172 - 3 * 8) / 4))
                             // The same height on every sheet, so the arrows
                             // stay put (they jumped between the cover and a
                             // page, polish-plan 27, 83).
@@ -214,7 +219,8 @@ struct BookReaderView: View {
     }
 
     /// Where we are, the hint, and the layouts of this page.
-    private var pageInfo: some View {
+    /// Where we are in the book, and the layout tiles `tile` points wide.
+    private func pageInfo(tile: CGFloat = 56) -> some View {
         VStack(spacing: 6) {
             Text(pageLabel)
                 .font(Kid.titleBold(22))
@@ -228,7 +234,7 @@ struct BookReaderView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            layoutMenu
+            layoutMenu(tile: tile)
         }
     }
 
@@ -282,7 +288,7 @@ struct BookReaderView: View {
 
     /// Three layout icons under a page made from a photo. Pages without a
     /// photo have only one layout, so there is nothing to choose.
-    @ViewBuilder private var layoutMenu: some View {
+    @ViewBuilder private func layoutMenu(tile: CGFloat) -> some View {
         #if DEBUG && targetEnvironment(simulator)
         if let id = current?.pageID, photoURL(id) == nil {
             // Sample pages have no photo: give this one the test photo to
@@ -313,7 +319,7 @@ struct BookReaderView: View {
                         // The book's own layout needs no exception.
                         setLayout(option == book.layout ? nil : option, for: id)
                     } label: {
-                        layoutTile(option.icon, on: on)
+                        layoutTile(option.icon, on: on, width: tile)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(option.title)
@@ -325,7 +331,8 @@ struct BookReaderView: View {
                         SoundFX.shared.play(.tap)
                         arranging = ArrangeTarget(pageID: id)
                     } label: {
-                        layoutTile("ReaderMove", on: book.pagePlacements[id] != nil, artSize: CGSize(width: 38, height: 34))
+                        layoutTile("ReaderMove", on: book.pagePlacements[id] != nil, artSize: CGSize(width: 38, height: 34),
+                                   width: tile)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Arrange this page")
@@ -336,12 +343,16 @@ struct BookReaderView: View {
 
     /// A small rounded tile with the layout's picture: lemon when it is this
     /// page's, white with a lilac edge otherwise.
-    private func layoutTile(_ art: String, on: Bool, artSize: CGSize = CGSize(width: 50, height: 40)) -> some View {
-        Image(art)
+    /// `width` is the tile's (56 pt as designed, less on a narrow phone);
+    /// the picture and the height shrink with it.
+    private func layoutTile(_ art: String, on: Bool, artSize: CGSize = CGSize(width: 50, height: 40),
+                            width: CGFloat = 56) -> some View {
+        let k = width / 56
+        return Image(art)
             .resizable()
             .scaledToFit()
-            .frame(width: artSize.width, height: artSize.height)
-            .frame(width: 56, height: 50)
+            .frame(width: artSize.width * k, height: artSize.height * k)
+            .frame(width: width, height: 50 * k)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(on ? Self.lemon : .white))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(on ? Self.lemonLine : Self.lilacLine, lineWidth: 2.5))
